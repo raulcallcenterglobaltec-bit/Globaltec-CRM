@@ -634,3 +634,109 @@ body {
     width: 100%;
   }
 }
+/* ========================================
+   LISTADO DE CLIENTES
+======================================== */
+
+.clients-list {
+  padding: 0;
+  overflow: hidden;
+}
+
+.clients-table-header,
+.client-row {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1.7fr 1fr 1.2fr;
+  gap: 18px;
+  align-items: center;
+}
+
+.clients-table-header {
+  padding: 14px 20px;
+  background: #f7f9fc;
+  border-bottom: 1px solid #e5eaf0;
+  color: #66758a;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.client-row {
+  padding: 18px 20px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.client-row:last-child {
+  border-bottom: 0;
+}
+
+.client-main,
+.client-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.client-main strong {
+  color: #102a43;
+  font-size: 15px;
+}
+
+.client-main small,
+.client-contact small {
+  color: #8290a3;
+  font-size: 12px;
+}
+
+.client-status {
+  display: inline-block;
+  width: fit-content;
+  padding: 5px 9px;
+  border-radius: 20px;
+  background: #e8f7f0;
+  color: #12805c;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.client-status.potencial {
+  background: #fff5dd;
+  color: #9a6700;
+}
+
+.client-status.inactivo {
+  background: #f2f4f7;
+  color: #667085;
+}
+
+.client-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.client-actions button {
+  border: 1px solid #d7dee8;
+  background: #ffffff;
+  border-radius: 7px;
+  padding: 7px 10px;
+  color: #40546a;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.client-actions button:hover {
+  background: #f4f7fa;
+}
+
+@media (max-width: 900px) {
+  .clients-table-header {
+    display: none;
+  }
+
+  .client-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
