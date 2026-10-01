@@ -11,6 +11,24 @@ function App() {
 const [currentPage, setCurrentPage] = useState('dashboard')
 const [companies, setCompanies] = useState([])
 const [companiesLoading, setCompaniesLoading] = useState(false)
+const [showCompanyForm, setShowCompanyForm] = useState(false)
+const [companySaving, setCompanySaving] = useState(false)
+const [companyForm, setCompanyForm] = useState({
+  name: '',
+  legal_name: '',
+  tax_id: '',
+  sector: '',
+  website: '',
+  phone: '',
+  email: '',
+  address: '',
+  city: '',
+  province: '',
+  postal_code: '',
+  country: 'España',
+  status: 'activo',
+  notes: ''
+})
   const [recoveryMode, setRecoveryMode] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [repeatPassword, setRepeatPassword] = useState('')
@@ -81,6 +99,48 @@ async function loadCompanies() {
   }
 
   setCompaniesLoading(false)
+}
+async function saveCompany(e) {
+  e.preventDefault()
+  setCompanySaving(true)
+  setError('')
+
+  const { error } = await supabase
+    .from('companies')
+    .insert([
+      {
+        ...companyForm,
+        owner_id: session.user.id
+      }
+    ])
+
+  if (error) {
+    console.error('Error guardando cliente:', error)
+    setError('No se ha podido guardar el cliente.')
+    setCompanySaving(false)
+    return
+  }
+
+  setCompanyForm({
+    name: '',
+    legal_name: '',
+    tax_id: '',
+    sector: '',
+    website: '',
+    phone: '',
+    email: '',
+    address: '',
+    city: '',
+    province: '',
+    postal_code: '',
+    country: 'España',
+    status: 'activo',
+    notes: ''
+  })
+
+  setShowCompanyForm(false)
+  await loadCompanies()
+  setCompanySaving(false)
 }
   async function handleLogin(e) {
     e.preventDefault()
@@ -375,12 +435,210 @@ async function loadCompanies() {
         <p>Gestión de empresas y clientes.</p>
       </div>
 
-      <button className="primary-action">
-        + Nuevo cliente
-      </button>
+<button
+  className="primary-action"
+  onClick={() => setShowCompanyForm(true)}
+>
+  + Nuevo cliente
+</button>
+    </div>
+</div>
+ {companiesLoading ? (
+{showCompanyForm && (
+  <div className="dashboard-card company-form-card">
+    <div className="card-heading">
+      <div>
+        <h2>Nuevo cliente</h2>
+        <p>Introduce los datos de la empresa.</p>
+      </div>
     </div>
 
-    {companiesLoading ? (
+    <form className="company-form" onSubmit={saveCompany}>
+      <div className="form-grid">
+
+        <div className="form-field">
+          <label>Nombre comercial *</label>
+          <input
+            type="text"
+            value={companyForm.name}
+            onChange={(e) =>
+              setCompanyForm({...companyForm, name: e.target.value})
+            }
+            required
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Razón social</label>
+          <input
+            type="text"
+            value={companyForm.legal_name}
+            onChange={(e) =>
+              setCompanyForm({...companyForm, legal_name: e.target.value})
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>CIF / NIF</label>
+          <input
+            type="text"
+            value={companyForm.tax_id}
+            onChange={(e) =>
+              setCompanyForm({...companyForm, tax_id: e.target.value})
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Sector</label>
+          <input
+            type="text"
+            value={companyForm.sector}
+            onChange={(e) =>
+              setCompanyForm({...companyForm, sector: e.target.value})
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Teléfono</label>
+          <input
+            type="tel"
+            value={companyForm.phone}
+            onChange={(e) =>
+              setCompanyForm({...companyForm, phone: e.target.value})
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Email</label>
+          <input
+            type="email"
+            value={companyForm.email}
+            onChange={(e) =>
+              setCompanyForm({...companyForm, email: e.target.value})
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Web</label>
+          <input
+            type="text"
+            value={companyForm.website}
+            onChange={(e) =>
+              setCompanyForm({...companyForm, website: e.target.value})
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Estado</label>
+          <select
+            value={companyForm.status}
+            onChange={(e) =>
+              setCompanyForm({...companyForm, status: e.target.value})
+            }
+          >
+            <option value="activo">Activo</option>
+            <option value="potencial">Potencial</option>
+            <option value="inactivo">Inactivo</option>
+          </select>
+        </div>
+
+        <div className="form-field form-field-wide">
+          <label>Dirección</label>
+          <input
+            type="text"
+            value={companyForm.address}
+            onChange={(e) =>
+              setCompanyForm({...companyForm, address: e.target.value})
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Localidad</label>
+          <input
+            type="text"
+            value={companyForm.city}
+            onChange={(e) =>
+              setCompanyForm({...companyForm, city: e.target.value})
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Provincia</label>
+          <input
+            type="text"
+            value={companyForm.province}
+            onChange={(e) =>
+              setCompanyForm({...companyForm, province: e.target.value})
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Código postal</label>
+          <input
+            type="text"
+            value={companyForm.postal_code}
+            onChange={(e) =>
+              setCompanyForm({...companyForm, postal_code: e.target.value})
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>País</label>
+          <input
+            type="text"
+            value={companyForm.country}
+            onChange={(e) =>
+              setCompanyForm({...companyForm, country: e.target.value})
+            }
+          />
+        </div>
+
+        <div className="form-field form-field-wide">
+          <label>Notas</label>
+          <textarea
+            rows="4"
+            value={companyForm.notes}
+            onChange={(e) =>
+              setCompanyForm({...companyForm, notes: e.target.value})
+            }
+          />
+        </div>
+
+      </div>
+
+      {error && <div className="login-error">{error}</div>}
+
+      <div className="form-actions">
+        <button
+          type="button"
+          className="secondary-action"
+          onClick={() => setShowCompanyForm(false)}
+        >
+          Cancelar
+        </button>
+
+        <button
+          type="submit"
+          className="primary-action"
+          disabled={companySaving}
+        >
+          {companySaving ? 'Guardando...' : 'Guardar cliente'}
+        </button>
+      </div>
+    </form>
+  </div>
+)}
+  {companiesLoading ? (
       <div className="dashboard-card">
         Cargando clientes...
       </div>
