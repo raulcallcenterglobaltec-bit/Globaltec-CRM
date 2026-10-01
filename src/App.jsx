@@ -651,14 +651,44 @@ async function saveCompany(e) {
         </div>
       </div>
     ) : (
-      <div className="dashboard-card">
-        {companies.map((company) => (
-          <div key={company.id}>
-            <strong>{company.name}</strong>
-            <span>{company.email || ''}</span>
-          </div>
-        ))}
+<div className="dashboard-card clients-list">
+  <div className="clients-table-header">
+    <span>Cliente</span>
+    <span>Sector</span>
+    <span>Contacto</span>
+    <span>Estado</span>
+    <span>Acciones</span>
+  </div>
+
+  {companies.map((company) => (
+    <div className="client-row" key={company.id}>
+      <div className="client-main">
+        <strong>{company.name}</strong>
+        <small>{company.legal_name || 'Sin razón social'}</small>
       </div>
+
+      <div>
+        {company.sector || '—'}
+      </div>
+
+      <div className="client-contact">
+        <span>{company.phone || 'Sin teléfono'}</span>
+        <small>{company.email || 'Sin email'}</small>
+      </div>
+
+      <div>
+        <span className={`client-status ${company.status || 'activo'}`}>
+          {company.status || 'Activo'}
+        </span>
+      </div>
+
+      <div className="client-actions">
+        <button type="button">Ver</button>
+        <button type="button">Editar</button>
+      </div>
+    </div>
+  ))}
+</div>
     )}
 
 </>
