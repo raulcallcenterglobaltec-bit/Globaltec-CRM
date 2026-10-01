@@ -14,7 +14,7 @@ const [companiesLoading, setCompaniesLoading] = useState(false)
 const [showCompanyForm, setShowCompanyForm] = useState(false)
 const [companySaving, setCompanySaving] = useState(false)
 const [editingCompanyId, setEditingCompanyId] = useState(null)
-  
+const [selectedCompany, setSelectedCompany] = useState(null)
 const [companyForm, setCompanyForm] = useState({
   name: '',
   legal_name: '',
@@ -481,7 +481,90 @@ const { error } = result
 </button>
     </div>
 </div>
+{selectedCompany && (
+  <div className="dashboard-card company-detail">
+    <div className="company-detail-header">
+      <div>
+        <p className="dashboard-kicker">FICHA DE CLIENTE</p>
+        <h2>{selectedCompany.name}</h2>
+        <p>{selectedCompany.legal_name || 'Sin razón social'}</p>
+      </div>
 
+      <button
+        type="button"
+        className="secondary-action"
+        onClick={() => setSelectedCompany(null)}
+      >
+        Cerrar
+      </button>
+    </div>
+
+    <div className="company-detail-grid">
+      <div>
+        <span>CIF / NIF</span>
+        <strong>{selectedCompany.tax_id || '—'}</strong>
+      </div>
+
+      <div>
+        <span>Sector</span>
+        <strong>{selectedCompany.sector || '—'}</strong>
+      </div>
+
+      <div>
+        <span>Teléfono</span>
+        <strong>{selectedCompany.phone || '—'}</strong>
+      </div>
+
+      <div>
+        <span>Email</span>
+        <strong>{selectedCompany.email || '—'}</strong>
+      </div>
+
+      <div>
+        <span>Web</span>
+        <strong>{selectedCompany.website || '—'}</strong>
+      </div>
+
+      <div>
+        <span>Estado</span>
+        <strong>{selectedCompany.status || 'Activo'}</strong>
+      </div>
+
+      <div>
+        <span>Localidad</span>
+        <strong>{selectedCompany.city || '—'}</strong>
+      </div>
+
+      <div>
+        <span>Provincia</span>
+        <strong>{selectedCompany.province || '—'}</strong>
+      </div>
+
+      <div className="detail-wide">
+        <span>Dirección</span>
+        <strong>
+          {selectedCompany.address || '—'}
+          {selectedCompany.postal_code
+            ? ` · ${selectedCompany.postal_code}`
+            : ''}
+        </strong>
+      </div>
+
+      <div className="detail-wide">
+        <span>Notas</span>
+        <strong>{selectedCompany.notes || 'Sin notas'}</strong>
+      </div>
+    </div>
+
+    <div className="company-detail-sections">
+      <button type="button">Contactos</button>
+      <button type="button">Oportunidades</button>
+      <button type="button">Llamadas</button>
+      <button type="button">Tareas</button>
+      <button type="button">Notas</button>
+    </div>
+  </div>
+)}
 {showCompanyForm && (
   <div className="dashboard-card company-form-card">
     <div className="card-heading">
@@ -731,7 +814,12 @@ onClick={() => {
       </div>
 
       <div className="client-actions">
-        <button type="button">Ver</button>
+<button
+  type="button"
+  onClick={() => setSelectedCompany(company)}
+>
+  Ver
+</button>
 <button
   type="button"
   onClick={() => editCompany(company)}
