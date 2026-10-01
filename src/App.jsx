@@ -427,6 +427,7 @@ async function saveCompany(e) {
 
   <section className="dashboard">
   {currentPage === 'clients' ? (
+ <>
   <div className="clients-page">
     <div className="dashboard-heading">
       <div>
@@ -660,6 +661,7 @@ async function saveCompany(e) {
       </div>
     )}
   </div>
+</>
 ) : (
 <>
   <div className="dashboard-heading">
