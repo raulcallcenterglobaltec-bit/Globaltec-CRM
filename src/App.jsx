@@ -660,7 +660,7 @@ async function saveCompany(e) {
         ))}
       </div>
     )}
-  </div>
+
 </>
 ) : (
 <>
