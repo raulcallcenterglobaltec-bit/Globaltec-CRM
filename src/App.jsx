@@ -435,10 +435,13 @@ const { error } = result
 </button>
 
 
-      <button className="nav-item">
-        <span>👤</span>
-        Contactos
-      </button>
+<button
+  className={`nav-item ${currentPage === 'contacts' ? 'active' : ''}`}
+  onClick={() => setCurrentPage('contacts')}
+>
+  <span>♟</span>
+  Contactos
+</button>
 
       <button className="nav-item">
         <span>◎</span>
@@ -825,6 +828,27 @@ onClick={() => {
     )}
 
 </>
+) : currentPage === 'contacts' ? (
+  <>
+    <div className="dashboard-heading">
+      <div>
+        <p className="dashboard-kicker">GLOBALTEC CRM</p>
+        <h1>Contactos</h1>
+        <p>Gestión de personas de contacto de tus clientes.</p>
+      </div>
+
+      <button className="primary-action">
+        + Nuevo contacto
+      </button>
+    </div>
+
+    <div className="dashboard-card">
+      <div className="empty-state">
+        <strong>No hay contactos registrados</strong>
+        <span>Los contactos de tus clientes aparecerán aquí.</span>
+      </div>
+    </div>
+  </>
 ) : (
 <>
   <div className="dashboard-heading">
