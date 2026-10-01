@@ -8,7 +8,9 @@ function App() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [profile, setProfile] = useState(null)
-
+const [currentPage, setCurrentPage] = useState('dashboard')
+const [companies, setCompanies] = useState([])
+const [companiesLoading, setCompaniesLoading] = useState(false)
   const [recoveryMode, setRecoveryMode] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [repeatPassword, setRepeatPassword] = useState('')
@@ -63,7 +65,23 @@ function App() {
 
     setLoading(false)
   }
+async function loadCompanies() {
+  setCompaniesLoading(true)
 
+  const { data, error } = await supabase
+    .from('companies')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error cargando clientes:', error)
+    setCompanies([])
+  } else {
+    setCompanies(data || [])
+  }
+
+  setCompaniesLoading(false)
+}
   async function handleLogin(e) {
     e.preventDefault()
     setError('')
@@ -301,15 +319,24 @@ function App() {
 <main className="crm-main">
   <aside className="sidebar">
     <nav className="sidebar-nav">
-      <button className="nav-item active">
+<button
+  className={`nav-item ${currentPage === 'dashboard' ? 'active' : ''}`}
+  onClick={() => setCurrentPage('dashboard')}
+>
         <span>▦</span>
         Inicio
       </button>
+<button
+  className={`nav-item ${currentPage === 'clients' ? 'active' : ''}`}
+  onClick={() => {
+    setCurrentPage('clients')
+    loadCompanies()
+  }}
+>
+  <span>👥</span>
+  Clientes
+</button>
 
-      <button className="nav-item">
-        <span>👥</span>
-        Clientes
-      </button>
 
       <button className="nav-item">
         <span>👤</span>
@@ -339,6 +366,43 @@ function App() {
   </aside>
 
   <section className="dashboard">
+  {currentPage === 'clients' ? (
+  <div className="clients-page">
+    <div className="dashboard-heading">
+      <div>
+        <p className="dashboard-kicker">GLOBALTEC CRM</p>
+        <h1>Clientes</h1>
+        <p>Gestión de empresas y clientes.</p>
+      </div>
+
+      <button className="primary-action">
+        + Nuevo cliente
+      </button>
+    </div>
+
+    {companiesLoading ? (
+      <div className="dashboard-card">
+        Cargando clientes...
+      </div>
+    ) : companies.length === 0 ? (
+      <div className="dashboard-card">
+        <div className="empty-state">
+          <strong>No hay clientes registrados</strong>
+          <span>Pulsa “+ Nuevo cliente” para añadir el primero.</span>
+        </div>
+      </div>
+    ) : (
+      <div className="dashboard-card">
+        {companies.map((company) => (
+          <div key={company.id}>
+            <strong>{company.name}</strong>
+            <span>{company.email || ''}</span>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+) : (
     <div className="dashboard-heading">
       <div>
         <p className="dashboard-kicker">GLOBALTEC CRM</p>
@@ -406,6 +470,7 @@ function App() {
         </div>
       </div>
     </div>
+  )}
   </section>
 </main>
      
