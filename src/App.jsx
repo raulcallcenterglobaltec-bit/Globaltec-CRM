@@ -13,6 +13,8 @@ const [companies, setCompanies] = useState([])
 const [companiesLoading, setCompaniesLoading] = useState(false)
 const [showCompanyForm, setShowCompanyForm] = useState(false)
 const [companySaving, setCompanySaving] = useState(false)
+const [editingCompanyId, setEditingCompanyId] = useState(null)
+  
 const [companyForm, setCompanyForm] = useState({
   name: '',
   legal_name: '',
@@ -100,12 +102,43 @@ async function loadCompanies() {
 
   setCompaniesLoading(false)
 }
+function editCompany(company) {
+  setEditingCompanyId(company.id)
+
+  setCompanyForm({
+    name: company.name || '',
+    legal_name: company.legal_name || '',
+    tax_id: company.tax_id || '',
+    sector: company.sector || '',
+    website: company.website || '',
+    phone: company.phone || '',
+    email: company.email || '',
+    address: company.address || '',
+    city: company.city || '',
+    province: company.province || '',
+    postal_code: company.postal_code || '',
+    country: company.country || 'España',
+    status: company.status || 'activo',
+    notes: company.notes || ''
+  })
+
+  setShowCompanyForm(true)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 async function saveCompany(e) {
   e.preventDefault()
   setCompanySaving(true)
   setError('')
 
-  const { error } = await supabase
+let result
+
+if (editingCompanyId) {
+  result = await supabase
+    .from('companies')
+    .update(companyForm)
+    .eq('id', editingCompanyId)
+} else {
+  result = await supabase
     .from('companies')
     .insert([
       {
@@ -113,6 +146,9 @@ async function saveCompany(e) {
         owner_id: session.user.id
       }
     ])
+}
+
+const { error } = result
 
   if (error) {
     console.error('Error guardando cliente:', error)
@@ -139,6 +175,7 @@ async function saveCompany(e) {
   })
 
   setShowCompanyForm(false)
+  setEditingCompanyId(null)
   await loadCompanies()
   setCompanySaving(false)
 }
@@ -449,8 +486,12 @@ async function saveCompany(e) {
   <div className="dashboard-card company-form-card">
     <div className="card-heading">
       <div>
-        <h2>Nuevo cliente</h2>
-        <p>Introduce los datos de la empresa.</p>
+<h2>{editingCompanyId ? 'Editar cliente' : 'Nuevo cliente'}</h2>
+<p>
+  {editingCompanyId
+    ? 'Modifica los datos de la empresa.'
+    : 'Introduce los datos de la empresa.'}
+</p>
       </div>
     </div>
 
@@ -623,7 +664,10 @@ async function saveCompany(e) {
         <button
           type="button"
           className="secondary-action"
-          onClick={() => setShowCompanyForm(false)}
+onClick={() => {
+  setShowCompanyForm(false)
+  setEditingCompanyId(null)
+}}
         >
           Cancelar
         </button>
@@ -633,7 +677,11 @@ async function saveCompany(e) {
           className="primary-action"
           disabled={companySaving}
         >
-          {companySaving ? 'Guardando...' : 'Guardar cliente'}
+{companySaving
+  ? 'Guardando...'
+  : editingCompanyId
+    ? 'Guardar cambios'
+    : 'Guardar cliente'}
         </button>
       </div>
     </form>
@@ -684,7 +732,12 @@ async function saveCompany(e) {
 
       <div className="client-actions">
         <button type="button">Ver</button>
-        <button type="button">Editar</button>
+<button
+  type="button"
+  onClick={() => editCompany(company)}
+>
+  Editar
+</button>
       </div>
     </div>
   ))}
