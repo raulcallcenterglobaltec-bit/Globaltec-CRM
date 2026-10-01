@@ -9,17 +9,32 @@ function App() {
   const [error, setError] = useState('')
   const [profile, setProfile] = useState(null)
 
+  const [recoveryMode, setRecoveryMode] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [repeatPassword, setRepeatPassword] = useState('')
+  const [recoveryMessage, setRecoveryMessage] = useState('')
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
-      if (session) loadProfile(session.user.id)
-      else setLoading(false)
+
+      if (session) {
+        loadProfile(session.user.id)
+      } else {
+        setLoading(false)
+      }
     })
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
+
+      if (event === 'PASSWORD_RECOVERY') {
+        setRecoveryMode(true)
+        setLoading(false)
+        return
+      }
 
       if (session) {
         loadProfile(session.user.id)
@@ -65,8 +80,57 @@ function App() {
     }
   }
 
+  async function handlePasswordUpdate(e) {
+    e.preventDefault()
+
+    setError('')
+    setRecoveryMessage('')
+
+    if (newPassword.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres.')
+      return
+    }
+
+    if (newPassword !== repeatPassword) {
+      setError('Las contraseñas no coinciden.')
+      return
+    }
+
+    setLoading(true)
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    })
+
+    if (error) {
+      console.error(error)
+      setError('No se ha podido actualizar la contraseña.')
+      setLoading(false)
+      return
+    }
+
+    setNewPassword('')
+    setRepeatPassword('')
+    setRecoveryMessage('Contraseña actualizada correctamente.')
+
+    await supabase.auth.signOut()
+
+    setSession(null)
+    setProfile(null)
+    setRecoveryMode(false)
+    setLoading(false)
+
+    window.history.replaceState(
+      {},
+      document.title,
+      window.location.pathname
+    )
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut()
+    setSession(null)
+    setProfile(null)
   }
 
   if (loading) {
@@ -79,22 +143,92 @@ function App() {
     )
   }
 
+  if (recoveryMode) {
+    return (
+      <div className="login-page">
+        <div className="login-card">
+
+          <div className="login-brand">
+            <strong>GLOBALTEC</strong>
+            <span> CRM</span>
+          </div>
+
+          <h1>Nueva contraseña</h1>
+
+          <p className="login-description">
+            Introduce tu nueva contraseña de acceso.
+          </p>
+
+          <form onSubmit={handlePasswordUpdate}>
+
+            <label>Nueva contraseña</label>
+
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Nueva contraseña"
+              required
+            />
+
+            <label>Repetir contraseña</label>
+
+            <input
+              type="password"
+              value={repeatPassword}
+              onChange={(e) => setRepeatPassword(e.target.value)}
+              placeholder="Repite la contraseña"
+              required
+            />
+
+            {error && (
+              <div className="login-error">
+                {error}
+              </div>
+            )}
+
+            <button type="submit">
+              Guardar contraseña
+            </button>
+
+          </form>
+
+          <div className="login-footer">
+            Globaltec CRM · Recuperación de acceso
+          </div>
+
+        </div>
+      </div>
+    )
+  }
+
   if (!session) {
     return (
       <div className="login-page">
         <div className="login-card">
+
           <div className="login-brand">
             <strong>GLOBALTEC</strong>
             <span> CRM</span>
           </div>
 
           <h1>Bienvenido</h1>
+
           <p className="login-description">
             Accede a la plataforma de gestión comercial.
           </p>
 
+          {recoveryMessage && (
+            <div className="status">
+              <span className="status-dot"></span>
+              {recoveryMessage}
+            </div>
+          )}
+
           <form onSubmit={handleLogin}>
+
             <label>Correo electrónico</label>
+
             <input
               type="email"
               value={email}
@@ -104,6 +238,7 @@ function App() {
             />
 
             <label>Contraseña</label>
+
             <input
               type="password"
               value={password}
@@ -112,14 +247,22 @@ function App() {
               required
             />
 
-            {error && <div className="login-error">{error}</div>}
+            {error && (
+              <div className="login-error">
+                {error}
+              </div>
+            )}
 
-            <button type="submit">Entrar</button>
+            <button type="submit">
+              Entrar
+            </button>
+
           </form>
 
           <div className="login-footer">
             Globaltec CRM · Acceso privado
           </div>
+
         </div>
       </div>
     )
@@ -127,13 +270,16 @@ function App() {
 
   return (
     <div className="app">
+
       <header className="header">
+
         <div>
           <span className="brand">GLOBALTEC</span>
           <span className="brand-subtitle"> CRM</span>
         </div>
 
         <div className="user-area">
+
           <span>
             {profile?.full_name || session.user.email}
           </span>
@@ -142,30 +288,40 @@ function App() {
             {profile?.role || 'usuario'}
           </span>
 
-          <button className="logout-button" onClick={handleLogout}>
+          <button
+            className="logout-button"
+            onClick={handleLogout}
+          >
             Cerrar sesión
           </button>
+
         </div>
+
       </header>
 
       <main className="welcome">
+
         <div className="welcome-card">
+
           <span className="badge">
-            {profile?.role === 'admin' ? 'ADMINISTRADOR' : 'CRM'}
+            CRM
           </span>
 
           <h1>Globaltec CRM</h1>
 
           <p>
-            Sesión iniciada correctamente.
+            Plataforma de gestión comercial de Call Center Globaltec.
           </p>
 
           <div className="status">
             <span className="status-dot"></span>
-            Conectado a Globaltec CRM
+            Aplicación conectada correctamente
           </div>
+
         </div>
+
       </main>
+
     </div>
   )
 }
