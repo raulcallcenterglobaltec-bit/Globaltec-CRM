@@ -16,15 +16,132 @@ body {
   color: #172033;
 }
 
+/* LOGIN */
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(34, 197, 94, 0.08), transparent 35%),
+    #f5f7fa;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 430px;
+  background: #ffffff;
+  border: 1px solid #e4e8ee;
+  border-radius: 18px;
+  padding: 42px;
+  box-shadow: 0 20px 55px rgba(23, 32, 51, 0.10);
+}
+
+.login-brand {
+  margin-bottom: 36px;
+  font-size: 22px;
+}
+
+.login-brand strong {
+  color: #10223f;
+  letter-spacing: 0.5px;
+}
+
+.login-brand span {
+  color: #64748b;
+}
+
+.login-card h1 {
+  margin: 0 0 8px;
+  font-size: 32px;
+  color: #10223f;
+}
+
+.login-description {
+  margin: 0 0 30px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.login-card form {
+  display: flex;
+  flex-direction: column;
+}
+
+.login-card label {
+  margin: 0 0 7px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.login-card input {
+  width: 100%;
+  height: 48px;
+  margin-bottom: 20px;
+  padding: 0 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #ffffff;
+  font-size: 15px;
+  outline: none;
+  transition: 0.2s;
+}
+
+.login-card input:focus {
+  border-color: #16a36a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 106, 0.12);
+}
+
+.login-card button {
+  height: 50px;
+  border: 0;
+  border-radius: 9px;
+  background: #138a5b;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.login-card button:hover {
+  background: #0f744c;
+}
+
+.login-error {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 14px;
+}
+
+.login-footer {
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid #e6e9ef;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+/* CRM */
+
 .app {
   min-height: 100vh;
 }
 
 .header {
-  height: 72px;
+  min-height: 72px;
   display: flex;
   align-items: center;
-  padding: 0 40px;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 40px;
   background: #ffffff;
   border-bottom: 1px solid #e6e9ef;
 }
@@ -32,13 +149,43 @@ body {
 .brand {
   font-size: 22px;
   font-weight: 800;
+  color: #10223f;
   letter-spacing: 0.5px;
 }
 
 .brand-subtitle {
   font-size: 22px;
-  font-weight: 400;
-  color: #687386;
+  color: #64748b;
+}
+
+.user-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.role-badge {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #087a52;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.logout-button {
+  padding: 8px 12px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+}
+
+.logout-button:hover {
+  background: #f8fafc;
 }
 
 .welcome {
@@ -46,15 +193,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 30px;
+  padding: 32px;
 }
 
 .welcome-card {
-  width: 100%;
-  max-width: 620px;
-  padding: 55px;
+  width: min(620px, 100%);
+  padding: 54px 56px;
   background: #ffffff;
-  border: 1px solid #e5e9ef;
+  border: 1px solid #e2e7ee;
   border-radius: 18px;
   box-shadow: 0 18px 50px rgba(23, 32, 51, 0.08);
 }
@@ -62,61 +208,64 @@ body {
 .badge {
   display: inline-block;
   padding: 7px 12px;
-  border-radius: 20px;
-  background: #edf8f3;
-  color: #16855b;
+  margin-bottom: 20px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #087a52;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
 }
 
 .welcome-card h1 {
-  margin: 20px 0 12px;
+  margin: 0 0 12px;
   font-size: 42px;
-  line-height: 1.1;
+  color: #10223f;
 }
 
 .welcome-card p {
-  margin: 0;
-  color: #687386;
+  color: #64748b;
   font-size: 17px;
-  line-height: 1.6;
 }
 
 .status {
-  display: flex;
-  align-items: center;
-  gap: 9px;
   margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid #edf0f4;
-  color: #465166;
+  padding-top: 26px;
+  border-top: 1px solid #e6e9ef;
+  color: #475569;
   font-size: 14px;
 }
 
 .status-dot {
+  display: inline-block;
   width: 9px;
   height: 9px;
+  margin-right: 10px;
   border-radius: 50%;
-  background: #21a875;
+  background: #22b573;
 }
 
-@media (max-width: 640px) {
-  .header {
-    height: 64px;
-    padding: 0 20px;
+@media (max-width: 700px) {
+  .login-card {
+    padding: 30px 24px;
   }
 
-  .welcome {
-    min-height: calc(100vh - 64px);
-    padding: 18px;
+  .header {
+    padding: 14px 20px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .user-area {
+    width: 100%;
+    flex-wrap: wrap;
   }
 
   .welcome-card {
-    padding: 32px 24px;
+    padding: 36px 26px;
   }
 
   .welcome-card h1 {
-    font-size: 34px;
+    font-size: 32px;
   }
 }
