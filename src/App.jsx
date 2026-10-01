@@ -787,10 +787,13 @@ onClick={() => {
 
   {companies.map((company) => (
     <div className="client-row" key={company.id}>
-      <div className="client-main">
-        <strong>{company.name}</strong>
-        <small>{company.legal_name || 'Sin razón social'}</small>
-      </div>
+<div
+  className="client-main client-main-clickable"
+  onClick={() => setSelectedCompany(company)}
+>
+  <strong>{company.name}</strong>
+  <small>{company.legal_name || 'Sin razón social'}</small>
+</div>
 
       <div>
         {company.sector || '—'}
