@@ -556,13 +556,7 @@ const { error } = result
       </div>
     </div>
 
-    <div className="company-detail-sections">
-      <button type="button">Contactos</button>
-      <button type="button">Oportunidades</button>
-      <button type="button">Llamadas</button>
-      <button type="button">Tareas</button>
-      <button type="button">Notas</button>
-    </div>
+   
   </div>
 )}
 {showCompanyForm && (
@@ -814,12 +808,7 @@ onClick={() => {
       </div>
 
       <div className="client-actions">
-<button
-  type="button"
-  onClick={() => setSelectedCompany(company)}
->
-  Ver
-</button>
+
 <button
   type="button"
   onClick={() => editCompany(company)}
