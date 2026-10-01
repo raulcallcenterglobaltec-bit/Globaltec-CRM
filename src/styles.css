@@ -848,3 +848,19 @@ body {
     width: 100%;
   }
 }
+.client-main-clickable {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 5px;
+  margin: -5px;
+  transition: background 0.15s ease;
+}
+
+.client-main-clickable:hover {
+  background: #f0faf6;
+}
+
+.client-main-clickable:hover strong {
+  color: #15956b;
+  text-decoration: underline;
+}
