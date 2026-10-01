@@ -403,7 +403,8 @@ async function loadCompanies() {
     )}
   </div>
 ) : (
-    <div className="dashboard-heading">
+<>
+  <div className="dashboard-heading">
       <div>
         <p className="dashboard-kicker">GLOBALTEC CRM</p>
         <h1>Panel de control</h1>
@@ -470,6 +471,7 @@ async function loadCompanies() {
         </div>
       </div>
     </div>
+ </>
   )}
   </section>
 </main>
