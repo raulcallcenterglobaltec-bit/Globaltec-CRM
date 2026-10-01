@@ -443,7 +443,7 @@ async function saveCompany(e) {
 </button>
     </div>
 </div>
- {companiesLoading ? (
+
 {showCompanyForm && (
   <div className="dashboard-card company-form-card">
     <div className="card-heading">
