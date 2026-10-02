@@ -1031,3 +1031,29 @@ body {
 .upcoming-task-date span {
   font-size: 12px;
 }
+.report-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.report-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 13px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.report-row:last-child {
+  border-bottom: none;
+}
+
+.report-row span {
+  font-size: 14px;
+  color: #52637a;
+}
+
+.report-row strong {
+  font-size: 15px;
+  color: #0b2948;
+}
