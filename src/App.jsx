@@ -59,6 +59,7 @@ const [companyForm, setCompanyForm] = useState({
 
       if (session) {
         loadProfile(session.user.id)
+        loadCompanies()
       } else {
         setLoading(false)
       }
@@ -77,6 +78,7 @@ const [companyForm, setCompanyForm] = useState({
 
       if (session) {
         loadProfile(session.user.id)
+        loadCompanies()
       } else {
         setProfile(null)
         setLoading(false)
@@ -526,7 +528,10 @@ const { error } = result
     <nav className="sidebar-nav">
 <button
   className={`nav-item ${currentPage === 'dashboard' ? 'active' : ''}`}
-  onClick={() => setCurrentPage('dashboard')}
+onClick={() => {
+  setCurrentPage('dashboard')
+  loadCompanies()
+}}
 >
         <span>▦</span>
         Inicio
@@ -1203,15 +1208,24 @@ onClick={() => {
         <p>Resumen de la actividad comercial.</p>
       </div>
 
-      <button className="primary-action">
-        + Nuevo cliente
-      </button>
+<button
+  className="primary-action"
+  onClick={() => {
+    setCurrentPage('clients')
+    setEditingCompanyId(null)
+    setSelectedCompany(null)
+    setShowCompanyForm(true)
+    loadCompanies()
+  }}
+>
+  + Nuevo cliente
+</button>
     </div>
 
     <div className="stats-grid">
       <div className="stat-card">
         <span>Clientes</span>
-        <strong>0</strong>
+<strong>{companies.length}</strong>
         <small>Total registrados</small>
       </div>
 
