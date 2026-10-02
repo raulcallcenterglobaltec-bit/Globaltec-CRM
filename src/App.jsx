@@ -61,7 +61,24 @@ const [tasksLoading, setTasksLoading] = useState(false)
 const [showTaskForm, setShowTaskForm] = useState(false)
 const [taskSaving, setTaskSaving] = useState(false)
 const [editingTaskId, setEditingTaskId] = useState(null)
+const [calls, setCalls] = useState([])
+const [callsLoading, setCallsLoading] = useState(false)
+const [showCallForm, setShowCallForm] = useState(false)
+const [callSaving, setCallSaving] = useState(false)
+const [editingCallId, setEditingCallId] = useState(null)
 
+const [callForm, setCallForm] = useState({
+  company_id: '',
+  contact_id: '',
+  opportunity_id: '',
+  assigned_to: '',
+  direction: 'inbound',
+  status: 'completed',
+  started_at: '',
+  duration_seconds: '',
+  outcome: '',
+  notes: ''
+})
 const [taskForm, setTaskForm] = useState({
   title: '',
   description: '',
@@ -247,6 +264,35 @@ async function loadTasks() {
   }
 
   setTasksLoading(false)
+}
+async function loadCalls() {
+  setCallsLoading(true)
+
+  const { data, error } = await supabase
+    .from('calls')
+    .select(`
+      *,
+      companies (
+        name
+      ),
+      contacts (
+        first_name,
+        last_name
+      ),
+      opportunities (
+        title
+      )
+    `)
+    .order('started_at', { ascending: false })
+
+  if (error) {
+    console.error('Error cargando llamadas:', error)
+    setCalls([])
+  } else {
+    setCalls(data || [])
+  }
+
+  setCallsLoading(false)
 }
 async function loadOpportunityOptions() {
   const [
@@ -534,6 +580,81 @@ async function saveTask(e) {
   setEditingTaskId(null)
   await loadTasks()
   setTaskSaving(false)
+}
+async function saveCall(e) {
+  e.preventDefault()
+  setCallSaving(true)
+  setError('')
+
+  const callData = {
+    company_id: callForm.company_id || null,
+    contact_id: callForm.contact_id || null,
+    opportunity_id: callForm.opportunity_id || null,
+    assigned_to: callForm.assigned_to || session.user.id,
+    direction: callForm.direction,
+    status: callForm.status,
+    started_at: callForm.started_at
+      ? new Date(callForm.started_at).toISOString()
+      : new Date().toISOString(),
+    duration_seconds: callForm.duration_seconds
+      ? Number(callForm.duration_seconds)
+      : 0,
+    outcome: callForm.outcome || null,
+    notes: callForm.notes || null
+  }
+
+  let result
+
+  if (editingCallId) {
+    result = await supabase
+      .from('calls')
+      .update(callData)
+      .eq('id', editingCallId)
+  } else {
+    result = await supabase
+      .from('calls')
+      .insert([
+        {
+          ...callData,
+          created_by: session.user.id
+        }
+      ])
+  }
+
+  const { error } = result
+
+  if (error) {
+    console.error('Error guardando llamada:', error)
+    setError('No se ha podido guardar la llamada.')
+    setCallSaving(false)
+    return
+  }
+
+  setShowCallForm(false)
+  setEditingCallId(null)
+  await loadCalls()
+  setCallSaving(false)
+}
+function editCall(call) {
+  setEditingCallId(call.id)
+
+  setCallForm({
+    company_id: call.company_id || '',
+    contact_id: call.contact_id || '',
+    opportunity_id: call.opportunity_id || '',
+    assigned_to: call.assigned_to || '',
+    direction: call.direction || 'inbound',
+    status: call.status || 'completed',
+    started_at: call.started_at
+      ? new Date(call.started_at).toISOString().slice(0, 16)
+      : '',
+    duration_seconds: call.duration_seconds || '',
+    outcome: call.outcome || '',
+    notes: call.notes || ''
+  })
+
+  setShowCallForm(true)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
   function editTask(task) {
   setEditingTaskId(task.id)
@@ -920,10 +1041,19 @@ onClick={() => {
   Oportunidades
 </button>
 
-      <button className="nav-item">
-        <span>☎</span>
-        Llamadas
-      </button>
+<button
+  className={`nav-item ${currentPage === 'calls' ? 'active' : ''}`}
+  onClick={() => {
+    setCurrentPage('calls')
+    loadCalls()
+    loadCompanies()
+    loadContacts()
+    loadOpportunities()
+  }}
+>
+  <span>☎</span>
+  Llamadas
+</button>
 
 <button
   className={`nav-item ${currentPage === 'tasks' ? 'active' : ''}`}
@@ -1906,6 +2036,307 @@ service_ids: [],
     ))}
   </div>
 )}
+  </>
+) : currentPage === 'calls' ? (
+  <>
+    <div className="dashboard-heading">
+      <div>
+        <p className="dashboard-kicker">GLOBALTEC CRM</p>
+        <h1>Llamadas</h1>
+        <p>Registro y seguimiento de llamadas.</p>
+      </div>
+
+      <button
+        className="primary-action"
+        onClick={() => {
+          setEditingCallId(null)
+          setCallForm({
+            company_id: '',
+            contact_id: '',
+            opportunity_id: '',
+            assigned_to: '',
+            direction: 'inbound',
+            status: 'completed',
+            started_at: '',
+            duration_seconds: '',
+            outcome: '',
+            notes: ''
+          })
+          setShowCallForm(true)
+        }}
+      >
+        + Nueva llamada
+      </button>
+    </div>
+{showCallForm && (
+  <div className="dashboard-card">
+    <div className="card-heading">
+      <div>
+        <h2>{editingCallId ? 'Editar llamada' : 'Nueva llamada'}</h2>
+        <p>Introduce los datos de la llamada.</p>
+      </div>
+    </div>
+
+    <form
+      className="company-form"
+      onSubmit={saveCall}
+    >
+      <div className="form-grid">
+
+        <div className="form-field">
+          <label>Cliente</label>
+          <select
+            value={callForm.company_id}
+            onChange={(e) =>
+              setCallForm({
+                ...callForm,
+                company_id: e.target.value,
+                contact_id: '',
+                opportunity_id: ''
+              })
+            }
+          >
+            <option value="">Sin cliente</option>
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-field">
+          <label>Contacto</label>
+          <select
+            value={callForm.contact_id}
+            onChange={(e) =>
+              setCallForm({
+                ...callForm,
+                contact_id: e.target.value
+              })
+            }
+          >
+            <option value="">Sin contacto</option>
+            {contacts
+              .filter(
+                (contact) =>
+                  !callForm.company_id ||
+                  contact.company_id === callForm.company_id
+              )
+              .map((contact) => (
+                <option key={contact.id} value={contact.id}>
+                  {`${contact.first_name || ''} ${contact.last_name || ''}`.trim()}
+                </option>
+              ))}
+          </select>
+        </div>
+
+        <div className="form-field">
+          <label>Oportunidad</label>
+          <select
+            value={callForm.opportunity_id}
+            onChange={(e) =>
+              setCallForm({
+                ...callForm,
+                opportunity_id: e.target.value
+              })
+            }
+          >
+            <option value="">Sin oportunidad</option>
+            {opportunities
+              .filter(
+                (opportunity) =>
+                  !callForm.company_id ||
+                  opportunity.company_id === callForm.company_id
+              )
+              .map((opportunity) => (
+                <option key={opportunity.id} value={opportunity.id}>
+                  {opportunity.title}
+                </option>
+              ))}
+          </select>
+        </div>
+
+        <div className="form-field">
+          <label>Tipo de llamada</label>
+          <select
+            value={callForm.direction}
+            onChange={(e) =>
+              setCallForm({
+                ...callForm,
+                direction: e.target.value
+              })
+            }
+          >
+            <option value="inbound">Entrante</option>
+            <option value="outbound">Saliente</option>
+          </select>
+        </div>
+
+        <div className="form-field">
+          <label>Estado</label>
+          <select
+            value={callForm.status}
+            onChange={(e) =>
+              setCallForm({
+                ...callForm,
+                status: e.target.value
+              })
+            }
+          >
+            <option value="completed">Completada</option>
+            <option value="missed">Perdida</option>
+            <option value="cancelled">Cancelada</option>
+            <option value="scheduled">Programada</option>
+          </select>
+        </div>
+
+        <div className="form-field">
+          <label>Fecha y hora</label>
+          <input
+            type="datetime-local"
+            value={callForm.started_at}
+            onChange={(e) =>
+              setCallForm({
+                ...callForm,
+                started_at: e.target.value
+              })
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Duración (segundos)</label>
+          <input
+            type="number"
+            min="0"
+            value={callForm.duration_seconds}
+            onChange={(e) =>
+              setCallForm({
+                ...callForm,
+                duration_seconds: e.target.value
+              })
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Resultado</label>
+          <input
+            type="text"
+            value={callForm.outcome}
+            onChange={(e) =>
+              setCallForm({
+                ...callForm,
+                outcome: e.target.value
+              })
+            }
+            placeholder="Ej.: Cliente interesado"
+          />
+        </div>
+
+        <div className="form-field form-field-full">
+          <label>Notas</label>
+          <textarea
+            value={callForm.notes}
+            onChange={(e) =>
+              setCallForm({
+                ...callForm,
+                notes: e.target.value
+              })
+            }
+            placeholder="Observaciones de la llamada..."
+          />
+        </div>
+
+      </div>
+
+      <div className="form-actions">
+        <button
+          type="button"
+          className="secondary-action"
+          onClick={() => {
+            setShowCallForm(false)
+            setEditingCallId(null)
+          }}
+        >
+          Cancelar
+        </button>
+
+        <button
+          type="submit"
+          className="primary-action"
+          disabled={callSaving}
+        >
+          {callSaving ? 'Guardando...' : 'Guardar llamada'}
+        </button>
+      </div>
+    </form>
+  </div>
+)}
+    {callsLoading ? (
+      <div className="dashboard-card">
+        Cargando llamadas...
+      </div>
+    ) : calls.length === 0 ? (
+      <div className="dashboard-card">
+        <div className="empty-state">
+          <strong>No hay llamadas registradas</strong>
+          <span>Pulsa “+ Nueva llamada” para añadir la primera.</span>
+        </div>
+      </div>
+    ) : (
+      <div className="dashboard-card clients-list">
+        <div className="clients-table-header">
+          <span>FECHA</span>
+          <span>CLIENTE</span>
+          <span>CONTACTO</span>
+          <span>TIPO</span>
+          <span>ESTADO</span>
+          <span>ACCIONES</span>
+        </div>
+
+        {calls.map((call) => (
+          <div className="client-row" key={call.id}>
+            <div>
+              {call.started_at
+                ? new Date(call.started_at).toLocaleString('es-ES')
+                : '-'}
+            </div>
+
+            <div>
+              {call.companies?.name || 'Sin cliente'}
+            </div>
+
+            <div>
+              {`${call.contacts?.first_name || ''} ${call.contacts?.last_name || ''}`.trim() || 'Sin contacto'}
+            </div>
+
+            <div>
+              {call.direction === 'inbound' ? 'Entrante' : 'Saliente'}
+            </div>
+
+            <div>
+              {{
+                completed: 'Completada',
+                missed: 'Perdida',
+                cancelled: 'Cancelada',
+                scheduled: 'Programada'
+              }[call.status] || call.status}
+            </div>
+
+<div className="client-actions">
+  <button
+    type="button"
+    onClick={() => editCall(call)}
+  >
+    Editar
+  </button>
+</div>
+          </div>
+        ))}
+      </div>
+    )}
   </>
 ) : currentPage === 'tasks' ? (
   <>
