@@ -2163,7 +2163,11 @@ service_ids: [],
       </div>
 
       <div className="stat-card">
-        <span>Tareas completadas</span>
+       {tasks.filter(
+  (task) =>
+    task.status === 'completed' &&
+    isInReportPeriod(task.created_at)
+).length}
         <strong>
           {tasks.filter(
             (task) => task.status === 'completed'
@@ -2262,8 +2266,13 @@ service_ids: [],
         <div className="report-list">
           <div className="report-row">
             <span>Pendientes</span>
-            <strong>
-              {tasks.filter(
+<strong>
+  {tasks.filter(
+    (task) =>
+      task.status === 'pending' &&
+      isInReportPeriod(task.created_at)
+  ).length}
+</strong>              {tasks.filter(
                 (task) => task.status === 'pending'
               ).length}
             </strong>
@@ -2271,8 +2280,13 @@ service_ids: [],
 
           <div className="report-row">
             <span>En curso</span>
-            <strong>
-              {tasks.filter(
+<strong>
+  {tasks.filter(
+    (task) =>
+      task.status === 'in_progress' &&
+      isInReportPeriod(task.created_at)
+  ).length}
+</strong>              {tasks.filter(
                 (task) => task.status === 'in_progress'
               ).length}
             </strong>
@@ -2280,8 +2294,13 @@ service_ids: [],
 
           <div className="report-row">
             <span>Completadas</span>
-            <strong>
-              {tasks.filter(
+<strong>
+  {tasks.filter(
+    (task) =>
+      task.status === 'completed' &&
+      isInReportPeriod(task.created_at)
+  ).length}
+</strong>              {tasks.filter(
                 (task) => task.status === 'completed'
               ).length}
             </strong>
@@ -2289,8 +2308,13 @@ service_ids: [],
 
           <div className="report-row">
             <span>Canceladas</span>
-            <strong>
-              {tasks.filter(
+<strong>
+  {tasks.filter(
+    (task) =>
+      task.status === 'cancelled' &&
+      isInReportPeriod(task.created_at)
+  ).length}
+</strong>              {tasks.filter(
                 (task) => task.status === 'cancelled'
               ).length}
             </strong>
