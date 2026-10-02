@@ -2132,20 +2132,27 @@ service_ids: [],
 
       <div className="stat-card">
         <span>Oportunidades</span>
-        <strong>{opportunities.length}</strong>
+        <strong>
+  {opportunities.filter((opportunity) =>
+    isInReportPeriod(opportunity.created_at)
+  ).length}
+</strong>
         <small>Total registradas</small>
       </div>
 
       <div className="stat-card">
         <span>Valor oportunidades</span>
         <strong>
-          {opportunities
-            .reduce(
-              (total, opportunity) =>
-                total + Number(opportunity.estimated_value || 0),
-              0
-            )
-            .toLocaleString('es-ES')} €
+{opportunities
+  .filter((opportunity) =>
+    isInReportPeriod(opportunity.created_at)
+  )
+  .reduce(
+    (total, opportunity) =>
+      total + Number(opportunity.estimated_value || 0),
+    0
+  )
+  .toLocaleString('es-ES')} €
         </strong>
         <small>Valor estimado total</small>
       </div>
@@ -2153,13 +2160,16 @@ service_ids: [],
       <div className="stat-card">
         <span>Cuota mensual</span>
         <strong>
-          {opportunities
-            .reduce(
-              (total, opportunity) =>
-                total + Number(opportunity.monthly_value || 0),
-              0
-            )
-            .toLocaleString('es-ES')} €
+{opportunities
+  .filter((opportunity) =>
+    isInReportPeriod(opportunity.created_at)
+  )
+  .reduce(
+    (total, opportunity) =>
+      total + Number(opportunity.monthly_value || 0),
+    0
+  )
+  .toLocaleString('es-ES')} €
         </strong>
         <small>Potencial mensual</small>
       </div>
