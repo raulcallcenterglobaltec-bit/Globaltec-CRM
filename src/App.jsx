@@ -121,6 +121,7 @@ const [companyForm, setCompanyForm] = useState({
         loadCompanies()
         loadOpportunities()
         loadTasks()
+        loadCalls()
       } else {
         setLoading(false)
       }
@@ -142,6 +143,7 @@ const [companyForm, setCompanyForm] = useState({
         loadCompanies()
         loadOpportunities()
         loadTasks()
+        loadCalls()
       } else {
         setProfile(null)
         setLoading(false)
@@ -998,6 +1000,7 @@ onClick={() => {
   loadCompanies()
   loadOpportunities()
   loadTasks()
+  loadCalls()
 }}
 >
         <span>▦</span>
@@ -2701,7 +2704,7 @@ priority: 'normal',
 
       <div className="stat-card">
         <span>Llamadas</span>
-        <strong>0</strong>
+       <strong>{calls.length}</strong>
         <small>Registradas</small>
       </div>
     </div>
