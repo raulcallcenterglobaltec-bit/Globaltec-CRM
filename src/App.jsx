@@ -2222,8 +2222,26 @@ service_ids: [],
 
           <div className="report-row">
             <span>Salientes</span>
-            <strong>
-          <div className="report-list">
+<strong>
+  {calls.filter(
+    (call) =>
+      call.direction === 'outbound' &&
+      isInReportPeriod(call.started_at)
+  ).length}
+</strong>
+</div>
+</div>
+</div>
+
+<div className="dashboard-card">
+  <div className="card-heading">
+    <div>
+      <h2>Estado de tareas</h2>
+      <p>Situación actual de las tareas</p>
+    </div>
+  </div>
+
+  <div className="report-list">
   <div className="report-row">
     <span>Pendientes</span>
     <strong>
