@@ -65,9 +65,9 @@ const [editingTaskId, setEditingTaskId] = useState(null)
 const [taskForm, setTaskForm] = useState({
   title: '',
   description: '',
-  task_type: 'Seguimiento',
-  status: 'Pendiente',
-  priority: 'Normal',
+task_type: 'follow_up',
+status: 'pending',
+priority: 'normal',
   due_date: '',
   company_id: '',
   contact_id: '',
@@ -496,7 +496,7 @@ async function saveTask(e) {
     opportunity_id: taskForm.opportunity_id || null,
     assigned_to: taskForm.assigned_to || session.user.id,
     completed_at:
-      taskForm.status === 'Completada'
+      taskForm.status === 'completed'
         ? new Date().toISOString()
         : null
   }
@@ -1899,9 +1899,9 @@ service_ids: [],
           setTaskForm({
             title: '',
             description: '',
-            task_type: 'Seguimiento',
-            status: 'Pendiente',
-            priority: 'Normal',
+task_type: 'follow_up',
+status: 'pending',
+priority: 'normal',
             due_date: '',
             company_id: '',
             contact_id: '',
@@ -1955,13 +1955,12 @@ service_ids: [],
               })
             }
           >
-            <option value="Llamada">Llamada</option>
-            <option value="Seguimiento">Seguimiento</option>
-            <option value="Email">Email</option>
-            <option value="Reunión">Reunión</option>
-            <option value="Presupuesto">Presupuesto</option>
-            <option value="Gestión">Gestión</option>
-            <option value="Otro">Otro</option>
+<option value="call">Llamada</option>
+<option value="follow_up">Seguimiento</option>
+<option value="email">Email</option>
+<option value="meeting">Reunión</option>
+<option value="proposal">Presupuesto</option>
+<option value="general">Gestión</option>
           </select>
         </div>
 
@@ -1976,10 +1975,10 @@ service_ids: [],
               })
             }
           >
-            <option value="Pendiente">Pendiente</option>
-            <option value="En curso">En curso</option>
-            <option value="Completada">Completada</option>
-            <option value="Cancelada">Cancelada</option>
+<option value="pending">Pendiente</option>
+<option value="in_progress">En curso</option>
+<option value="completed">Completada</option>
+<option value="cancelled">Cancelada</option>
           </select>
         </div>
 
@@ -1994,10 +1993,10 @@ service_ids: [],
               })
             }
           >
-            <option value="Baja">Baja</option>
-            <option value="Normal">Normal</option>
-            <option value="Alta">Alta</option>
-            <option value="Urgente">Urgente</option>
+<option value="low">Baja</option>
+<option value="normal">Normal</option>
+<option value="high">Alta</option>
+<option value="urgent">Urgente</option>
           </select>
         </div>
 
