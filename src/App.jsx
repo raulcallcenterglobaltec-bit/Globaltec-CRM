@@ -56,6 +56,24 @@ const [opportunityForm, setOpportunityForm] = useState({
   description: '',
   lost_reason: ''
 })
+const [tasks, setTasks] = useState([])
+const [tasksLoading, setTasksLoading] = useState(false)
+const [showTaskForm, setShowTaskForm] = useState(false)
+const [taskSaving, setTaskSaving] = useState(false)
+const [editingTaskId, setEditingTaskId] = useState(null)
+
+const [taskForm, setTaskForm] = useState({
+  title: '',
+  description: '',
+  task_type: 'Seguimiento',
+  status: 'Pendiente',
+  priority: 'Normal',
+  due_date: '',
+  company_id: '',
+  contact_id: '',
+  opportunity_id: '',
+  assigned_to: ''
+})
 const [companyForm, setCompanyForm] = useState({
   name: '',
   legal_name: '',
@@ -198,6 +216,35 @@ async function loadOpportunities() {
   }
 
   setOpportunitiesLoading(false)
+}
+async function loadTasks() {
+  setTasksLoading(true)
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .select(`
+      *,
+      companies (
+        name
+      ),
+      contacts (
+        first_name,
+        last_name
+      ),
+      opportunities (
+        title
+      )
+    `)
+    .order('due_date', { ascending: true })
+
+  if (error) {
+    console.error('Error cargando tareas:', error)
+    setTasks([])
+  } else {
+    setTasks(data || [])
+  }
+
+  setTasksLoading(false)
 }
 async function loadOpportunityOptions() {
   const [
@@ -431,6 +478,60 @@ async function editOpportunity(opportunity) {
 
   setShowOpportunityForm(true)
   window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+async function saveTask(e) {
+  e.preventDefault()
+  setTaskSaving(true)
+  setError('')
+
+  const taskData = {
+    title: taskForm.title,
+    description: taskForm.description || null,
+    task_type: taskForm.task_type,
+    status: taskForm.status,
+    priority: taskForm.priority,
+    due_date: taskForm.due_date || null,
+    company_id: taskForm.company_id || null,
+    contact_id: taskForm.contact_id || null,
+    opportunity_id: taskForm.opportunity_id || null,
+    assigned_to: taskForm.assigned_to || session.user.id,
+    completed_at:
+      taskForm.status === 'Completada'
+        ? new Date().toISOString()
+        : null
+  }
+
+  let result
+
+  if (editingTaskId) {
+    result = await supabase
+      .from('tasks')
+      .update(taskData)
+      .eq('id', editingTaskId)
+  } else {
+    result = await supabase
+      .from('tasks')
+      .insert([
+        {
+          ...taskData,
+          created_by: session.user.id
+        }
+      ])
+  }
+
+  const { error } = result
+
+  if (error) {
+    console.error('Error guardando tarea:', error)
+    setError('No se ha podido guardar la tarea.')
+    setTaskSaving(false)
+    return
+  }
+
+  setShowTaskForm(false)
+  setEditingTaskId(null)
+  await loadTasks()
+  setTaskSaving(false)
 }
 function editCompany(company) {
   setEditingCompanyId(company.id)
@@ -800,10 +901,19 @@ onClick={() => {
         Llamadas
       </button>
 
-      <button className="nav-item">
-        <span>✓</span>
-        Tareas
-      </button>
+<button
+  className={`nav-item ${currentPage === 'tasks' ? 'active' : ''}`}
+  onClick={() => {
+    setCurrentPage('tasks')
+    loadTasks()
+    loadCompanies()
+    loadContacts()
+    loadOpportunities()
+  }}
+>
+  <span>✓</span>
+  Tareas
+</button>
 
       <button className="nav-item">
         <span>▥</span>
@@ -1772,6 +1882,299 @@ service_ids: [],
     ))}
   </div>
 )}
+  </>
+) : currentPage === 'tasks' ? (
+  <>
+    <div className="dashboard-heading">
+      <div>
+        <p className="dashboard-kicker">GLOBALTEC CRM</p>
+        <h1>Tareas</h1>
+        <p>Gestión y seguimiento de tareas pendientes.</p>
+      </div>
+
+      <button
+        className="primary-action"
+        onClick={() => {
+          setEditingTaskId(null)
+          setTaskForm({
+            title: '',
+            description: '',
+            task_type: 'Seguimiento',
+            status: 'Pendiente',
+            priority: 'Normal',
+            due_date: '',
+            company_id: '',
+            contact_id: '',
+            opportunity_id: '',
+            assigned_to: ''
+          })
+          setShowTaskForm(true)
+        }}
+      >
+        + Nueva tarea
+      </button>
+    </div>
+{showTaskForm && (
+  <div className="dashboard-card">
+    <div className="card-heading">
+      <div>
+        <h2>{editingTaskId ? 'Editar tarea' : 'Nueva tarea'}</h2>
+        <p>Introduce los datos de la tarea.</p>
+      </div>
+    </div>
+
+<form
+  className="company-form"
+  onSubmit={saveTask}
+>
+      <div className="form-grid">
+
+        <div className="form-field">
+          <label>Título *</label>
+          <input
+            type="text"
+            value={taskForm.title}
+            onChange={(e) =>
+              setTaskForm({
+                ...taskForm,
+                title: e.target.value
+              })
+            }
+            required
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Tipo</label>
+          <select
+            value={taskForm.task_type}
+            onChange={(e) =>
+              setTaskForm({
+                ...taskForm,
+                task_type: e.target.value
+              })
+            }
+          >
+            <option value="Llamada">Llamada</option>
+            <option value="Seguimiento">Seguimiento</option>
+            <option value="Email">Email</option>
+            <option value="Reunión">Reunión</option>
+            <option value="Presupuesto">Presupuesto</option>
+            <option value="Gestión">Gestión</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+
+        <div className="form-field">
+          <label>Estado</label>
+          <select
+            value={taskForm.status}
+            onChange={(e) =>
+              setTaskForm({
+                ...taskForm,
+                status: e.target.value
+              })
+            }
+          >
+            <option value="Pendiente">Pendiente</option>
+            <option value="En curso">En curso</option>
+            <option value="Completada">Completada</option>
+            <option value="Cancelada">Cancelada</option>
+          </select>
+        </div>
+
+        <div className="form-field">
+          <label>Prioridad</label>
+          <select
+            value={taskForm.priority}
+            onChange={(e) =>
+              setTaskForm({
+                ...taskForm,
+                priority: e.target.value
+              })
+            }
+          >
+            <option value="Baja">Baja</option>
+            <option value="Normal">Normal</option>
+            <option value="Alta">Alta</option>
+            <option value="Urgente">Urgente</option>
+          </select>
+        </div>
+
+        <div className="form-field">
+          <label>Fecha límite</label>
+          <input
+            type="datetime-local"
+            value={taskForm.due_date}
+            onChange={(e) =>
+              setTaskForm({
+                ...taskForm,
+                due_date: e.target.value
+              })
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Cliente</label>
+          <select
+            value={taskForm.company_id}
+            onChange={(e) =>
+              setTaskForm({
+                ...taskForm,
+                company_id: e.target.value,
+                contact_id: ''
+              })
+            }
+          >
+            <option value="">Sin cliente</option>
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-field">
+          <label>Contacto</label>
+          <select
+            value={taskForm.contact_id}
+            onChange={(e) =>
+              setTaskForm({
+                ...taskForm,
+                contact_id: e.target.value
+              })
+            }
+          >
+            <option value="">Sin contacto</option>
+            {contacts
+              .filter(
+                (contact) =>
+                  !taskForm.company_id ||
+                  contact.company_id === taskForm.company_id
+              )
+              .map((contact) => (
+                <option key={contact.id} value={contact.id}>
+                  {`${contact.first_name || ''} ${contact.last_name || ''}`.trim()}
+                </option>
+              ))}
+          </select>
+        </div>
+
+        <div className="form-field">
+          <label>Oportunidad</label>
+          <select
+            value={taskForm.opportunity_id}
+            onChange={(e) =>
+              setTaskForm({
+                ...taskForm,
+                opportunity_id: e.target.value
+              })
+            }
+          >
+            <option value="">Sin oportunidad</option>
+            {opportunities
+              .filter(
+                (opportunity) =>
+                  !taskForm.company_id ||
+                  opportunity.company_id === taskForm.company_id
+              )
+              .map((opportunity) => (
+                <option key={opportunity.id} value={opportunity.id}>
+                  {opportunity.title}
+                </option>
+              ))}
+          </select>
+        </div>
+
+        <div className="form-field form-field-full">
+          <label>Descripción</label>
+          <textarea
+            value={taskForm.description}
+            onChange={(e) =>
+              setTaskForm({
+                ...taskForm,
+                description: e.target.value
+              })
+            }
+          />
+        </div>
+
+      </div>
+
+      <div className="form-actions">
+        <button
+          type="button"
+          className="secondary-action"
+          onClick={() => {
+            setShowTaskForm(false)
+            setEditingTaskId(null)
+          }}
+        >
+          Cancelar
+        </button>
+
+        <button
+          type="submit"
+          className="primary-action"
+          disabled={taskSaving}
+        >
+          {taskSaving ? 'Guardando...' : 'Guardar tarea'}
+        </button>
+      </div>
+    </form>
+  </div>
+)}
+    {tasksLoading ? (
+      <div className="dashboard-card">
+        Cargando tareas...
+      </div>
+    ) : tasks.length === 0 ? (
+      <div className="dashboard-card">
+        <div className="empty-state">
+          <strong>No hay tareas registradas</strong>
+          <span>Pulsa “+ Nueva tarea” para añadir la primera.</span>
+        </div>
+      </div>
+    ) : (
+      <div className="dashboard-card clients-list">
+        <div className="clients-table-header">
+          <span>Tarea</span>
+          <span>Cliente</span>
+          <span>Estado</span>
+          <span>Prioridad</span>
+          <span>Acciones</span>
+        </div>
+
+        {tasks.map((task) => (
+          <div className="client-row" key={task.id}>
+            <div className="client-main">
+              <strong>{task.title}</strong>
+              <small>{task.task_type || 'Tarea'}</small>
+            </div>
+
+            <div>
+              {task.companies?.name || 'Sin cliente'}
+            </div>
+
+            <div>
+              {task.status || 'Pendiente'}
+            </div>
+
+            <div>
+              {task.priority || 'Normal'}
+            </div>
+
+            <div className="client-actions">
+              <button type="button">
+                Editar
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
   </>
 ) : (
 <>
