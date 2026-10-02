@@ -15,6 +15,23 @@ const [showCompanyForm, setShowCompanyForm] = useState(false)
 const [companySaving, setCompanySaving] = useState(false)
 const [editingCompanyId, setEditingCompanyId] = useState(null)
 const [selectedCompany, setSelectedCompany] = useState(null)
+const [contacts, setContacts] = useState([])
+const [contactsLoading, setContactsLoading] = useState(false)
+const [showContactForm, setShowContactForm] = useState(false)
+const [contactSaving, setContactSaving] = useState(false)
+const [editingContactId, setEditingContactId] = useState(null)
+
+const [contactForm, setContactForm] = useState({
+  company_id: '',
+  first_name: '',
+  last_name: '',
+  job_title: '',
+  phone: '',
+  mobile: '',
+  email: '',
+  preferred_contact_method: 'telefono',
+  notes: ''
+})  
 const [companyForm, setCompanyForm] = useState({
   name: '',
   legal_name: '',
@@ -102,6 +119,68 @@ async function loadCompanies() {
 
   setCompaniesLoading(false)
 }
+async function loadContacts() {
+  setContactsLoading(true)
+
+  const { data, error } = await supabase
+    .from('contacts')
+    .select(`
+      *,
+      companies (
+        name
+      )
+    `)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error cargando contactos:', error)
+    setContacts([])
+  } else {
+    setContacts(data || [])
+  }
+
+  setContactsLoading(false)
+}
+
+
+async function saveContact(e) {
+  e.preventDefault()
+  setContactSaving(true)
+  setError('')
+
+  const { error } = await supabase
+    .from('contacts')
+    .insert([
+      {
+        ...contactForm,
+        owner_id: session.user.id
+      }
+    ])
+
+  if (error) {
+    console.error('Error guardando contacto:', error)
+    setError('No se ha podido guardar el contacto.')
+    setContactSaving(false)
+    return
+  }
+
+  setContactForm({
+    company_id: '',
+    first_name: '',
+    last_name: '',
+    job_title: '',
+    phone: '',
+    mobile: '',
+    email: '',
+    preferred_contact_method: 'telefono',
+    notes: ''
+  })
+
+  setShowContactForm(false)
+  await loadContacts()
+  setContactSaving(false)
+}
+
 function editCompany(company) {
   setEditingCompanyId(company.id)
 
@@ -437,7 +516,11 @@ const { error } = result
 
 <button
   className={`nav-item ${currentPage === 'contacts' ? 'active' : ''}`}
-  onClick={() => setCurrentPage('contacts')}
+onClick={() => {
+  setCurrentPage('contacts')
+  loadCompanies()
+  loadContacts()
+}}
 >
   <span>♟</span>
   Contactos
@@ -837,17 +920,236 @@ onClick={() => {
         <p>Gestión de personas de contacto de tus clientes.</p>
       </div>
 
-      <button className="primary-action">
-        + Nuevo contacto
-      </button>
+<button
+  className="primary-action"
+  onClick={() => setShowContactForm(true)}
+>
+  + Nuevo contacto
+</button>
     </div>
-
-    <div className="dashboard-card">
-      <div className="empty-state">
-        <strong>No hay contactos registrados</strong>
-        <span>Los contactos de tus clientes aparecerán aquí.</span>
+{showContactForm && (
+  <div className="dashboard-card company-form-card">
+    <div className="card-heading">
+      <div>
+        <h2>Nuevo contacto</h2>
+        <p>Introduce los datos de la persona de contacto.</p>
       </div>
     </div>
+
+<form className="company-form" onSubmit={saveContact}>
+  <div className="form-grid">
+
+        <div className="form-field">
+          <label>Empresa *</label>
+          <select
+            value={contactForm.company_id}
+            onChange={(e) =>
+              setContactForm({
+                ...contactForm,
+                company_id: e.target.value
+              })
+            }
+            required
+          >
+            <option value="">Selecciona una empresa</option>
+
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-field">
+          <label>Cargo</label>
+          <input
+            type="text"
+            value={contactForm.job_title}
+            onChange={(e) =>
+              setContactForm({
+                ...contactForm,
+                job_title: e.target.value
+              })
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Nombre *</label>
+          <input
+            type="text"
+            value={contactForm.first_name}
+            onChange={(e) =>
+              setContactForm({
+                ...contactForm,
+                first_name: e.target.value
+              })
+            }
+            required
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Apellidos</label>
+          <input
+            type="text"
+            value={contactForm.last_name}
+            onChange={(e) =>
+              setContactForm({
+                ...contactForm,
+                last_name: e.target.value
+              })
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Teléfono</label>
+          <input
+            type="tel"
+            value={contactForm.phone}
+            onChange={(e) =>
+              setContactForm({
+                ...contactForm,
+                phone: e.target.value
+              })
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Móvil</label>
+          <input
+            type="tel"
+            value={contactForm.mobile}
+            onChange={(e) =>
+              setContactForm({
+                ...contactForm,
+                mobile: e.target.value
+              })
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Email</label>
+          <input
+            type="email"
+            value={contactForm.email}
+            onChange={(e) =>
+              setContactForm({
+                ...contactForm,
+                email: e.target.value
+              })
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Contacto preferido</label>
+          <select
+            value={contactForm.preferred_contact_method}
+            onChange={(e) =>
+              setContactForm({
+                ...contactForm,
+                preferred_contact_method: e.target.value
+              })
+            }
+          >
+            <option value="telefono">Teléfono</option>
+            <option value="movil">Móvil</option>
+            <option value="email">Email</option>
+          </select>
+        </div>
+
+        <div className="form-field form-field-full">
+          <label>Notas</label>
+          <textarea
+            value={contactForm.notes}
+            onChange={(e) =>
+              setContactForm({
+                ...contactForm,
+                notes: e.target.value
+              })
+            }
+          />
+        </div>
+
+      </div>
+
+      <div className="form-actions">
+        <button
+          type="button"
+          className="secondary-action"
+          onClick={() => setShowContactForm(false)}
+        >
+          Cancelar
+        </button>
+
+<button
+  type="submit"
+  className="primary-action"
+  disabled={contactSaving}
+>
+  {contactSaving ? 'Guardando...' : 'Guardar contacto'}
+</button>
+      </div>
+    </form>
+  </div>
+)}
+{contactsLoading ? (
+  <div className="dashboard-card">
+    Cargando contactos...
+  </div>
+) : contacts.length === 0 ? (
+  <div className="dashboard-card">
+    <div className="empty-state">
+      <strong>No hay contactos registrados</strong>
+      <span>Pulsa “+ Nuevo contacto” para añadir el primero.</span>
+    </div>
+  </div>
+) : (
+  <div className="dashboard-card clients-list">
+    <div className="clients-table-header">
+      <span>Contacto</span>
+      <span>Empresa</span>
+      <span>Cargo</span>
+      <span>Teléfono</span>
+      <span>Acciones</span>
+    </div>
+
+    {contacts.map((contact) => (
+      <div className="client-row" key={contact.id}>
+        <div className="client-main">
+          <strong>
+            {contact.first_name} {contact.last_name}
+          </strong>
+          <small>{contact.email || 'Sin email'}</small>
+        </div>
+
+        <div>
+          {contact.companies?.name || 'Sin empresa'}
+        </div>
+
+        <div>
+          {contact.job_title || '—'}
+        </div>
+
+        <div className="client-contact">
+          <span>{contact.phone || contact.mobile || 'Sin teléfono'}</span>
+          <small>{contact.preferred_contact_method || ''}</small>
+        </div>
+
+        <div className="client-actions">
+          <button type="button">
+            Editar
+          </button>
+        </div>
+      </div>
+    ))}
+  </div>
+)}
   </>
 ) : (
 <>
