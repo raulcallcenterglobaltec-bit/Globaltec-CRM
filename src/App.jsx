@@ -46,7 +46,7 @@ const [opportunityForm, setOpportunityForm] = useState({
   title: '',
   company_id: '',
   contact_id: '',
-  service_id: '',
+ service_ids: [],
   source_id: '',
   stage_id: '',
   estimated_value: '',
@@ -314,7 +314,6 @@ const { error } = result
     title: opportunityForm.title,
     company_id: opportunityForm.company_id || null,
     contact_id: opportunityForm.contact_id || null,
-    service_id: opportunityForm.service_id || null,
     source_id: opportunityForm.source_id || null,
     stage_id: opportunityForm.stage_id || null,
     estimated_value: opportunityForm.estimated_value
@@ -347,6 +346,7 @@ const { error } = result
           owner_id: session.user.id
         }
       ])
+.select('id')
   }
 
   const { error } = result
@@ -357,7 +357,44 @@ const { error } = result
     setOpportunitySaving(false)
     return
   }
+const opportunityId = editingOpportunityId || result.data?.[0]?.id
 
+if (opportunityId) {
+  const { error: deleteServicesError } = await supabase
+    .from('opportunity_services')
+    .delete()
+    .eq('opportunity_id', opportunityId)
+
+  if (deleteServicesError) {
+    console.error(
+      'Error eliminando servicios anteriores:',
+      deleteServicesError
+    )
+  }
+
+  if (opportunityForm.service_ids.length > 0) {
+    const servicesToInsert = opportunityForm.service_ids.map(
+      (serviceId) => ({
+        opportunity_id: opportunityId,
+        service_id: serviceId
+      })
+    )
+
+    const { error: servicesError } = await supabase
+      .from('opportunity_services')
+      .insert(servicesToInsert)
+
+    if (servicesError) {
+      console.error(
+        'Error guardando servicios de la oportunidad:',
+        servicesError
+      )
+      setError('La oportunidad se guardó, pero hubo un problema con los servicios.')
+      setOpportunitySaving(false)
+      return
+    }
+  }
+}
   setShowOpportunityForm(false)
   setEditingOpportunityId(null)
   await loadOpportunities()
@@ -1377,7 +1414,7 @@ onClick={() => {
       title: '',
       company_id: '',
       contact_id: '',
-      service_id: '',
+service_ids: [],
       source_id: '',
       stage_id: pipelineStages[0]?.id || '',
       estimated_value: '',
@@ -1514,25 +1551,38 @@ onClick={() => {
           </select>
         </div>
 
-        <div className="form-field">
-          <label>Servicio</label>
-          <select
-            value={opportunityForm.service_id}
-            onChange={(e) =>
+<div className="form-field form-field-full">
+  <label>Servicios</label>
+
+  <div className="services-selector">
+    {services.length === 0 ? (
+      <span>No hay servicios disponibles</span>
+    ) : (
+      services.map((service) => (
+        <label className="service-option" key={service.id}>
+          <input
+            type="checkbox"
+            checked={opportunityForm.service_ids.includes(service.id)}
+            onChange={(e) => {
+              const serviceIds = e.target.checked
+                ? [...opportunityForm.service_ids, service.id]
+                : opportunityForm.service_ids.filter(
+                    (id) => id !== service.id
+                  )
+
               setOpportunityForm({
                 ...opportunityForm,
-                service_id: e.target.value
+                service_ids: serviceIds
               })
-            }
-          >
-            <option value="">Sin servicio</option>
-            {services.map((service) => (
-              <option key={service.id} value={service.id}>
-                {service.name}
-              </option>
-            ))}
-          </select>
-        </div>
+            }}
+          />
+
+          <span>{service.name}</span>
+        </label>
+      ))
+    )}
+  </div>
+</div>
 
         <div className="form-field">
           <label>Valor estimado (€)</label>
