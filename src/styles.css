@@ -1057,3 +1057,35 @@ body {
   font-size: 15px;
   color: #0b2948;
 }
+.report-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 24px;
+  padding: 14px 18px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.report-filters span {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0b2948;
+}
+
+.report-filters select {
+  min-width: 180px;
+  padding: 9px 36px 9px 12px;
+  border: 1px solid #d7dee8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0b2948;
+  font-size: 14px;
+  cursor: pointer;
+  outline: none;
+}
+
+.report-filters select:focus {
+  border-color: #2f8f68;
+}
