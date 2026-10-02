@@ -2094,20 +2094,21 @@ service_ids: [],
         <p>Resumen y análisis de la actividad comercial.</p>
       </div>
     </div>
-<div className="report-filters">
-  <span>Periodo:</span>
 
-  <select
-    value={reportPeriod}
-    onChange={(e) => setReportPeriod(e.target.value)}
-  >
-    <option value="all">Todo</option>
-    <option value="today">Hoy</option>
-    <option value="7days">Últimos 7 días</option>
-    <option value="30days">Últimos 30 días</option>
-    <option value="month">Este mes</option>
-  </select>
-</div>
+    <div className="report-filters">
+      <span>Periodo:</span>
+      <select
+        value={reportPeriod}
+        onChange={(e) => setReportPeriod(e.target.value)}
+      >
+        <option value="all">Todo</option>
+        <option value="today">Hoy</option>
+        <option value="7days">Últimos 7 días</option>
+        <option value="30days">Últimos 30 días</option>
+        <option value="month">Este mes</option>
+      </select>
+    </div>
+
     <div className="stats-grid">
       <div className="stat-card">
         <span>Clientes</span>
@@ -2172,93 +2173,17 @@ service_ids: [],
       </div>
 
       <div className="stat-card">
-<div className="stat-card">
-  <span>Llamadas</span>
-  <strong>
-    {calls.filter((call) =>
-      isInReportPeriod(call.started_at)
-    ).length}
-  </strong>
-  <small>Total registradas</small>
-</div>
-
-<div className="stat-card">
-  <span>Llamadas entrantes</span>
-  <strong>
-    {calls.filter(
-      (call) =>
-        call.direction === 'inbound' &&
-        isInReportPeriod(call.started_at)
-    ).length}
-  </strong>
-  <small>Recibidas</small>
-</div>
-
-</div>
-      <div className="report-row">
-        <span>Entrantes</span>
+        <span>Llamadas</span>
         <strong>
-          {calls.filter((call) => call.direction === 'inbound').length}
+          {calls.filter((call) =>
+            isInReportPeriod(call.started_at)
+          ).length}
         </strong>
+        <small>Total registradas</small>
       </div>
 
-      <div className="report-row">
-        <span>Salientes</span>
-        <strong>
-          {calls.filter((call) => call.direction === 'outbound').length}
-        </strong>
-      </div>
-
-      <div className="report-row">
-        <span>Completadas</span>
-        <strong>
-          {calls.filter((call) => call.status === 'completed').length}
-        </strong>
-      </div>
-
-      <div className="report-row">
-        <span>Perdidas</span>
-        <strong>
-          {calls.filter((call) => call.status === 'missed').length}
-        </strong>
-      </div>
-    </div>
-
-<div className="stat-card">
-  <span>Llamadas</span>
-  <strong>
-    {calls.filter((call) =>
-      isInReportPeriod(call.started_at)
-    ).length}
-  </strong>
-  <small>Total registradas</small>
-</div>
-
-<div className="stat-card">
-  <span>Llamadas entrantes</span>
-  <strong>
-    {calls.filter(
-      (call) =>
-        call.direction === 'inbound' &&
-        isInReportPeriod(call.started_at)
-    ).length}
-  </strong>
-  <small>Recibidas</small>
-</div>
-
-<div className="dashboard-grid">
-
-  <div className="dashboard-card">
-    <div className="card-heading">
-      <div>
-        <h2>Llamadas por tipo</h2>
-        <p>Distribución de llamadas registradas</p>
-      </div>
-    </div>
-
-    <div className="report-list">
-      <div className="report-row">
-        <span>Entrantes</span>
+      <div className="stat-card">
+        <span>Llamadas entrantes</span>
         <strong>
           {calls.filter(
             (call) =>
@@ -2266,75 +2191,113 @@ service_ids: [],
               isInReportPeriod(call.started_at)
           ).length}
         </strong>
-      </div>
-
-      <div className="report-row">
-        <span>Salientes</span>
-        <strong>
-          {calls.filter(
-            (call) =>
-              call.direction === 'outbound' &&
-              isInReportPeriod(call.started_at)
-          ).length}
-        </strong>
-      </div>
-
-      <div className="report-row">
-        <span>Completadas</span>
-        <strong>
-          {calls.filter(
-            (call) =>
-              call.status === 'completed' &&
-              isInReportPeriod(call.started_at)
-          ).length}
-        </strong>
-      </div>
-
-      <div className="report-row">
-        <span>Perdidas</span>
-        <strong>
-          {calls.filter(
-            (call) =>
-              call.status === 'missed' &&
-              isInReportPeriod(call.started_at)
-          ).length}
-        </strong>
-      </div>
-</div>
-
-<div className="dashboard-card">
-  <div className="card-heading">
-    <div>
-      <h2>Estado de tareas</h2>
-      <p>Situación actual de las tareas</p>
-    </div>
-  </div>
-
-    <div className="report-list">
-      <div className="report-row">
-        <span>Pendientes</span>
-        <strong>{tasks.filter((task) => task.status === 'pending').length}</strong>
-      </div>
-
-      <div className="report-row">
-        <span>En curso</span>
-        <strong>{tasks.filter((task) => task.status === 'in_progress').length}</strong>
-      </div>
-
-      <div className="report-row">
-        <span>Completadas</span>
-        <strong>{tasks.filter((task) => task.status === 'completed').length}</strong>
-      </div>
-
-      <div className="report-row">
-        <span>Canceladas</span>
-        <strong>{tasks.filter((task) => task.status === 'cancelled').length}</strong>
+        <small>Recibidas</small>
       </div>
     </div>
-  </div>
 
-</div>
-</div>
+    <div className="dashboard-grid">
+      <div className="dashboard-card">
+        <div className="card-heading">
+          <div>
+            <h2>Llamadas por tipo</h2>
+            <p>Distribución de llamadas registradas</p>
+          </div>
+        </div>
+
+        <div className="report-list">
+          <div className="report-row">
+            <span>Entrantes</span>
+            <strong>
+              {calls.filter(
+                (call) =>
+                  call.direction === 'inbound' &&
+                  isInReportPeriod(call.started_at)
+              ).length}
+            </strong>
+          </div>
+
+          <div className="report-row">
+            <span>Salientes</span>
+            <strong>
+              {calls.filter(
+                (call) =>
+                  call.direction === 'outbound' &&
+                  isInReportPeriod(call.started_at)
+              ).length}
+            </strong>
+          </div>
+
+          <div className="report-row">
+            <span>Completadas</span>
+            <strong>
+              {calls.filter(
+                (call) =>
+                  call.status === 'completed' &&
+                  isInReportPeriod(call.started_at)
+              ).length}
+            </strong>
+          </div>
+
+          <div className="report-row">
+            <span>Perdidas</span>
+            <strong>
+              {calls.filter(
+                (call) =>
+                  call.status === 'missed' &&
+                  isInReportPeriod(call.started_at)
+              ).length}
+            </strong>
+          </div>
+        </div>
+      </div>
+
+      <div className="dashboard-card">
+        <div className="card-heading">
+          <div>
+            <h2>Estado de tareas</h2>
+            <p>Situación actual de las tareas</p>
+          </div>
+        </div>
+
+        <div className="report-list">
+          <div className="report-row">
+            <span>Pendientes</span>
+            <strong>
+              {tasks.filter(
+                (task) => task.status === 'pending'
+              ).length}
+            </strong>
+          </div>
+
+          <div className="report-row">
+            <span>En curso</span>
+            <strong>
+              {tasks.filter(
+                (task) => task.status === 'in_progress'
+              ).length}
+            </strong>
+          </div>
+
+          <div className="report-row">
+            <span>Completadas</span>
+            <strong>
+              {tasks.filter(
+                (task) => task.status === 'completed'
+              ).length}
+            </strong>
+          </div>
+
+          <div className="report-row">
+            <span>Canceladas</span>
+            <strong>
+              {tasks.filter(
+                (task) => task.status === 'cancelled'
+              ).length}
+            </strong>
+          </div>
+        </div>
+      </div>
+    </div>
   </>
 ) : currentPage === 'calls' ? (
   <>
