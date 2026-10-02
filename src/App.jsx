@@ -103,6 +103,7 @@ const [companyForm, setCompanyForm] = useState({
         loadProfile(session.user.id)
         loadCompanies()
         loadOpportunities()
+        loadTasks()
       } else {
         setLoading(false)
       }
@@ -123,6 +124,7 @@ const [companyForm, setCompanyForm] = useState({
         loadProfile(session.user.id)
         loadCompanies()
         loadOpportunities()
+        loadTasks()
       } else {
         setProfile(null)
         setLoading(false)
@@ -533,6 +535,27 @@ async function saveTask(e) {
   await loadTasks()
   setTaskSaving(false)
 }
+  function editTask(task) {
+  setEditingTaskId(task.id)
+
+  setTaskForm({
+    title: task.title || '',
+    description: task.description || '',
+    task_type: task.task_type || 'follow_up',
+    status: task.status || 'pending',
+    priority: task.priority || 'normal',
+    due_date: task.due_date
+      ? new Date(task.due_date).toISOString().slice(0, 16)
+      : '',
+    company_id: task.company_id || '',
+    contact_id: task.contact_id || '',
+    opportunity_id: task.opportunity_id || '',
+    assigned_to: task.assigned_to || ''
+  })
+
+  setShowTaskForm(true)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 function editCompany(company) {
   setEditingCompanyId(company.id)
 
@@ -853,6 +876,7 @@ onClick={() => {
   setCurrentPage('dashboard')
   loadCompanies()
   loadOpportunities()
+  loadTasks()
 }}
 >
         <span>▦</span>
@@ -2150,7 +2174,16 @@ priority: 'normal',
           <div className="client-row" key={task.id}>
             <div className="client-main">
               <strong>{task.title}</strong>
-              <small>{task.task_type || 'Tarea'}</small>
+ <small>
+  {{
+    general: 'Gestión',
+    call: 'Llamada',
+    email: 'Email',
+    meeting: 'Reunión',
+    follow_up: 'Seguimiento',
+    proposal: 'Presupuesto'
+  }[task.task_type] || 'Tarea'}
+</small>
             </div>
 
             <div>
@@ -2158,18 +2191,30 @@ priority: 'normal',
             </div>
 
             <div>
-              {task.status || 'Pendiente'}
-            </div>
+              {task.status || 'Pendiente'}{{
+  pending: 'Pendiente',
+  in_progress: 'En curso',
+  completed: 'Completada',
+  cancelled: 'Cancelada'
+}[task.status] || 'Pendiente'}            </div>
 
             <div>
-              {task.priority || 'Normal'}
+{{
+  low: 'Baja',
+  normal: 'Normal',
+  high: 'Alta',
+  urgent: 'Urgente'
+}[task.priority] || 'Normal'}
             </div>
 
-            <div className="client-actions">
-              <button type="button">
-                Editar
-              </button>
-            </div>
+<div className="client-actions">
+  <button
+    type="button"
+    onClick={() => editTask(task)}
+  >
+    Editar
+  </button>
+</div>
           </div>
         ))}
       </div>
@@ -2213,7 +2258,13 @@ priority: 'normal',
 
       <div className="stat-card">
         <span>Tareas pendientes</span>
-        <strong>0</strong>
+        <strong><strong>
+  {tasks.filter(
+    (task) =>
+      task.status === 'pending' ||
+      task.status === 'in_progress'
+  ).length}
+</strong></strong>
         <small>Por completar</small>
       </div>
 
