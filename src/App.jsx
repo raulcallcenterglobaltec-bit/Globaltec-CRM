@@ -2223,7 +2223,6 @@ service_ids: [],
         </strong>
       </div>
     </div>
-  </div>
 
 <div className="stat-card">
   <span>Llamadas</span>
