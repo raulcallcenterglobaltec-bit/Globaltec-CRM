@@ -32,6 +32,30 @@ const [contactForm, setContactForm] = useState({
   preferred_contact_method: 'telefono',
   notes: ''
 })  
+const [opportunities, setOpportunities] = useState([])
+const [opportunitiesLoading, setOpportunitiesLoading] = useState(false)
+const [showOpportunityForm, setShowOpportunityForm] = useState(false)
+const [opportunitySaving, setOpportunitySaving] = useState(false)
+const [editingOpportunityId, setEditingOpportunityId] = useState(null)
+
+const [pipelineStages, setPipelineStages] = useState([])
+const [leadSources, setLeadSources] = useState([])
+const [services, setServices] = useState([])
+
+const [opportunityForm, setOpportunityForm] = useState({
+  title: '',
+  company_id: '',
+  contact_id: '',
+  service_id: '',
+  source_id: '',
+  stage_id: '',
+  estimated_value: '',
+  monthly_value: '',
+  probability: '',
+  expected_close_date: '',
+  description: '',
+  lost_reason: ''
+})
 const [companyForm, setCompanyForm] = useState({
   name: '',
   legal_name: '',
@@ -143,7 +167,77 @@ async function loadContacts() {
 
   setContactsLoading(false)
 }
+async function loadOpportunities() {
+  setOpportunitiesLoading(true)
 
+  const { data, error } = await supabase
+    .from('opportunities')
+    .select(`
+      *,
+      companies (
+        name
+      ),
+      contacts (
+        first_name,
+        last_name
+      ),
+      pipeline_stages (
+        name,
+        position
+      )
+    `)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error cargando oportunidades:', error)
+    setOpportunities([])
+  } else {
+    setOpportunities(data || [])
+  }
+
+  setOpportunitiesLoading(false)
+}
+async function loadOpportunityOptions() {
+  const [
+    stagesResult,
+    sourcesResult,
+    servicesResult
+  ] = await Promise.all([
+    supabase
+      .from('pipeline_stages')
+      .select('*')
+      .order('position', { ascending: true }),
+
+    supabase
+      .from('lead_sources')
+      .select('*')
+      .order('name', { ascending: true }),
+
+    supabase
+      .from('services')
+      .select('*')
+      .eq('active', true)
+      .order('name', { ascending: true })
+  ])
+
+  if (stagesResult.error) {
+    console.error('Error cargando etapas:', stagesResult.error)
+  } else {
+    setPipelineStages(stagesResult.data || [])
+  }
+
+  if (sourcesResult.error) {
+    console.error('Error cargando orígenes:', sourcesResult.error)
+  } else {
+    setLeadSources(sourcesResult.data || [])
+  }
+
+  if (servicesResult.error) {
+    console.error('Error cargando servicios:', servicesResult.error)
+  } else {
+    setServices(servicesResult.data || [])
+  }
+}
 function editContact(contact) {
   setEditingContactId(contact.id)
 
@@ -210,6 +304,64 @@ const { error } = result
   setEditingContactId(null)
   await loadContacts()
   setContactSaving(false)
+}
+  async function saveOpportunity(e) {
+  e.preventDefault()
+  setOpportunitySaving(true)
+  setError('')
+
+  const opportunityData = {
+    title: opportunityForm.title,
+    company_id: opportunityForm.company_id || null,
+    contact_id: opportunityForm.contact_id || null,
+    service_id: opportunityForm.service_id || null,
+    source_id: opportunityForm.source_id || null,
+    stage_id: opportunityForm.stage_id || null,
+    estimated_value: opportunityForm.estimated_value
+      ? Number(opportunityForm.estimated_value)
+      : null,
+    monthly_value: opportunityForm.monthly_value
+      ? Number(opportunityForm.monthly_value)
+      : null,
+    probability: opportunityForm.probability
+      ? Number(opportunityForm.probability)
+      : null,
+    expected_close_date: opportunityForm.expected_close_date || null,
+    description: opportunityForm.description || null,
+    lost_reason: opportunityForm.lost_reason || null
+  }
+
+  let result
+
+  if (editingOpportunityId) {
+    result = await supabase
+      .from('opportunities')
+      .update(opportunityData)
+      .eq('id', editingOpportunityId)
+  } else {
+    result = await supabase
+      .from('opportunities')
+      .insert([
+        {
+          ...opportunityData,
+          owner_id: session.user.id
+        }
+      ])
+  }
+
+  const { error } = result
+
+  if (error) {
+    console.error('Error guardando oportunidad:', error)
+    setError('No se ha podido guardar la oportunidad.')
+    setOpportunitySaving(false)
+    return
+  }
+
+  setShowOpportunityForm(false)
+  setEditingOpportunityId(null)
+  await loadOpportunities()
+  setOpportunitySaving(false)
 }
 
 function editCompany(company) {
@@ -562,7 +714,13 @@ onClick={() => {
 
 <button
   className={`nav-item ${currentPage === 'opportunities' ? 'active' : ''}`}
-  onClick={() => setCurrentPage('opportunities')}
+onClick={() => {
+  setCurrentPage('opportunities')
+  loadCompanies()
+  loadContacts()
+  loadOpportunities()
+  loadOpportunityOptions()
+}}
 >
   <span>◎</span>
   Oportunidades
@@ -1211,17 +1369,324 @@ onClick={() => {
         <p>Gestión y seguimiento de oportunidades comerciales.</p>
       </div>
 
-      <button className="primary-action">
-        + Nueva oportunidad
-      </button>
+<button
+  className="primary-action"
+  onClick={() => {
+    setEditingOpportunityId(null)
+    setOpportunityForm({
+      title: '',
+      company_id: '',
+      contact_id: '',
+      service_id: '',
+      source_id: '',
+      stage_id: pipelineStages[0]?.id || '',
+      estimated_value: '',
+      monthly_value: '',
+      probability: '',
+      expected_close_date: '',
+      description: '',
+      lost_reason: ''
+    })
+    setShowOpportunityForm(true)
+  }}
+>
+  + Nueva oportunidad
+</button>
     </div>
-
-    <div className="dashboard-card">
-      <div className="empty-state">
-        <strong>No hay oportunidades registradas</strong>
-        <span>Las oportunidades comerciales aparecerán aquí.</span>
+{showOpportunityForm && (
+  <div className="dashboard-card">
+    <div className="card-heading">
+      <div>
+        <h2>
+          {editingOpportunityId ? 'Editar oportunidad' : 'Nueva oportunidad'}
+        </h2>
+        <p>Introduce los datos de la oportunidad comercial.</p>
       </div>
     </div>
+
+<form
+  className="company-form"
+  onSubmit={saveOpportunity}
+>
+      <div className="form-grid">
+
+        <div className="form-field">
+          <label>Título *</label>
+          <input
+            type="text"
+            value={opportunityForm.title}
+            onChange={(e) =>
+              setOpportunityForm({
+                ...opportunityForm,
+                title: e.target.value
+              })
+            }
+            required
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Cliente *</label>
+          <select
+            value={opportunityForm.company_id}
+            onChange={(e) =>
+              setOpportunityForm({
+                ...opportunityForm,
+                company_id: e.target.value,
+                contact_id: ''
+              })
+            }
+            required
+          >
+            <option value="">Seleccionar cliente</option>
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-field">
+          <label>Contacto</label>
+          <select
+            value={opportunityForm.contact_id}
+            onChange={(e) =>
+              setOpportunityForm({
+                ...opportunityForm,
+                contact_id: e.target.value
+              })
+            }
+          >
+            <option value="">Sin contacto</option>
+            {contacts
+              .filter(
+                (contact) =>
+                  !opportunityForm.company_id ||
+                  contact.company_id === opportunityForm.company_id
+              )
+              .map((contact) => (
+                <option key={contact.id} value={contact.id}>
+                  {`${contact.first_name || ''} ${contact.last_name || ''}`.trim()}
+                </option>
+              ))}
+          </select>
+        </div>
+
+        <div className="form-field">
+          <label>Etapa *</label>
+          <select
+            value={opportunityForm.stage_id}
+            onChange={(e) =>
+              setOpportunityForm({
+                ...opportunityForm,
+                stage_id: e.target.value
+              })
+            }
+            required
+          >
+            <option value="">Seleccionar etapa</option>
+            {pipelineStages.map((stage) => (
+              <option key={stage.id} value={stage.id}>
+                {stage.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-field">
+          <label>Origen</label>
+          <select
+            value={opportunityForm.source_id}
+            onChange={(e) =>
+              setOpportunityForm({
+                ...opportunityForm,
+                source_id: e.target.value
+              })
+            }
+          >
+            <option value="">Sin origen</option>
+            {leadSources.map((source) => (
+              <option key={source.id} value={source.id}>
+                {source.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-field">
+          <label>Servicio</label>
+          <select
+            value={opportunityForm.service_id}
+            onChange={(e) =>
+              setOpportunityForm({
+                ...opportunityForm,
+                service_id: e.target.value
+              })
+            }
+          >
+            <option value="">Sin servicio</option>
+            {services.map((service) => (
+              <option key={service.id} value={service.id}>
+                {service.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-field">
+          <label>Valor estimado (€)</label>
+          <input
+            type="number"
+            step="0.01"
+            value={opportunityForm.estimated_value}
+            onChange={(e) =>
+              setOpportunityForm({
+                ...opportunityForm,
+                estimated_value: e.target.value
+              })
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Cuota mensual (€)</label>
+          <input
+            type="number"
+            step="0.01"
+            value={opportunityForm.monthly_value}
+            onChange={(e) =>
+              setOpportunityForm({
+                ...opportunityForm,
+                monthly_value: e.target.value
+              })
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Probabilidad (%)</label>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            value={opportunityForm.probability}
+            onChange={(e) =>
+              setOpportunityForm({
+                ...opportunityForm,
+                probability: e.target.value
+              })
+            }
+          />
+        </div>
+
+        <div className="form-field">
+          <label>Fecha prevista de cierre</label>
+          <input
+            type="date"
+            value={opportunityForm.expected_close_date}
+            onChange={(e) =>
+              setOpportunityForm({
+                ...opportunityForm,
+                expected_close_date: e.target.value
+              })
+            }
+          />
+        </div>
+
+        <div className="form-field form-field-full">
+          <label>Descripción</label>
+          <textarea
+            value={opportunityForm.description}
+            onChange={(e) =>
+              setOpportunityForm({
+                ...opportunityForm,
+                description: e.target.value
+              })
+            }
+          />
+        </div>
+
+      </div>
+
+      <div className="form-actions">
+        <button
+          type="button"
+          className="secondary-action"
+          onClick={() => {
+            setShowOpportunityForm(false)
+            setEditingOpportunityId(null)
+          }}
+        >
+          Cancelar
+        </button>
+
+        <button
+          type="submit"
+          className="primary-action"
+          disabled={opportunitySaving}
+        >
+          {opportunitySaving ? 'Guardando...' : 'Guardar oportunidad'}
+        </button>
+      </div>
+    </form>
+  </div>
+)}
+{opportunitiesLoading ? (
+  <div className="dashboard-card">
+    Cargando oportunidades...
+  </div>
+) : opportunities.length === 0 ? (
+  <div className="dashboard-card">
+    <div className="empty-state">
+      <strong>No hay oportunidades registradas</strong>
+      <span>Pulsa “+ Nueva oportunidad” para añadir la primera.</span>
+    </div>
+  </div>
+) : (
+  <div className="dashboard-card clients-list">
+    <div className="clients-table-header">
+      <span>Oportunidad</span>
+      <span>Cliente</span>
+      <span>Etapa</span>
+      <span>Valor</span>
+      <span>Acciones</span>
+    </div>
+
+    {opportunities.map((opportunity) => (
+      <div className="client-row" key={opportunity.id}>
+        <div className="client-main">
+          <strong>{opportunity.title}</strong>
+          <small>
+            {opportunity.contacts
+              ? `${opportunity.contacts.first_name || ''} ${opportunity.contacts.last_name || ''}`.trim()
+              : 'Sin contacto'}
+          </small>
+        </div>
+
+        <div>
+          {opportunity.companies?.name || 'Sin cliente'}
+        </div>
+
+        <div>
+          {opportunity.pipeline_stages?.name || 'Sin etapa'}
+        </div>
+
+        <div>
+          {opportunity.estimated_value
+            ? `${Number(opportunity.estimated_value).toLocaleString('es-ES')} €`
+            : '—'}
+        </div>
+
+        <div className="client-actions">
+          <button type="button">
+            Editar
+          </button>
+        </div>
+      </div>
+    ))}
+  </div>
+)}
   </>
 ) : (
 <>
