@@ -2334,6 +2334,7 @@ service_ids: [],
   </div>
 
 </div>
+</div>
   </>
 ) : currentPage === 'calls' ? (
   <>
