@@ -1227,7 +1227,9 @@ onClick={() => {
       </div>
     </div>
 
-   
+ <div className="detail-wide">
+  <h3>Contactos del cliente</h3>
+</div>  
   </div>
 )}
 {showCompanyForm && (
