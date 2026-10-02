@@ -2748,7 +2748,25 @@ priority: 'normal',
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 5)
     .map((item) => (
-      <div className="activity-item" key={item.id}>
+      <div
+  className="activity-item"
+  key={item.id}
+  onClick={() => {
+    if (item.type === 'call') {
+      setCurrentPage('calls')
+      loadCalls()
+    } else if (item.type === 'task') {
+      setCurrentPage('tasks')
+      loadTasks()
+    } else if (item.type === 'opportunity') {
+      setCurrentPage('opportunities')
+      loadOpportunities()
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }}
+  style={{ cursor: 'pointer' }}
+>
         <div>
 <span className={`activity-type activity-type-${item.type}`}>
   {item.type === 'call'
