@@ -142,13 +142,38 @@ async function loadContacts() {
   setContactsLoading(false)
 }
 
+function editContact(contact) {
+  setEditingContactId(contact.id)
 
+  setContactForm({
+    company_id: contact.company_id || '',
+    first_name: contact.first_name || '',
+    last_name: contact.last_name || '',
+    job_title: contact.job_title || '',
+    phone: contact.phone || '',
+    mobile: contact.mobile || '',
+    email: contact.email || '',
+    preferred_contact_method: contact.preferred_contact_method || 'telefono',
+    notes: contact.notes || ''
+  })
+
+  setShowContactForm(true)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 async function saveContact(e) {
   e.preventDefault()
   setContactSaving(true)
   setError('')
 
-  const { error } = await supabase
+let result
+
+if (editingContactId) {
+  result = await supabase
+    .from('contacts')
+    .update(contactForm)
+    .eq('id', editingContactId)
+} else {
+  result = await supabase
     .from('contacts')
     .insert([
       {
@@ -156,6 +181,9 @@ async function saveContact(e) {
         owner_id: session.user.id
       }
     ])
+}
+
+const { error } = result
 
   if (error) {
     console.error('Error guardando contacto:', error)
@@ -177,6 +205,7 @@ async function saveContact(e) {
   })
 
   setShowContactForm(false)
+  setEditingContactId(null)
   await loadContacts()
   setContactSaving(false)
 }
@@ -931,8 +960,12 @@ onClick={() => {
   <div className="dashboard-card company-form-card">
     <div className="card-heading">
       <div>
-        <h2>Nuevo contacto</h2>
-        <p>Introduce los datos de la persona de contacto.</p>
+<h2>{editingContactId ? 'Editar contacto' : 'Nuevo contacto'}</h2>
+<p>
+  {editingContactId
+    ? 'Modifica los datos de la persona de contacto.'
+    : 'Introduce los datos de la persona de contacto.'}
+</p>
       </div>
     </div>
 
@@ -1082,7 +1115,10 @@ onClick={() => {
         <button
           type="button"
           className="secondary-action"
-          onClick={() => setShowContactForm(false)}
+onClick={() => {
+  setShowContactForm(false)
+  setEditingContactId(null)
+}}
         >
           Cancelar
         </button>
@@ -1092,7 +1128,11 @@ onClick={() => {
   className="primary-action"
   disabled={contactSaving}
 >
-  {contactSaving ? 'Guardando...' : 'Guardar contacto'}
+{contactSaving
+  ? 'Guardando...'
+  : editingContactId
+    ? 'Guardar cambios'
+    : 'Guardar contacto'}
 </button>
       </div>
     </form>
@@ -1141,11 +1181,14 @@ onClick={() => {
           <small>{contact.preferred_contact_method || ''}</small>
         </div>
 
-        <div className="client-actions">
-          <button type="button">
-            Editar
-          </button>
-        </div>
+<div className="client-actions">
+  <button
+    type="button"
+    onClick={() => editContact(contact)}
+  >
+    Editar
+  </button>
+</div>
       </div>
     ))}
   </div>
