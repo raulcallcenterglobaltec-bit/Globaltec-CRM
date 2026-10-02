@@ -1072,10 +1072,19 @@ onClick={() => {
   Tareas
 </button>
 
-      <button className="nav-item">
-        <span>▥</span>
-        Informes
-      </button>
+<button
+  className={`nav-item ${currentPage === 'reports' ? 'active' : ''}`}
+  onClick={() => {
+    setCurrentPage('reports')
+    loadCompanies()
+    loadOpportunities()
+    loadTasks()
+    loadCalls()
+  }}
+>
+  <span>▥</span>
+  Informes
+</button>
     </nav>
   </aside>
 
@@ -2039,6 +2048,169 @@ service_ids: [],
     ))}
   </div>
 )}
+  </>
+) : currentPage === 'reports' ? (
+  <>
+    <div className="dashboard-heading">
+      <div>
+        <p className="dashboard-kicker">GLOBALTEC CRM</p>
+        <h1>Informes</h1>
+        <p>Resumen y análisis de la actividad comercial.</p>
+      </div>
+    </div>
+
+    <div className="stats-grid">
+      <div className="stat-card">
+        <span>Clientes</span>
+        <strong>{companies.length}</strong>
+        <small>Total registrados</small>
+      </div>
+
+      <div className="stat-card">
+        <span>Oportunidades</span>
+        <strong>{opportunities.length}</strong>
+        <small>Total registradas</small>
+      </div>
+
+      <div className="stat-card">
+        <span>Valor oportunidades</span>
+        <strong>
+          {opportunities
+            .reduce(
+              (total, opportunity) =>
+                total + Number(opportunity.estimated_value || 0),
+              0
+            )
+            .toLocaleString('es-ES')} €
+        </strong>
+        <small>Valor estimado total</small>
+      </div>
+
+      <div className="stat-card">
+        <span>Cuota mensual</span>
+        <strong>
+          {opportunities
+            .reduce(
+              (total, opportunity) =>
+                total + Number(opportunity.monthly_value || 0),
+              0
+            )
+            .toLocaleString('es-ES')} €
+        </strong>
+        <small>Potencial mensual</small>
+      </div>
+
+      <div className="stat-card">
+        <span>Tareas pendientes</span>
+        <strong>
+          {tasks.filter(
+            (task) =>
+              task.status === 'pending' ||
+              task.status === 'in_progress'
+          ).length}
+        </strong>
+        <small>Por completar</small>
+      </div>
+
+      <div className="stat-card">
+        <span>Tareas completadas</span>
+        <strong>
+          {tasks.filter(
+            (task) => task.status === 'completed'
+          ).length}
+        </strong>
+        <small>Finalizadas</small>
+      </div>
+
+      <div className="stat-card">
+        <span>Llamadas</span>
+        <strong>{calls.length}</strong>
+        <small>Total registradas</small>
+      </div>
+
+      <div className="stat-card">
+        <span>Llamadas entrantes</span>
+        <strong>
+          {calls.filter(
+            (call) => call.direction === 'inbound'
+          ).length}
+        </strong>
+        <small>Recibidas</small>
+      </div>
+    </div>
+  <div className="dashboard-grid">
+
+  <div className="dashboard-card">
+    <div className="card-heading">
+      <div>
+        <h2>Llamadas por tipo</h2>
+        <p>Distribución de llamadas registradas</p>
+      </div>
+    </div>
+
+    <div className="report-list">
+      <div className="report-row">
+        <span>Entrantes</span>
+        <strong>
+          {calls.filter((call) => call.direction === 'inbound').length}
+        </strong>
+      </div>
+
+      <div className="report-row">
+        <span>Salientes</span>
+        <strong>
+          {calls.filter((call) => call.direction === 'outbound').length}
+        </strong>
+      </div>
+
+      <div className="report-row">
+        <span>Completadas</span>
+        <strong>
+          {calls.filter((call) => call.status === 'completed').length}
+        </strong>
+      </div>
+
+      <div className="report-row">
+        <span>Perdidas</span>
+        <strong>
+          {calls.filter((call) => call.status === 'missed').length}
+        </strong>
+      </div>
+    </div>
+  </div>
+
+  <div className="dashboard-card">
+    <div className="card-heading">
+      <div>
+        <h2>Estado de tareas</h2>
+        <p>Situación actual de las tareas</p>
+      </div>
+    </div>
+
+    <div className="report-list">
+      <div className="report-row">
+        <span>Pendientes</span>
+        <strong>{tasks.filter((task) => task.status === 'pending').length}</strong>
+      </div>
+
+      <div className="report-row">
+        <span>En curso</span>
+        <strong>{tasks.filter((task) => task.status === 'in_progress').length}</strong>
+      </div>
+
+      <div className="report-row">
+        <span>Completadas</span>
+        <strong>{tasks.filter((task) => task.status === 'completed').length}</strong>
+      </div>
+
+      <div className="report-row">
+        <span>Canceladas</span>
+        <strong>{tasks.filter((task) => task.status === 'cancelled').length}</strong>
+      </div>
+    </div>
+  </div>
+
+</div>
   </>
 ) : currentPage === 'calls' ? (
   <>
