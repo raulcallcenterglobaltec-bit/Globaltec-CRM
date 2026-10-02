@@ -1238,6 +1238,7 @@ onClick={() => {
       ...contactForm,
       company_id: selectedCompany.id
     })
+    setCurrentPage('contacts')
     setShowContactForm(true)
   }}
 >
