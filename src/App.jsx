@@ -2177,21 +2177,13 @@ service_ids: [],
   {calls.filter((call) =>
     isInReportPeriod(call.started_at)
   ).length}
+<strong>
+  {calls.filter(
+    (call) =>
+      call.direction === 'inbound' &&
+      isInReportPeriod(call.started_at)
+  ).length}
 </strong>
-        <small>Total registradas</small>
-      </div>
-
-      <div className="stat-card">
-        <span>Llamadas entrantes</span>
-        <strong>
-          {calls.filter(
-          {calls.filter(
-  (call) =>
-    call.direction === 'inbound' &&
-    isInReportPeriod(call.started_at)
-).length}
-          ).length}
-        </strong>
         <small>Recibidas</small>
       </div>
     </div>
