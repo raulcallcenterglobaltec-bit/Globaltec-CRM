@@ -2122,7 +2122,11 @@ service_ids: [],
     <div className="stats-grid">
       <div className="stat-card">
         <span>Clientes</span>
-        <strong>{companies.length}</strong>
+      <strong>
+  {companies.filter((company) =>
+    isInReportPeriod(company.created_at)
+  ).length}
+</strong>
         <small>Total registrados</small>
       </div>
 
