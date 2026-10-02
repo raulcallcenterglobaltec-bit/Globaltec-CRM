@@ -2718,10 +2718,48 @@ priority: 'normal',
           </div>
         </div>
 
-        <div className="empty-state">
-          <strong>Sin actividad todavía</strong>
-          <span>Las últimas gestiones aparecerán aquí.</span>
+<div className="recent-activity">
+  {[
+    ...calls.map((call) => ({
+      id: `call-${call.id}`,
+      type: 'call',
+      date: call.created_at,
+      title: 'Llamada registrada',
+      detail: call.companies?.name || 'Sin cliente'
+    })),
+
+    ...tasks.map((task) => ({
+      id: `task-${task.id}`,
+      type: 'task',
+      date: task.created_at,
+      title: task.title || 'Tarea',
+      detail: 'Tarea creada'
+    })),
+
+    ...opportunities.map((opportunity) => ({
+      id: `opportunity-${opportunity.id}`,
+      type: 'opportunity',
+      date: opportunity.created_at,
+      title: opportunity.title || 'Oportunidad',
+      detail: opportunity.companies?.name || 'Sin cliente'
+    }))
+  ]
+    .filter((item) => item.date)
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 5)
+    .map((item) => (
+      <div className="activity-item" key={item.id}>
+        <div>
+          <strong>{item.title}</strong>
+          <span>{item.detail}</span>
         </div>
+
+        <small>
+          {new Date(item.date).toLocaleString('es-ES')}
+        </small>
+      </div>
+    ))}
+</div>
       </div>
 
       <div className="dashboard-card">
