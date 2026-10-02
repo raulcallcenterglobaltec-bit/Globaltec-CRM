@@ -2246,8 +2246,6 @@ service_ids: [],
   <small>Recibidas</small>
 </div>
 
-</div>
-
 <div className="dashboard-grid">
 
   <div className="dashboard-card">
