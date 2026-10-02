@@ -969,3 +969,10 @@ body {
   background: #fff4df;
   color: #9a6500 !important;
 }
+.activity-item {
+  transition: background-color 0.2s ease;
+}
+
+.activity-item:hover {
+  background-color: #f8fafc;
+}
