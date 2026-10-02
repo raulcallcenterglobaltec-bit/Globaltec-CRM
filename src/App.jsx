@@ -2225,10 +2225,86 @@ service_ids: [],
     </div>
   </div>
 
+<div className="stat-card">
+  <span>Llamadas</span>
+  <strong>
+    {calls.filter((call) =>
+      isInReportPeriod(call.started_at)
+    ).length}
+  </strong>
+  <small>Total registradas</small>
+</div>
+
+<div className="stat-card">
+  <span>Llamadas entrantes</span>
+  <strong>
+    {calls.filter(
+      (call) =>
+        call.direction === 'inbound' &&
+        isInReportPeriod(call.started_at)
+    ).length}
+  </strong>
+  <small>Recibidas</small>
+</div>
+
+</div>
+
+<div className="dashboard-grid">
+
   <div className="dashboard-card">
     <div className="card-heading">
       <div>
-        <h2>Estado de tareas</h2>
+        <h2>Llamadas por tipo</h2>
+        <p>Distribución de llamadas registradas</p>
+      </div>
+    </div>
+
+    <div className="report-list">
+      <div className="report-row">
+        <span>Entrantes</span>
+        <strong>
+          {calls.filter(
+            (call) =>
+              call.direction === 'inbound' &&
+              isInReportPeriod(call.started_at)
+          ).length}
+        </strong>
+      </div>
+
+      <div className="report-row">
+        <span>Salientes</span>
+        <strong>
+          {calls.filter(
+            (call) =>
+              call.direction === 'outbound' &&
+              isInReportPeriod(call.started_at)
+          ).length}
+        </strong>
+      </div>
+
+      <div className="report-row">
+        <span>Completadas</span>
+        <strong>
+          {calls.filter(
+            (call) =>
+              call.status === 'completed' &&
+              isInReportPeriod(call.started_at)
+          ).length}
+        </strong>
+      </div>
+
+      <div className="report-row">
+        <span>Perdidas</span>
+        <strong>
+          {calls.filter(
+            (call) =>
+              call.status === 'missed' &&
+              isInReportPeriod(call.started_at)
+          ).length}
+        </strong>
+      </div>
+    </div>
+  </div>
         <p>Situación actual de las tareas</p>
       </div>
     </div>
