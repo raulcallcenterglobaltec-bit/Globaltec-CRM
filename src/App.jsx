@@ -2223,103 +2223,51 @@ service_ids: [],
           <div className="report-row">
             <span>Salientes</span>
             <strong>
-              {calls.filter(
-                (call) =>
-                  call.direction === 'outbound' &&
-                  isInReportPeriod(call.started_at)
-              ).length}
-            </strong>
-          </div>
+          <div className="report-list">
+  <div className="report-row">
+    <span>Pendientes</span>
+    <strong>
+      {tasks.filter(
+        (task) =>
+          task.status === 'pending' &&
+          isInReportPeriod(task.created_at)
+      ).length}
+    </strong>
+  </div>
 
-          <div className="report-row">
-            <span>Completadas</span>
-            <strong>
-              {calls.filter(
-                (call) =>
-                  call.status === 'completed' &&
-                  isInReportPeriod(call.started_at)
-              ).length}
-            </strong>
-          </div>
+  <div className="report-row">
+    <span>En curso</span>
+    <strong>
+      {tasks.filter(
+        (task) =>
+          task.status === 'in_progress' &&
+          isInReportPeriod(task.created_at)
+      ).length}
+    </strong>
+  </div>
 
-          <div className="report-row">
-            <span>Perdidas</span>
-            <strong>
-              {calls.filter(
-                (call) =>
-                  call.status === 'missed' &&
-                  isInReportPeriod(call.started_at)
-              ).length}
-            </strong>
-          </div>
-        </div>
-      </div>
+  <div className="report-row">
+    <span>Completadas</span>
+    <strong>
+      {tasks.filter(
+        (task) =>
+          task.status === 'completed' &&
+          isInReportPeriod(task.created_at)
+      ).length}
+    </strong>
+  </div>
 
-      <div className="dashboard-card">
-        <div className="card-heading">
-          <div>
-            <h2>Estado de tareas</h2>
-            <p>Situación actual de las tareas</p>
-          </div>
-        </div>
-
-        <div className="report-list">
-          <div className="report-row">
-            <span>Pendientes</span>
-<strong>
-  {tasks.filter(
-    (task) =>
-      task.status === 'pending' &&
-      isInReportPeriod(task.created_at)
-  ).length}
-</strong>              {tasks.filter(
-                (task) => task.status === 'pending'
-              ).length}
-            </strong>
-          </div>
-
-          <div className="report-row">
-            <span>En curso</span>
-<strong>
-  {tasks.filter(
-    (task) =>
-      task.status === 'in_progress' &&
-      isInReportPeriod(task.created_at)
-  ).length}
-</strong>              {tasks.filter(
-                (task) => task.status === 'in_progress'
-              ).length}
-            </strong>
-          </div>
-
-          <div className="report-row">
-            <span>Completadas</span>
-<strong>
-  {tasks.filter(
-    (task) =>
-      task.status === 'completed' &&
-      isInReportPeriod(task.created_at)
-  ).length}
-</strong>              {tasks.filter(
-                (task) => task.status === 'completed'
-              ).length}
-            </strong>
-          </div>
-
-          <div className="report-row">
-            <span>Canceladas</span>
-<strong>
-  {tasks.filter(
-    (task) =>
-      task.status === 'cancelled' &&
-      isInReportPeriod(task.created_at)
-  ).length}
-</strong>              {tasks.filter(
-                (task) => task.status === 'cancelled'
-              ).length}
-            </strong>
-          </div>
-        </div>
+  <div className="report-row">
+    <span>Canceladas</span>
+    <strong>
+      {tasks.filter(
+        (task) =>
+          task.status === 'cancelled' &&
+          isInReportPeriod(task.created_at)
+      ).length}
+    </strong>
+  </div>
+</div>
       </div>
     </div>
   </>
