@@ -400,7 +400,36 @@ if (opportunityId) {
   await loadOpportunities()
   setOpportunitySaving(false)
 }
+async function editOpportunity(opportunity) {
+  setEditingOpportunityId(opportunity.id)
 
+  const { data: opportunityServices, error: servicesError } = await supabase
+    .from('opportunity_services')
+    .select('service_id')
+    .eq('opportunity_id', opportunity.id)
+
+  if (servicesError) {
+    console.error('Error cargando servicios de la oportunidad:', servicesError)
+  }
+
+  setOpportunityForm({
+    title: opportunity.title || '',
+    company_id: opportunity.company_id || '',
+    contact_id: opportunity.contact_id || '',
+    service_ids: opportunityServices?.map((item) => item.service_id) || [],
+    source_id: opportunity.source_id || '',
+    stage_id: opportunity.stage_id || '',
+    estimated_value: opportunity.estimated_value ?? '',
+    monthly_value: opportunity.monthly_value ?? '',
+    probability: opportunity.probability ?? '',
+    expected_close_date: opportunity.expected_close_date || '',
+    description: opportunity.description || '',
+    lost_reason: opportunity.lost_reason || ''
+  })
+
+  setShowOpportunityForm(true)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 function editCompany(company) {
   setEditingCompanyId(company.id)
 
@@ -1728,11 +1757,14 @@ service_ids: [],
             : '—'}
         </div>
 
-        <div className="client-actions">
-          <button type="button">
-            Editar
-          </button>
-        </div>
+<div className="client-actions">
+  <button
+    type="button"
+    onClick={() => editOpportunity(opportunity)}
+  >
+    Editar
+  </button>
+</div>
       </div>
     ))}
   </div>
