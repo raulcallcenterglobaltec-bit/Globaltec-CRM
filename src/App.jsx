@@ -1227,9 +1227,29 @@ onClick={() => {
       </div>
     </div>
 
- <div className="detail-wide">
+<div className="detail-wide">
   <h3>Contactos del cliente</h3>
-</div>  
+
+  {contacts.filter(
+    (contact) => contact.company_id === selectedCompany.id
+  ).length === 0 ? (
+    <p>No hay contactos registrados para este cliente.</p>
+  ) : (
+    <div>
+      {contacts
+        .filter(
+          (contact) => contact.company_id === selectedCompany.id
+        )
+        .map((contact) => (
+          <div key={contact.id}>
+            <strong>
+              {`${contact.first_name || ''} ${contact.last_name || ''}`.trim()}
+            </strong>
+          </div>
+        ))}
+    </div>
+  )}
+</div>
   </div>
 )}
 {showCompanyForm && (
