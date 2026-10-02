@@ -2186,19 +2186,17 @@ service_ids: [],
         <small>Por completar</small>
       </div>
 
-      <div className="stat-card">
-       {tasks.filter(
-  (task) =>
-    task.status === 'completed' &&
-    isInReportPeriod(task.created_at)
-).length}
-        <strong>
-          {tasks.filter(
-            (task) => task.status === 'completed'
-          ).length}
-        </strong>
-        <small>Finalizadas</small>
-      </div>
+<div className="stat-card">
+  <span>Tareas completadas</span>
+  <strong>
+    {tasks.filter(
+      (task) =>
+        task.status === 'completed' &&
+        isInReportPeriod(task.created_at)
+    ).length}
+  </strong>
+  <small>Finalizadas</small>
+</div>
 
       <div className="stat-card">
         <span>Llamadas</span>
