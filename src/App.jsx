@@ -1229,7 +1229,20 @@ onClick={() => {
 
 <div className="detail-wide">
   <h3>Contactos del cliente</h3>
-
+<button
+  type="button"
+  className="secondary-action"
+  onClick={() => {
+    setEditingContactId(null)
+    setContactForm({
+      ...contactForm,
+      company_id: selectedCompany.id
+    })
+    setShowContactForm(true)
+  }}
+>
+  + Nuevo contacto
+</button>
   {contacts.filter(
     (contact) => contact.company_id === selectedCompany.id
   ).length === 0 ? (
