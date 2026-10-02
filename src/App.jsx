@@ -560,10 +560,13 @@ onClick={() => {
   Contactos
 </button>
 
-      <button className="nav-item">
-        <span>◎</span>
-        Oportunidades
-      </button>
+<button
+  className={`nav-item ${currentPage === 'opportunities' ? 'active' : ''}`}
+  onClick={() => setCurrentPage('opportunities')}
+>
+  <span>◎</span>
+  Oportunidades
+</button>
 
       <button className="nav-item">
         <span>☎</span>
@@ -1198,6 +1201,27 @@ onClick={() => {
     ))}
   </div>
 )}
+  </>
+) : currentPage === 'opportunities' ? (
+  <>
+    <div className="dashboard-heading">
+      <div>
+        <p className="dashboard-kicker">GLOBALTEC CRM</p>
+        <h1>Oportunidades</h1>
+        <p>Gestión y seguimiento de oportunidades comerciales.</p>
+      </div>
+
+      <button className="primary-action">
+        + Nueva oportunidad
+      </button>
+    </div>
+
+    <div className="dashboard-card">
+      <div className="empty-state">
+        <strong>No hay oportunidades registradas</strong>
+        <span>Las oportunidades comerciales aparecerán aquí.</span>
+      </div>
+    </div>
   </>
 ) : (
 <>
