@@ -2750,8 +2750,16 @@ priority: 'normal',
     .map((item) => (
       <div className="activity-item" key={item.id}>
         <div>
-          <strong>{item.title}</strong>
-          <span>{item.detail}</span>
+<span className={`activity-type activity-type-${item.type}`}>
+  {item.type === 'call'
+    ? 'LLAMADA'
+    : item.type === 'task'
+      ? 'TAREA'
+      : 'OPORTUNIDAD'}
+</span>
+
+<strong>{item.title}</strong>
+<span>{item.detail}</span>
         </div>
 
         <small>
