@@ -310,7 +310,16 @@ async function loadCalls() {
       itemDate.getDate() === now.getDate()
     )
   }
+if (reportPeriod === 'yesterday') {
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
 
+  return (
+    itemDate.getFullYear() === yesterday.getFullYear() &&
+    itemDate.getMonth() === yesterday.getMonth() &&
+    itemDate.getDate() === yesterday.getDate()
+  )
+}
   if (reportPeriod === '7days') {
     const limit = new Date()
     limit.setDate(now.getDate() - 7)
@@ -2103,6 +2112,7 @@ service_ids: [],
       >
         <option value="all">Todo</option>
         <option value="today">Hoy</option>
+        <option value="yesterday">Ayer</option>
         <option value="7days">Últimos 7 días</option>
         <option value="30days">Últimos 30 días</option>
         <option value="month">Este mes</option>
