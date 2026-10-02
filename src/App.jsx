@@ -2172,32 +2172,29 @@ service_ids: [],
       </div>
 
       <div className="stat-card">
-        <span>Llamadas</span>
-      <strong>
-  {calls.filter((call) =>
-    isInReportPeriod(call.started_at)
-  ).length}
-<strong>
-  {calls.filter(
-    (call) =>
-      call.direction === 'inbound' &&
+<div className="stat-card">
+  <span>Llamadas</span>
+  <strong>
+    {calls.filter((call) =>
       isInReportPeriod(call.started_at)
-  ).length}
-</strong>
-        <small>Recibidas</small>
-      </div>
-    </div>
-  <div className="dashboard-grid">
+    ).length}
+  </strong>
+  <small>Total registradas</small>
+</div>
 
-  <div className="dashboard-card">
-    <div className="card-heading">
-      <div>
-        <h2>Llamadas por tipo</h2>
-        <p>Distribución de llamadas registradas</p>
-      </div>
-    </div>
+<div className="stat-card">
+  <span>Llamadas entrantes</span>
+  <strong>
+    {calls.filter(
+      (call) =>
+        call.direction === 'inbound' &&
+        isInReportPeriod(call.started_at)
+    ).length}
+  </strong>
+  <small>Recibidas</small>
+</div>
 
-    <div className="report-list">
+</div>
       <div className="report-row">
         <span>Entrantes</span>
         <strong>
