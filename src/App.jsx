@@ -2796,10 +2796,57 @@ priority: 'normal',
           </div>
         </div>
 
-        <div className="empty-state">
-          <strong>Todo al día</strong>
-          <span>No hay tareas pendientes.</span>
+{tasks.filter(
+  (task) =>
+    (task.status === 'pending' || task.status === 'in_progress') &&
+    task.due_date
+).length === 0 ? (
+  <div className="empty-state">
+    <strong>Todo al día</strong>
+    <span>No hay tareas pendientes con fecha límite.</span>
+  </div>
+) : (
+  <div className="upcoming-tasks">
+    {tasks
+      .filter(
+        (task) =>
+          (task.status === 'pending' || task.status === 'in_progress') &&
+          task.due_date
+      )
+      .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
+      .slice(0, 5)
+      .map((task) => (
+        <div
+          className="upcoming-task-item"
+          key={task.id}
+          onClick={() => {
+            setCurrentPage('tasks')
+            loadTasks()
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          }}
+        >
+          <div>
+            <strong>{task.title}</strong>
+            <span>
+              {task.companies?.name || 'Sin cliente'}
+            </span>
+          </div>
+
+          <div className="upcoming-task-date">
+            <strong>
+              {new Date(task.due_date).toLocaleDateString('es-ES')}
+            </strong>
+            <span>
+              {new Date(task.due_date).toLocaleTimeString('es-ES', {
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </span>
+          </div>
         </div>
+      ))}
+  </div>
+)}
       </div>
     </div>
  </>
