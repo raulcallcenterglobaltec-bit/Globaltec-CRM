@@ -84,6 +84,7 @@ const [companyForm, setCompanyForm] = useState({
       if (session) {
         loadProfile(session.user.id)
         loadCompanies()
+        loadOpportunities()
       } else {
         setLoading(false)
       }
@@ -103,6 +104,7 @@ const [companyForm, setCompanyForm] = useState({
       if (session) {
         loadProfile(session.user.id)
         loadCompanies()
+        loadOpportunities()
       } else {
         setProfile(null)
         setLoading(false)
@@ -749,6 +751,7 @@ const { error } = result
 onClick={() => {
   setCurrentPage('dashboard')
   loadCompanies()
+  loadOpportunities()
 }}
 >
         <span>▦</span>
@@ -1802,7 +1805,7 @@ service_ids: [],
 
       <div className="stat-card">
         <span>Oportunidades</span>
-        <strong>0</strong>
+<strong>{opportunities.length}</strong>
         <small>En seguimiento</small>
       </div>
 
