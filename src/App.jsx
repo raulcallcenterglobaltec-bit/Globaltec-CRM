@@ -66,7 +66,7 @@ const [callsLoading, setCallsLoading] = useState(false)
 const [showCallForm, setShowCallForm] = useState(false)
 const [callSaving, setCallSaving] = useState(false)
 const [editingCallId, setEditingCallId] = useState(null)
-
+const [reportPeriod, setReportPeriod] = useState('all')
 const [callForm, setCallForm] = useState({
   company_id: '',
   contact_id: '',
@@ -295,6 +295,42 @@ async function loadCalls() {
   }
 
   setCallsLoading(false)
+}
+  function isInReportPeriod(date) {
+  if (reportPeriod === 'all') return true
+  if (!date) return false
+
+  const itemDate = new Date(date)
+  const now = new Date()
+
+  if (reportPeriod === 'today') {
+    return (
+      itemDate.getFullYear() === now.getFullYear() &&
+      itemDate.getMonth() === now.getMonth() &&
+      itemDate.getDate() === now.getDate()
+    )
+  }
+
+  if (reportPeriod === '7days') {
+    const limit = new Date()
+    limit.setDate(now.getDate() - 7)
+    return itemDate >= limit
+  }
+
+  if (reportPeriod === '30days') {
+    const limit = new Date()
+    limit.setDate(now.getDate() - 30)
+    return itemDate >= limit
+  }
+
+  if (reportPeriod === 'month') {
+    return (
+      itemDate.getFullYear() === now.getFullYear() &&
+      itemDate.getMonth() === now.getMonth()
+    )
+  }
+
+  return true
 }
 async function loadOpportunityOptions() {
   const [
@@ -2058,7 +2094,20 @@ service_ids: [],
         <p>Resumen y análisis de la actividad comercial.</p>
       </div>
     </div>
+<div className="report-filters">
+  <span>Periodo:</span>
 
+  <select
+    value={reportPeriod}
+    onChange={(e) => setReportPeriod(e.target.value)}
+  >
+    <option value="all">Todo</option>
+    <option value="today">Hoy</option>
+    <option value="7days">Últimos 7 días</option>
+    <option value="30days">Últimos 30 días</option>
+    <option value="month">Este mes</option>
+  </select>
+</div>
     <div className="stats-grid">
       <div className="stat-card">
         <span>Clientes</span>
@@ -2124,7 +2173,11 @@ service_ids: [],
 
       <div className="stat-card">
         <span>Llamadas</span>
-        <strong>{calls.length}</strong>
+      <strong>
+  {calls.filter((call) =>
+    isInReportPeriod(call.started_at)
+  ).length}
+</strong>
         <small>Total registradas</small>
       </div>
 
@@ -2132,7 +2185,11 @@ service_ids: [],
         <span>Llamadas entrantes</span>
         <strong>
           {calls.filter(
-            (call) => call.direction === 'inbound'
+          {calls.filter(
+  (call) =>
+    call.direction === 'inbound' &&
+    isInReportPeriod(call.started_at)
+).length}
           ).length}
         </strong>
         <small>Recibidas</small>
