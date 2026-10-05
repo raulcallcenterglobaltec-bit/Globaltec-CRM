@@ -1128,6 +1128,13 @@ onClick={() => {
   Llamadas
 </button>
 
+<button className={`nav-item ${currentPage === 'agenda' ? 'active' : ''}`} onClick={() => {
+  setCurrentPage('agenda')
+  loadTasks()
+  loadCompanies()
+  loadContacts()
+}}><span>▦</span> Agenda</button>
+
 <button
   className={`nav-item ${currentPage === 'tasks' ? 'active' : ''}`}
   onClick={() => {
@@ -2718,6 +2725,8 @@ service_ids: [],
       </div>
     )}
   </>
+) : currentPage === 'agenda' ? (
+  <Agenda session={session} profile={profile} tasks={tasks} companies={companies} contacts={contacts} onEditTask={(task) => { setCurrentPage('tasks'); editTask(task) }} />
 ) : currentPage === 'tasks' ? (
   <>
     <div className="dashboard-heading">
@@ -3234,6 +3243,132 @@ priority: 'normal',
 
     </div>
   )
+}
+
+function Agenda({ session, profile, tasks, companies, contacts, onEditTask }) {
+  const [view, setView] = useState('month')
+  const [anchor, setAnchor] = useState(new Date())
+  const [meetings, setMeetings] = useState([])
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const [form, setForm] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const readOnly = profile?.role === 'demo'
+  const localInput = (date) => {
+    const d = new Date(date)
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+  }
+  async function loadMeetings() {
+    setBusy(true)
+    const { data, error } = await supabase.from('activities').select('*').eq('activity_type', 'meeting').order('activity_date')
+    if (error) setMessage('No se han podido cargar las citas: ' + error.message)
+    else setMeetings(data || [])
+    setBusy(false)
+  }
+  useEffect(() => { loadMeetings() }, [])
+  function newMeeting(day = anchor) {
+    const start = new Date(day)
+    start.setHours(10, 0, 0, 0)
+    setMessage('')
+    setForm({ subject: '', description: '', company_id: '', contact_id: '', activity_date: localInput(start), end_date: localInput(new Date(start.getTime() + 3600000)) })
+  }
+  async function saveMeeting(e) {
+    e.preventDefault()
+    const start = new Date(form.activity_date), end = new Date(form.end_date)
+    if (!form.subject.trim() || !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) {
+      setMessage('Indica un título y una hora de finalización posterior al inicio.')
+      return
+    }
+    setSaving(true)
+    setMessage('')
+    try {
+      let org = form.organization_id
+      if (!form.id) {
+        const { data, error } = await supabase.from('organization_members').select('organization_id').eq('user_id', session.user.id).eq('active', true)
+        if (error) throw error
+        const client = companies.find(c => c.id === form.company_id)
+        const orgs = [...new Set((data || []).map(m => m.organization_id))]
+        org = client?.organization_id || (orgs.length === 1 ? orgs[0] : null)
+        if (!org || !orgs.includes(org)) throw new Error('Selecciona un cliente de tu organización para guardar la cita.')
+      }
+      const payload = { subject: form.subject.trim(), description: form.description || null, company_id: form.company_id || null, contact_id: form.contact_id || null, activity_date: start.toISOString(), end_date: end.toISOString() }
+      const query = form.id
+        ? supabase.from('activities').update(payload).eq('id', form.id).eq('activity_type', 'meeting')
+        : supabase.from('activities').insert({ ...payload, activity_type: 'meeting', user_id: session.user.id, organization_id: org })
+      const { data, error } = await query.select('id')
+      if (error) throw error
+      if (!data?.length) throw new Error('No tienes permiso para guardar esta cita.')
+      setForm(null)
+      await loadMeetings()
+    } catch (err) { setMessage('No se ha podido guardar: ' + err.message) }
+    finally { setSaving(false) }
+  }
+  const start = new Date(anchor.getFullYear(), anchor.getMonth(), view === 'month' ? 1 : anchor.getDate())
+  if (view !== 'day') start.setDate(start.getDate() - (start.getDay() + 6) % 7)
+  const days = Array.from({ length: view === 'month' ? 42 : view === 'week' ? 7 : 1 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i))
+  const events = [
+    ...tasks.filter(t => t.due_date).map(t => ({ ...t, kind: 'task', start: new Date(t.due_date), title: t.title })),
+    ...meetings.filter(m => m.activity_date).map(m => ({ ...m, kind: 'meeting', start: new Date(m.activity_date), title: m.subject }))
+  ].sort((a, b) => a.start - b.start)
+  const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  const eventsFor = (day) => events.filter(e => {
+    if (e.kind === 'task' || !e.end_date) return sameDay(e.start, day)
+    const next = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1)
+    return e.start < next && new Date(e.end_date) > day
+  })
+  function move(direction) {
+    const d = new Date(anchor)
+    if (view === 'month') { d.setDate(1); d.setMonth(d.getMonth() + direction) }
+    else d.setDate(d.getDate() + direction * (view === 'week' ? 7 : 1))
+    setAnchor(d)
+  }
+  function openEvent(e) {
+    if (e.kind === 'task') onEditTask(e)
+    else {
+      setMessage('')
+      setForm({ ...e, activity_date: localInput(e.activity_date), end_date: localInput(e.end_date || new Date(e.start.getTime() + 3600000)), company_id: e.company_id || '', contact_id: e.contact_id || '' })
+    }
+  }
+  const colors = { pending: ['#fff7ed', '#9a3412'], in_progress: ['#eff6ff', '#1d4ed8'], completed: ['#ecfdf5', '#047857'], cancelled: ['#f1f5f9', '#64748b'] }
+  return <section className="agenda-shell">
+    <style>{`
+      .agenda-shell{--ag-ink:#123047;color:var(--ag-ink)}
+      .agenda-hero{padding:24px;border-radius:20px;background:linear-gradient(120deg,#103b50,#087f8c);color:white;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+      .agenda-hero h1{margin:4px 0;font-size:30px;color:white}.agenda-hero p{margin:4px 0;color:#d2edf0}
+      .agenda-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:18px 0}.agenda-toolbar strong{flex:1;min-width:180px;text-transform:capitalize}
+      .agenda-shell button{cursor:pointer}.agenda-control{padding:10px 15px;background:white;border:1px solid #cbd5e1;border-radius:10px;color:#123047}.agenda-control.active{background:#087f8c;color:white;border-color:#087f8c}
+      .agenda-scroll{overflow-x:auto;background:white;border:1px solid #dde7ed;border-radius:16px}.agenda-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));min-width:840px}.agenda-grid.day{grid-template-columns:1fr;min-width:0}
+      .agenda-day{min-height:145px;padding:10px;border-right:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0}.agenda-day.outside{background:#f8fafc}.agenda-date{background:transparent;border:0;border-radius:8px;padding:6px;font-weight:700;color:#123047}.agenda-date.today{background:#087f8c;color:white}
+      .agenda-event{display:block;width:100%;text-align:left;border:0;border-left:3px solid currentColor;border-radius:7px;padding:8px;margin:6px 0;white-space:normal;overflow-wrap:anywhere;font-size:12px}.agenda-event small{display:block;margin-top:3px}.agenda-weekday{padding:12px;text-align:center;background:#f1f6f9;font-size:12px;font-weight:700}.agenda-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;margin:12px 0;color:#526578}
+      .agenda-form{padding:24px;background:white;border:1px solid #dce6ec;border-radius:16px;margin-bottom:20px}.agenda-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.agenda-fields label{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:600}.agenda-fields input,.agenda-fields select,.agenda-fields textarea{width:100%;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:9px;font:inherit}.agenda-form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}@media(max-width:600px){.agenda-fields{grid-template-columns:1fr}}
+    `}</style>
+    <div className="agenda-hero"><div><small>GLOBALTEC CRM · ORGANIZA TU DÍA</small><h1>Agenda</h1><p>Tus citas y tareas, en un solo calendario.</p></div>{!readOnly && <button className="primary-btn" onClick={() => newMeeting()}>+ Nueva cita</button>}</div>
+    {message && <p role="alert" style={{ color: '#b91c1c' }}>{message}</p>}
+    {form && <form className="agenda-form" onSubmit={saveMeeting}><h2>{form.id ? 'Editar cita' : 'Nueva cita'}</h2><fieldset disabled={saving || readOnly} style={{ border: 0, padding: 0, margin: 0 }}><div className="agenda-fields">
+      <label>Título<input required value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} /></label>
+      <label>Cliente<select value={form.company_id} onChange={e => setForm({ ...form, company_id: e.target.value, contact_id: '' })}><option value="">Sin cliente</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+      <label>Contacto<select value={form.contact_id} onChange={e => setForm({ ...form, contact_id: e.target.value })}><option value="">Sin contacto</option>{contacts.filter(c => !form.company_id || c.company_id === form.company_id).map(c => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}</select></label>
+      <label>Inicio<input required type="datetime-local" value={form.activity_date} onChange={e => setForm({ ...form, activity_date: e.target.value })} /></label>
+      <label>Finalización<input required type="datetime-local" min={form.activity_date} value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} /></label>
+      <label>Notas<textarea rows="3" value={form.description || ''} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
+    </div></fieldset><div className="agenda-form-actions"><button type="button" disabled={saving} className="agenda-control" onClick={() => setForm(null)}>Cancelar</button>{!readOnly && <button disabled={saving} className="primary-btn" type="submit">{saving ? 'Guardando…' : 'Guardar cita'}</button>}</div></form>}
+    <div className="agenda-toolbar"><button className="agenda-control" aria-label="Periodo anterior" onClick={() => move(-1)}>‹</button><button className="agenda-control" onClick={() => setAnchor(new Date())}>Hoy</button><button className="agenda-control" aria-label="Periodo siguiente" onClick={() => move(1)}>›</button><strong>{view === 'month' ? anchor.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }) : view === 'week' ? `${days[0].toLocaleDateString('es-ES')} – ${days[6].toLocaleDateString('es-ES')}` : anchor.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong>{[['month','Mes'],['week','Semana'],['day','Día']].map(([key,label]) => <button key={key} className={`agenda-control ${view === key ? 'active' : ''}`} onClick={() => setView(key)}>{label}</button>)}</div>
+    <div className="agenda-legend"><span>🟣 Citas</span><span>🟠 Pendientes</span><span>🔵 En curso</span><span>🟢 Completadas</span><span>⚪ Canceladas</span></div>
+    {busy && <p>Cargando citas…</p>}
+    <div className="agenda-scroll"><div className={`agenda-grid ${view === 'day' ? 'day' : ''}`}>
+      {view !== 'day' && ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'].map(d => <div key={d} className="agenda-weekday">{d}</div>)}
+      {days.map(day => <div key={day.toISOString()} className={`agenda-day ${view === 'month' && day.getMonth() !== anchor.getMonth() ? 'outside' : ''}`}>
+        <button className={`agenda-date ${sameDay(day, new Date()) ? 'today' : ''}`} onClick={() => { setAnchor(day); setView('day') }}>{day.toLocaleDateString('es-ES', { day: 'numeric', ...(view !== 'month' ? { month: 'short' } : {}) })}</button>
+        {eventsFor(day).map(event => {
+          const [bg, fg] = event.kind === 'meeting' ? ['#f3e8ff', '#7e22ce'] : (colors[event.status] || colors.pending)
+          const client = companies.find(c => c.id === event.company_id)
+          return <button key={`${event.kind}-${event.id}`} className="agenda-event" style={{ background: bg, color: fg }} onClick={() => openEvent(event)}><b>{event.start.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</b> · {event.title}<small>{event.kind === 'meeting' ? 'Cita' : ({ pending: 'Pendiente', in_progress: 'En curso', completed: 'Completada', cancelled: 'Cancelada' }[event.status] || 'Tarea')}{client ? ` · ${client.name}` : ''}</small>{event.kind === 'meeting' && event.end_date && <small>Hasta {new Date(event.end_date).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>}</button>
+        })}
+        {view !== 'month' && eventsFor(day).length === 0 && <p style={{ fontSize: 12, color: '#94a3b8' }}>Sin citas ni tareas</p>}
+        {view === 'day' && !readOnly && <button className="agenda-control" onClick={() => newMeeting(day)}>+ Añadir cita</button>}
+      </div>)}
+    </div></div>
+  </section>
 }
 
 export default App
