@@ -2956,7 +2956,7 @@ priority: 'normal',
             </div>
 
             <div>
-              {task.status || 'Pendiente'}{{
+              {{
   pending: 'Pendiente',
   in_progress: 'En curso',
   completed: 'Completada',
