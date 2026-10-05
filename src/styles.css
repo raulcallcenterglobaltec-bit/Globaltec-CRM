@@ -1089,3 +1089,92 @@ body {
 .report-filters select:focus {
   border-color: #2f8f68;
 }
+
+
+/* GLOBALTEC · Diseño visual */
+:root { --crm-navy: #142c48; --crm-teal: #087f74; --crm-border: #dce5ef; }
+body { background:#f2f5fa; color:#20354c; }
+button, input, select, textarea { font-family:inherit; }
+button { transition:background .18s, box-shadow .18s; }
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline:3px solid #318bd1; outline-offset:3px; }
+button:disabled { cursor:not-allowed; opacity:.6; }
+.header { min-height:82px; padding:18px 32px; border-bottom:1px solid var(--crm-border); box-shadow:0 3px 20px #19324f08; }
+.brand { font-size:24px; letter-spacing:-.6px; }
+.brand-subtitle { font-size:15px; font-weight:700; color:var(--crm-teal); background:#e5f5f0; border-radius:7px; padding:5px 9px; margin-left:8px; }
+.user-area { color:#526379; }
+.role-badge { background:#e5f5f0; color:#076557; padding:7px 12px; }
+.logout-button { min-height:38px; font-weight:600; }
+.crm-main { min-height:calc(100vh - 82px); background:radial-gradient(ellipse at top right,#e3f1f1 0,transparent 45%),#f2f5fa; }
+.sidebar { width:232px; padding:30px 15px; background:linear-gradient(165deg,#193953,#12283f); border:0; }
+.sidebar-label { color:#b1c6d7; font-size:10px; letter-spacing:1.4px; font-weight:700; margin:0 14px 22px; }
+.sidebar-nav { gap:8px; }
+.nav-item { color:#d1dfeb; min-height:46px; border-radius:11px; font-weight:500; padding:12px 14px; }
+.crm-icon { flex-shrink:0; }
+.nav-item:hover { color:#fff; background:#ffffff12; }
+.nav-item.active { color:#fff; background:#087f74; box-shadow:0 5px 15px #081b3326; }
+.dashboard { padding:32px; }
+.dashboard-heading { margin-bottom:28px; }
+.dashboard-heading h1 { font-size:clamp(26px,2.7vw,36px); letter-spacing:-1px; color:var(--crm-navy); }
+.dashboard-kicker { color:#076e65; font-size:11px; letter-spacing:1.4px; margin-bottom:9px; }
+.dashboard-heading p:not(.dashboard-kicker) { color:#52667e; line-height:1.6; }
+.primary-action { min-height:44px; background:var(--crm-teal); border-radius:11px; box-shadow:0 4px 10px #087f741a; }
+.primary-action:hover { background:#06675f; box-shadow:0 6px 14px #087f7426; }
+.secondary-action { min-height:44px; color:#334e68; border-radius:11px; }
+.stats-grid { gap:16px; margin-bottom:24px; }
+.stat-card { position:relative; padding:24px 20px; border:1px solid var(--crm-border); border-radius:16px; box-shadow:0 5px 16px #19395306; overflow:hidden; }
+.stat-card span { color:#475c73; padding-right:38px; line-height:1.4; min-height:20px; }
+.stat-card strong { font-size:36px; letter-spacing:-1px; margin:14px 0 10px; }
+.stat-card strong strong { font:inherit; margin:0; }
+.stat-card small { color:#596c82; }
+.stat-icon { position:absolute; right:16px; top:18px; width:36px; height:36px; padding:8px; border-radius:11px; }
+.stat-clients { border-top:3px solid #168d80; background:linear-gradient(140deg,#edf9f5,#fff 70%); }
+.stat-clients .stat-icon { color:#08756b; background:#d5f0e8; }
+.stat-opportunities { border-top:3px solid #d58b24; background:linear-gradient(140deg,#fff7e8,#fff 70%); }
+.stat-opportunities .stat-icon { color:#965e0c; background:#ffedc8; }
+.stat-tasks { border-top:3px solid #8061c1; background:linear-gradient(140deg,#f3effc,#fff 70%); }
+.stat-tasks .stat-icon { color:#6b49a5; background:#e9dff9; }
+.stat-calls { border-top:3px solid #3a82c5; background:linear-gradient(140deg,#edf5ff,#fff 70%); }
+.stat-calls .stat-icon { color:#27669e; background:#dcecff; }
+.dashboard-grid { grid-template-columns:minmax(0,1.5fr) minmax(270px,1fr); gap:22px; align-items:start; }
+.dashboard-card { border-radius:16px; border-color:var(--crm-border); box-shadow:0 5px 20px #19395305; padding:24px; }
+.card-heading h2 { font-size:18px; letter-spacing:-.3px; }
+.card-heading p { color:#5d7087; line-height:1.5; }
+.activity-item { gap:14px; padding:18px 0; align-items:flex-start; }
+.activity-item > div { min-width:0; }
+.activity-item strong, .upcoming-task-item strong { font-size:14px; overflow-wrap:anywhere; line-height:1.5; }
+.activity-item span, .upcoming-task-item span { color:#576b82; }
+.activity-item small { color:#60738b; font-size:11px; padding-top:5px; }
+.activity-type { padding:5px 9px; border-radius:6px; margin-bottom:3px; }
+.upcoming-task-item { gap:12px; padding:20px 0; }
+.upcoming-task-date { background:#eef5fc; border-radius:9px; padding:9px; }
+.clients-list { padding:0; }
+.client-row:hover { background:#f5fafb; }
+.clients-table-header { background:#edf3f8; color:#4b6179; }
+.client-main small, .client-contact small { color:#5f7288; }
+.form-field-full { grid-column:1 / -1; }
+.form-field input, .form-field select, .form-field textarea { border-radius:10px; min-height:44px; }
+.login-page { background:radial-gradient(ellipse at top left,#d9f1e9,transparent 55%),#eef3fa; }
+.login-card { border-radius:22px; border-top:4px solid var(--crm-teal); }
+@media (max-width:1100px) { .stats-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .dashboard-grid { grid-template-columns:1fr; } .dashboard { padding:26px; } }
+@media (max-width:700px) {
+  .header { padding:16px; gap:14px; }
+  .user-area { font-size:12px; gap:8px; overflow-wrap:anywhere; }
+  .sidebar { width:100%; padding:10px; }
+  .sidebar-label { display:none; }
+  .nav-item { white-space:nowrap; }
+  .dashboard { padding:24px 16px; }
+  .dashboard-heading { gap:18px; }
+  .dashboard-heading h1 { font-size:28px; }
+  .stat-card { padding:20px 14px; }
+  .stat-card span { font-size:12px; padding-right:30px; min-height:34px; }
+  .stat-icon { right:10px; width:30px; height:30px; padding:6px; }
+  .stat-card strong { font-size:30px; }
+  .dashboard-card { padding:20px; }
+  .clients-list { padding:0; }
+  .activity-item { flex-wrap:wrap; gap:6px; }
+  .activity-item small { width:100%; }
+  .form-field-full { grid-column:auto; }
+  .report-filters select { min-width:0; max-width:100%; }
+}
+@media (max-width:380px) { .stats-grid { grid-template-columns:1fr; } }
+@media (prefers-reduced-motion:reduce) { *, *::before, *::after { transition:none !important; } }
