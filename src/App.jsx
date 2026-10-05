@@ -3245,6 +3245,25 @@ priority: 'normal',
   )
 }
 
+function AgendaDateTime({ label, value, onChange }) {
+  const [date = '', time = '00:00'] = (value || '').split('T')
+  const [hour = '00', minute = '00'] = time.split(':')
+  const update = (nextDate, nextHour, nextMinute) => onChange(nextDate ? `${nextDate}T${nextHour}:${nextMinute}` : '')
+  return <div className="agenda-datetime-field">
+    <span>{label}</span>
+    <div className="agenda-datetime-controls">
+      <input aria-label={`${label}: fecha`} type="date" required value={date} onChange={e => update(e.target.value, hour, minute)} />
+      <select aria-label={`${label}: hora`} value={hour} onChange={e => update(date, e.target.value, minute)}>
+        {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')).map(h => <option key={h} value={h}>{h}</option>)}
+      </select>
+      <span aria-hidden="true">:</span>
+      <select aria-label={`${label}: minutos`} value={minute} onChange={e => update(date, hour, e.target.value)}>
+        {Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0')).map(m => <option key={m} value={m}>{m}</option>)}
+      </select>
+    </div>
+  </div>
+}
+
 function Agenda({ session, profile, tasks, companies, contacts, onEditTask }) {
   const [view, setView] = useState('month')
   const [anchor, setAnchor] = useState(new Date())
@@ -3346,7 +3365,8 @@ function Agenda({ session, profile, tasks, companies, contacts, onEditTask }) {
       .agenda-scroll{overflow-x:auto;background:white;border:1px solid #dde7ed;border-radius:16px}.agenda-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));min-width:840px}.agenda-grid.day{grid-template-columns:1fr;min-width:0}
       .agenda-day{min-height:145px;padding:10px;border-right:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0}.agenda-day.outside{background:#f8fafc}.agenda-date{background:transparent;border:0;border-radius:8px;padding:6px;font-weight:700;color:#123047}.agenda-date.today{background:#087f8c;color:white}
       .agenda-event{display:block;width:100%;text-align:left;border:0;border-left:3px solid currentColor;border-radius:7px;padding:8px;margin:6px 0;white-space:normal;overflow-wrap:anywhere;font-size:12px}.agenda-event small{display:block;margin-top:3px}.agenda-weekday{padding:12px;text-align:center;background:#f1f6f9;font-size:12px;font-weight:700}.agenda-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;margin:12px 0;color:#526578}
-      .agenda-form{padding:24px;background:white;border:1px solid #dce6ec;border-radius:16px;margin-bottom:20px}.agenda-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.agenda-fields label{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:600}.agenda-fields input,.agenda-fields select,.agenda-fields textarea{width:100%;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:9px;font:inherit}.agenda-form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}@media(max-width:600px){.agenda-fields{grid-template-columns:1fr}}
+      .agenda-form{padding:24px;background:white;border:1px solid #dce6ec;border-radius:16px;margin-bottom:20px}.agenda-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.agenda-fields label,.agenda-datetime-field{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:600}.agenda-fields input,.agenda-fields select,.agenda-fields textarea{width:100%;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:9px;font:inherit}.agenda-form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}@media(max-width:600px){.agenda-fields{grid-template-columns:1fr}}
+      .agenda-datetime-controls{display:grid;grid-template-columns:minmax(0,1fr) 66px 8px 66px;gap:6px;align-items:center}.agenda-datetime-controls input{min-width:0}.agenda-datetime-controls select{padding:11px 6px}.agenda-fields{align-items:start}
     `}</style>
     <div className="agenda-hero"><div><small>GLOBALTEC CRM · ORGANIZA TU DÍA</small><h1>Agenda</h1><p>Tus citas y tareas, en un solo calendario.</p></div>{!readOnly && <button className="primary-btn" onClick={() => newMeeting()}>+ Nueva cita</button>}</div>
     {message && <p role="alert" style={{ color: '#b91c1c' }}>{message}</p>}
@@ -3354,8 +3374,8 @@ function Agenda({ session, profile, tasks, companies, contacts, onEditTask }) {
       <label>Título<input required value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} /></label>
       <label>Cliente<select value={form.company_id} onChange={e => setForm({ ...form, company_id: e.target.value, contact_id: '' })}><option value="">Sin cliente</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
       <label>Contacto<select value={form.contact_id} onChange={e => setForm({ ...form, contact_id: e.target.value })}><option value="">Sin contacto</option>{contacts.filter(c => !form.company_id || c.company_id === form.company_id).map(c => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}</select></label>
-      <label>Inicio<input required type="datetime-local" value={form.activity_date} onChange={e => setForm({ ...form, activity_date: e.target.value })} /></label>
-      <label>Finalización<input required type="datetime-local" min={form.activity_date} value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} /></label>
+      <AgendaDateTime label="Inicio" value={form.activity_date} onChange={value => setForm({ ...form, activity_date: value })} />
+      <AgendaDateTime label="Finalización" value={form.end_date} onChange={value => setForm({ ...form, end_date: value })} />
       <label>Notas<textarea rows="3" value={form.description || ''} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
     </div></fieldset><div className="agenda-form-actions"><button type="button" disabled={saving} className="agenda-control" onClick={() => setForm(null)}>Cancelar</button>{!readOnly && <button disabled={saving} className="primary-btn" type="submit">{saving ? 'Guardando…' : 'Guardar cita'}</button>}</div></form>}
     <div className="agenda-toolbar"><button className="agenda-control" aria-label="Periodo anterior" onClick={() => move(-1)}>‹</button><button className="agenda-control" onClick={() => setAnchor(new Date())}>Hoy</button><button className="agenda-control" aria-label="Periodo siguiente" onClick={() => move(1)}>›</button><strong>{view === 'month' ? anchor.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }) : view === 'week' ? `${days[0].toLocaleDateString('es-ES')} – ${days[6].toLocaleDateString('es-ES')}` : anchor.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong>{[['month','Mes'],['week','Semana'],['day','Día']].map(([key,label]) => <button key={key} className={`agenda-control ${view === key ? 'active' : ''}`} onClick={() => setView(key)}>{label}</button>)}</div>
