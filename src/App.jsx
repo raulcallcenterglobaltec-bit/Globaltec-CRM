@@ -694,9 +694,9 @@ function editCall(call) {
     status: call.status || 'completed',
     started_at: call.started_at
       ? new Date(
-  new Date(call.started_at).getTime() -
-  new Date(call.started_at).getTimezoneOffset() * 60000
-).toISOString().slice(0, 16)
+          new Date(call.started_at).getTime() -
+          new Date(call.started_at).getTimezoneOffset() * 60000
+        ).toISOString().slice(0, 16)
       : '',
     duration_seconds: call.duration_seconds || '',
     outcome: call.outcome || '',
@@ -715,12 +715,11 @@ function editCall(call) {
     task_type: task.task_type || 'follow_up',
     status: task.status || 'pending',
     priority: task.priority || 'normal',
-   due_date: task.due_date
-  ? new Date(
-      new Date(task.due_date).getTime() -
-      new Date(task.due_date).getTimezoneOffset() * 60000
-    ).toISOString().slice(0, 16)
-  : '',
+    due_date: task.due_date
+      ? new Date(
+          new Date(task.due_date).getTime() -
+          new Date(task.due_date).getTimezoneOffset() * 60000
+        ).toISOString().slice(0, 16)
       : '',
     company_id: task.company_id || '',
     contact_id: task.contact_id || '',
