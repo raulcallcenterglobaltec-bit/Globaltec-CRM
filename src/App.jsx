@@ -2626,8 +2626,8 @@ service_ids: [],
         </div>
       </div>
     ) : (
-      <div className="dashboard-card clients-list">
-        <div className="clients-table-header">
+      <div className="dashboard-card clients-list" style={{ overflowX: 'auto' }}>
+        <div className="clients-table-header" style={{ display: 'grid', gridTemplateColumns: '1.3fr 1.2fr 1.2fr 0.75fr 0.9fr 90px', minWidth: '760px', gap: '16px', alignItems: 'center' }}>
           <span>FECHA</span>
           <span>CLIENTE</span>
           <span>CONTACTO</span>
@@ -2637,7 +2637,7 @@ service_ids: [],
         </div>
 
         {calls.map((call) => (
-          <div className="client-row" key={call.id}>
+          <div className="client-row" key={call.id} style={{ display: 'grid', gridTemplateColumns: '1.3fr 1.2fr 1.2fr 0.75fr 0.9fr 90px', minWidth: '760px', gap: '16px', alignItems: 'center' }}>
             <div>
               {call.started_at
                 ? new Date(call.started_at).toLocaleString('es-ES')
