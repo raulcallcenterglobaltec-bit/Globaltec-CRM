@@ -1319,6 +1319,7 @@ onClick={() => {
     </div>
   )}
 </div>
+<ClientAttachments key={selectedCompany.id} company={selectedCompany} session={session} profile={profile} />
   </div>
 )}
 {showCompanyForm && (
@@ -3243,6 +3244,96 @@ priority: 'normal',
 
     </div>
   )
+}
+
+function ClientAttachments({ company, session, profile }) {
+  const [files, setFiles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [working, setWorking] = useState(false)
+  const [message, setMessage] = useState('')
+  const [pending, setPending] = useState(null)
+  const canUpload = !!profile?.active && profile.role !== 'demo'
+  const canDelete = canUpload && profile.role === 'admin'
+  const bucket = supabase.storage.from('crm-attachments')
+  async function loadFiles() {
+    setLoading(true)
+    const { data, error } = await supabase.from('crm_attachments').select('*').eq('company_id', company.id).order('created_at', { ascending: false })
+    if (error) setMessage('No se han podido cargar los documentos: ' + error.message)
+    else setFiles(data || [])
+    setLoading(false)
+  }
+  useEffect(() => { loadFiles() }, [company.id])
+  async function registerFile(record) {
+    const { data, error } = await supabase.from('crm_attachments').insert(record).select('id')
+    if (error || !data?.length) {
+      setPending(record)
+      throw new Error('El archivo se ha subido, pero falta registrarlo en la ficha. Pulsa «Reintentar registro». ' + (error?.message || 'Permiso de registro denegado.'))
+    }
+    setPending(null)
+    await loadFiles()
+    setMessage('Documento guardado correctamente.')
+  }
+  async function uploadFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || working || !canUpload || pending) return
+    setMessage('')
+    if (!file.size || file.size > 10 * 1024 * 1024) { setMessage('Elige un archivo de entre 1 byte y 10 MB.'); return }
+    if (!company.organization_id) { setMessage('Este cliente no tiene una empresa asignada.'); return }
+    setWorking(true)
+    try {
+      const id = crypto.randomUUID()
+      const safeName = file.name.normalize('NFKD').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-150) || 'documento'
+      const path = `${company.organization_id}/${company.id}/${id}/${safeName}`
+      const { error } = await bucket.upload(path, file, { upsert: false, contentType: file.type || 'application/octet-stream' })
+      if (error) throw error
+      await registerFile({ id, organization_id: company.organization_id, company_id: company.id, file_name: file.name, object_path: path, mime_type: file.type || null, file_size: file.size, uploaded_by: session.user.id })
+    } catch (error) { setMessage(error.message || 'No se ha podido subir el documento.') }
+    finally { setWorking(false) }
+  }
+  async function retryRegistration() {
+    if (!pending || working) return
+    setWorking(true)
+    try { await registerFile(pending) }
+    catch (error) { setMessage(error.message) }
+    finally { setWorking(false) }
+  }
+  async function downloadFile(file) {
+    setWorking(true); setMessage('')
+    try {
+      const { data, error } = await bucket.download(file.object_path)
+      if (error) throw error
+      const url = URL.createObjectURL(data)
+      const link = document.createElement('a')
+      link.href = url; link.download = file.file_name
+      document.body.appendChild(link); link.click(); link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (error) { setMessage('No se ha podido descargar: ' + error.message) }
+    finally { setWorking(false) }
+  }
+  async function deleteFile(file) {
+    if (!canDelete || working || !window.confirm(`¿Eliminar «${file.file_name}»? Esta acción no se puede deshacer.`)) return
+    setWorking(true); setMessage('')
+    try {
+      const { error: storageError } = await bucket.remove([file.object_path])
+      if (storageError) throw storageError
+      const { data, error } = await supabase.from('crm_attachments').delete().eq('id', file.id).select('id')
+      if (error || !data?.length) throw new Error('El archivo se ha borrado, pero falta quitar su registro. Reintenta eliminarlo. ' + (error?.message || 'Permiso denegado.'))
+      await loadFiles(); setMessage('Documento eliminado.')
+    } catch (error) { setMessage(error.message) }
+    finally { setWorking(false) }
+  }
+  const sizeLabel = bytes => bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.ceil(bytes / 1024))} KB`
+  return <section className="client-attachments">
+    <style>{`
+      .client-attachments{margin-top:28px;padding:22px;border:1px solid #dce6ec;border-radius:16px;background:#f8fbfc}.attachment-header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}.attachment-upload input{max-width:100%;font-size:13px;color:#526578}.attachment-upload input::file-selector-button{background:#087f8c;color:white;border:0;border-radius:10px;padding:11px 16px;margin-right:10px;font:inherit;font-weight:600;cursor:pointer}.attachment-upload input:disabled{opacity:.55}.attachment-header h3{margin:0 0 6px;color:#123047}.attachment-header p{margin:0;color:#64748b;font-size:13px}.client-attachments .attachment-button{display:inline-flex;align-items:center;justify-content:center;background:#087f8c;color:white;border:0;border-radius:10px;padding:10px 16px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}.client-attachments .attachment-button:disabled{opacity:.55;cursor:wait}.client-attachments .attachment-button.secondary{background:white;color:#123047;border:1px solid #cbd5e1}.client-attachments .attachment-button.danger{background:#fff1f2;color:#be123c;border:1px solid #fecdd3}.attachment-list{display:grid;gap:10px;margin-top:18px}.attachment-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:16px;background:white;border:1px solid #e2e8f0;border-radius:12px}.attachment-info{flex:1;min-width:150px;overflow-wrap:anywhere}.attachment-info strong{display:block}.attachment-info small{display:block;color:#64748b;margin-top:6px}.attachment-actions{display:flex;gap:8px;flex-wrap:wrap}.attachment-message{padding:12px;border-radius:10px;background:#e9f3f6;overflow-wrap:anywhere;font-size:13px}
+    `}</style>
+    <div className="attachment-header"><div><h3>Documentos y adjuntos</h3><p>Documentos de este cliente · Máximo 10 MB por archivo</p></div>{canUpload && <label className="attachment-upload"><span className="sr-only" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clipPath: 'inset(50%)' }}>Seleccionar documento</span><input type="file" disabled={working || !!pending} onChange={uploadFile} /></label>}</div>
+    {message && <p className="attachment-message" role="status">{message}</p>}
+    {pending && <button type="button" className="attachment-button" disabled={working} onClick={retryRegistration}>Reintentar registro</button>}
+    {working && <p role="status">Procesando documento…</p>}
+    {loading ? <p>Cargando documentos…</p> : files.length === 0 ? <p style={{ color: '#64748b', marginTop: 20 }}>Todavía no hay documentos para este cliente.</p> : <div className="attachment-list">{files.map(file => <div className="attachment-row" key={file.id}><div className="attachment-info"><strong>📎 {file.file_name}</strong><small>{sizeLabel(file.file_size)} · {new Date(file.created_at).toLocaleDateString('es-ES')}</small></div><div className="attachment-actions"><button type="button" className="attachment-button secondary" disabled={working} onClick={() => downloadFile(file)}>Descargar</button>{canDelete && <button type="button" className="attachment-button danger" disabled={working} onClick={() => deleteFile(file)}>Eliminar</button>}</div></div>)}</div>}
+  </section>
 }
 
 function AgendaDateTime({ label, value, onChange }) {
