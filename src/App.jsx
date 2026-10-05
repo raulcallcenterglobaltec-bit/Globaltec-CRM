@@ -67,6 +67,15 @@ const [showCallForm, setShowCallForm] = useState(false)
 const [callSaving, setCallSaving] = useState(false)
 const [editingCallId, setEditingCallId] = useState(null)
 const [reportPeriod, setReportPeriod] = useState('all')
+const [reportFrom, setReportFrom] = useState('')
+const [reportTo, setReportTo] = useState('')
+const reportRangeError = reportPeriod === 'custom'
+  ? (!reportFrom || !reportTo
+      ? 'Selecciona las fechas Desde y Hasta.'
+      : reportFrom > reportTo
+        ? 'La fecha Desde debe ser anterior o igual a Hasta.'
+        : '')
+  : ''
 const [callForm, setCallForm] = useState({
   company_id: '',
   contact_id: '',
@@ -302,6 +311,15 @@ async function loadCalls() {
 
   const itemDate = new Date(date)
   const now = new Date()
+
+  if (reportPeriod === 'custom') {
+    if (reportRangeError || Number.isNaN(itemDate.getTime())) return false
+    const [fromYear, fromMonth, fromDay] = reportFrom.split('-').map(Number)
+    const [toYear, toMonth, toDay] = reportTo.split('-').map(Number)
+    const start = new Date(fromYear, fromMonth - 1, fromDay)
+    const end = new Date(toYear, toMonth - 1, toDay + 1)
+    return itemDate >= start && itemDate < end
+  }
 
   if (reportPeriod === 'today') {
     return (
@@ -2170,7 +2188,7 @@ service_ids: [],
       </div>
     </div>
 
-    <div className="report-filters">
+    <div className="report-filters" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
       <span>Periodo:</span>
       <select
         value={reportPeriod}
@@ -2182,7 +2200,29 @@ service_ids: [],
         <option value="7days">Últimos 7 días</option>
         <option value="30days">Últimos 30 días</option>
         <option value="month">Este mes</option>
+        <option value="custom">Personalizado</option>
       </select>
+      {reportPeriod === 'custom' && (
+        <>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            Desde
+            <input type="date" value={reportFrom} max={reportTo || undefined}
+              onChange={(e) => setReportFrom(e.target.value)}
+              style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '8px' }} />
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            Hasta
+            <input type="date" value={reportTo} min={reportFrom || undefined}
+              onChange={(e) => setReportTo(e.target.value)}
+              style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '8px' }} />
+          </label>
+          {reportRangeError && (
+            <p role="alert" style={{ width: '100%', margin: 0, color: '#b45309' }}>
+              {reportRangeError}
+            </p>
+          )}
+        </>
+      )}
     </div>
 
     <div className="stats-grid">
