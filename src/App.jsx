@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from './supabase'
 
 function App() {
@@ -8,8 +8,52 @@ function App() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [profile, setProfile] = useState(null)
-  const canWrite = !!profile?.active && profile.role !== 'demo'
+  const [modulePermissions, setModulePermissions] = useState([])
+  const [organizations, setOrganizations] = useState([])
+  const [activeOrg, setActiveOrg] = useState('')
+  const accessRef = useRef({ org: '', permissions: [], user: null })
+  function canViewModule(module) {
+    return !!profile?.active && modulePermissions.some(p => p.organization_id === activeOrg && p.module === module && p.can_view)
+  }
+  function canEditModule(module) {
+    return canViewModule(module) && profile.role !== 'demo' && modulePermissions.some(p => p.organization_id === activeOrg && p.module === module && p.can_edit)
+  }
+  function clearCRMData() {
+    setCompanies([]); setContacts([]); setOpportunities([]); setTasks([]); setCalls([])
+    setPipelineStages([]); setLeadSources([]); setServices([])
+    setSelectedCompany(null); setShowCompanyForm(false); setShowContactForm(false)
+    setShowOpportunityForm(false); setShowTaskForm(false); setShowCallForm(false)
+    setEditingCompanyId(null); setEditingContactId(null); setEditingOpportunityId(null)
+    setEditingTaskId(null); setEditingCallId(null)
+  }
+  async function refreshPermissions(userId) {
+    const [permissionsResult, orgResult] = await Promise.all([
+      supabase.from('crm_module_permissions').select('*').eq('user_id', userId),
+      supabase.from('organizations').select('id,name').eq('active', true).order('name')
+    ])
+    if (accessRef.current.user !== userId) return
+    if (permissionsResult.error || orgResult.error) {
+      setModulePermissions([]); setOrganizations([]); setActiveOrg('')
+      setError('No se han podido cargar los permisos. Cierra sesión y vuelve a entrar.')
+      return
+    }
+    const orgs = orgResult.data || []
+    setModulePermissions(permissionsResult.data || []); setOrganizations(orgs)
+    setActiveOrg(previous => orgs.some(o => o.id === previous) ? previous : (orgs[0]?.id || ''))
+  }
+  useEffect(() => {
+    accessRef.current = { ...accessRef.current, org: activeOrg, permissions: modulePermissions }
+    clearCRMData()
+    if (!activeOrg || !profile?.active) return
+    const pages = ['dashboard','clients','contacts','opportunities','calls','agenda','tasks','reports']
+    if (!(currentPage === 'permissions' && profile.role === 'admin') && !canViewModule(currentPage)) {
+      setCurrentPage(pages.find(canViewModule) || 'no-access')
+    }
+    loadCompanies(); loadContacts(); loadOpportunities(); loadTasks(); loadCalls()
+    if (canViewModule('opportunities')) loadOpportunityOptions()
+  }, [activeOrg, modulePermissions, profile])
 const [currentPage, setCurrentPage] = useState('dashboard')
+  const canWrite = canEditModule(currentPage === 'dashboard' ? 'clients' : currentPage)
 const [companies, setCompanies] = useState([])
 const [companiesLoading, setCompaniesLoading] = useState(false)
 const [showCompanyForm, setShowCompanyForm] = useState(false)
@@ -127,11 +171,9 @@ const [companyForm, setCompanyForm] = useState({
       setSession(session)
 
       if (session) {
+        accessRef.current = { org: '', permissions: [], user: session.user.id }
+        setModulePermissions([]); setActiveOrg(''); clearCRMData()
         loadProfile(session.user.id)
-        loadCompanies()
-        loadOpportunities()
-        loadTasks()
-        loadCalls()
       } else {
         setLoading(false)
       }
@@ -149,13 +191,12 @@ const [companyForm, setCompanyForm] = useState({
       }
 
       if (session) {
+        accessRef.current = { org: '', permissions: [], user: session.user.id }
+        setModulePermissions([]); setActiveOrg(''); clearCRMData()
         loadProfile(session.user.id)
-        loadCompanies()
-        loadOpportunities()
-        loadTasks()
-        loadCalls()
       } else {
-        setProfile(null)
+        accessRef.current = { org: '', permissions: [], user: null }
+        setProfile(null); setModulePermissions([]); setActiveOrg(''); clearCRMData()
         setLoading(false)
       }
     })
@@ -170,23 +211,29 @@ const [companyForm, setCompanyForm] = useState({
       .eq('id', userId)
       .single()
 
+    if (accessRef.current.user !== userId) return
     if (error) {
       console.error(error)
       setError('No se ha podido cargar el perfil del usuario.')
     } else {
       setProfile(data)
+      await refreshPermissions(userId)
     }
 
     setLoading(false)
   }
 async function loadCompanies() {
+  const access = accessRef.current
+  if (!access.org || !access.permissions.some(p => p.organization_id === access.org && p.module === 'clients' && p.can_view)) { setCompanies([]); setCompaniesLoading(false); return }
   setCompaniesLoading(true)
 
   const { data, error } = await supabase
     .from('companies')
     .select('*')
+    .eq('organization_id', access.org)
     .order('created_at', { ascending: false })
 
+  if (accessRef.current !== access) return
   if (error) {
     console.error('Error cargando clientes:', error)
     setCompanies([])
@@ -197,6 +244,8 @@ async function loadCompanies() {
   setCompaniesLoading(false)
 }
 async function loadContacts() {
+  const access = accessRef.current
+  if (!access.org || !access.permissions.some(p => p.organization_id === access.org && p.module === 'contacts' && p.can_view)) { setContacts([]); setContactsLoading(false); return }
   setContactsLoading(true)
 
   const { data, error } = await supabase
@@ -207,8 +256,10 @@ async function loadContacts() {
         name
       )
     `)
+    .eq('organization_id', access.org)
     .order('created_at', { ascending: false })
 
+  if (accessRef.current !== access) return
   if (error) {
     console.error('Error cargando contactos:', error)
     setContacts([])
@@ -219,6 +270,8 @@ async function loadContacts() {
   setContactsLoading(false)
 }
 async function loadOpportunities() {
+  const access = accessRef.current
+  if (!access.org || !access.permissions.some(p => p.organization_id === access.org && p.module === 'opportunities' && p.can_view)) { setOpportunities([]); setOpportunitiesLoading(false); return }
   setOpportunitiesLoading(true)
 
   const { data, error } = await supabase
@@ -237,8 +290,10 @@ async function loadOpportunities() {
         position
       )
     `)
+    .eq('organization_id', access.org)
     .order('created_at', { ascending: false })
 
+  if (accessRef.current !== access) return
   if (error) {
     console.error('Error cargando oportunidades:', error)
     setOpportunities([])
@@ -249,6 +304,8 @@ async function loadOpportunities() {
   setOpportunitiesLoading(false)
 }
 async function loadTasks() {
+  const access = accessRef.current
+  if (!access.org || !access.permissions.some(p => p.organization_id === access.org && p.module === 'tasks' && p.can_view)) { setTasks([]); setTasksLoading(false); return }
   setTasksLoading(true)
 
   const { data, error } = await supabase
@@ -266,8 +323,10 @@ async function loadTasks() {
         title
       )
     `)
+    .eq('organization_id', access.org)
     .order('due_date', { ascending: true })
 
+  if (accessRef.current !== access) return
   if (error) {
     console.error('Error cargando tareas:', error)
     setTasks([])
@@ -278,6 +337,8 @@ async function loadTasks() {
   setTasksLoading(false)
 }
 async function loadCalls() {
+  const access = accessRef.current
+  if (!access.org || !access.permissions.some(p => p.organization_id === access.org && p.module === 'calls' && p.can_view)) { setCalls([]); setCallsLoading(false); return }
   setCallsLoading(true)
 
   const { data, error } = await supabase
@@ -295,8 +356,10 @@ async function loadCalls() {
         title
       )
     `)
+    .eq('organization_id', access.org)
     .order('started_at', { ascending: false })
 
+  if (accessRef.current !== access) return
   if (error) {
     console.error('Error cargando llamadas:', error)
     setCalls([])
@@ -361,6 +424,8 @@ if (reportPeriod === 'yesterday') {
   return true
 }
 async function loadOpportunityOptions() {
+  const access = accessRef.current
+  if (!access.org || !canViewModule('opportunities')) return
   const [
     stagesResult,
     sourcesResult,
@@ -368,21 +433,22 @@ async function loadOpportunityOptions() {
   ] = await Promise.all([
     supabase
       .from('pipeline_stages')
-      .select('*')
+      .select('*').eq('organization_id', access.org)
       .order('position', { ascending: true }),
 
     supabase
       .from('lead_sources')
-      .select('*')
+      .select('*').eq('organization_id', access.org)
       .order('name', { ascending: true }),
 
     supabase
       .from('services')
-      .select('*')
+      .select('*').eq('organization_id', access.org)
       .eq('active', true)
       .order('name', { ascending: true })
   ])
 
+  if (accessRef.current !== access) return
   if (stagesResult.error) {
     console.error('Error cargando etapas:', stagesResult.error)
   } else {
@@ -402,7 +468,7 @@ async function loadOpportunityOptions() {
   }
 }
 function editContact(contact) {
-  if (!canWrite) return
+  if (!canEditModule('contacts')) return
   setEditingContactId(contact.id)
 
   setContactForm({
@@ -422,7 +488,7 @@ function editContact(contact) {
 }
 async function saveContact(e) {
   e.preventDefault()
-  if (!canWrite) { setError('Esta cuenta solo permite consultar datos.'); return }
+  if (!canEditModule('contacts')) { setError('Esta cuenta solo permite consultar datos.'); return }
   setContactSaving(true)
   setError('')
 
@@ -432,13 +498,14 @@ if (editingContactId) {
   result = await supabase
     .from('contacts')
     .update(contactForm)
-    .eq('id', editingContactId)
+    .eq('id', editingContactId).eq('organization_id', activeOrg).select('id')
 } else {
   result = await supabase
     .from('contacts')
     .insert([
       {
         ...contactForm,
+        organization_id: activeOrg,
         owner_id: session.user.id
       }
     ])
@@ -472,7 +539,7 @@ const { error } = result
 }
   async function saveOpportunity(e) {
   e.preventDefault()
-  if (!canWrite) { setError('Esta cuenta solo permite consultar datos.'); return }
+  if (!canEditModule('opportunities')) { setError('Esta cuenta solo permite consultar datos.'); return }
   setOpportunitySaving(true)
   setError('')
 
@@ -502,20 +569,21 @@ const { error } = result
     result = await supabase
       .from('opportunities')
       .update(opportunityData)
-      .eq('id', editingOpportunityId)
+      .eq('id', editingOpportunityId).eq('organization_id', activeOrg).select('id')
   } else {
     result = await supabase
       .from('opportunities')
       .insert([
         {
           ...opportunityData,
+        organization_id: activeOrg,
           owner_id: session.user.id
         }
       ])
 .select('id')
   }
 
-  const { error } = result
+  const error = result.error || (editingOpportunityId && !result.data?.length ? new Error('No tienes permiso para guardar este registro.') : null)
 
   if (error) {
     console.error('Error guardando oportunidad:', error)
@@ -542,6 +610,7 @@ if (opportunityId) {
     const servicesToInsert = opportunityForm.service_ids.map(
       (serviceId) => ({
         opportunity_id: opportunityId,
+        organization_id: activeOrg,
         service_id: serviceId
       })
     )
@@ -567,7 +636,7 @@ if (opportunityId) {
   setOpportunitySaving(false)
 }
 async function editOpportunity(opportunity) {
-  if (!canWrite) return
+  if (!canEditModule('opportunities')) return
   setEditingOpportunityId(opportunity.id)
 
   const { data: opportunityServices, error: servicesError } = await supabase
@@ -599,7 +668,7 @@ async function editOpportunity(opportunity) {
 }
 async function saveTask(e) {
   e.preventDefault()
-  if (!canWrite) { setError('Esta cuenta solo permite consultar datos.'); return }
+  if (!canEditModule('tasks')) { setError('Esta cuenta solo permite consultar datos.'); return }
   setTaskSaving(true)
   setError('')
 
@@ -626,19 +695,20 @@ async function saveTask(e) {
     result = await supabase
       .from('tasks')
       .update(taskData)
-      .eq('id', editingTaskId)
+      .eq('id', editingTaskId).eq('organization_id', activeOrg).select('id')
   } else {
     result = await supabase
       .from('tasks')
       .insert([
         {
           ...taskData,
+        organization_id: activeOrg,
           created_by: session.user.id
         }
       ])
   }
 
-  const { error } = result
+  const error = result.error || (editingTaskId && !result.data?.length ? new Error('No tienes permiso para guardar este registro.') : null)
 
   if (error) {
     console.error('Error guardando tarea:', error)
@@ -654,7 +724,7 @@ async function saveTask(e) {
 }
 async function saveCall(e) {
   e.preventDefault()
-  if (!canWrite) { setError('Esta cuenta solo permite consultar datos.'); return }
+  if (!canEditModule('calls')) { setError('Esta cuenta solo permite consultar datos.'); return }
   setCallSaving(true)
   setError('')
 
@@ -681,19 +751,20 @@ async function saveCall(e) {
     result = await supabase
       .from('calls')
       .update(callData)
-      .eq('id', editingCallId)
+      .eq('id', editingCallId).eq('organization_id', activeOrg).select('id')
   } else {
     result = await supabase
       .from('calls')
       .insert([
         {
           ...callData,
+        organization_id: activeOrg,
           created_by: session.user.id
         }
       ])
   }
 
-  const { error } = result
+  const error = result.error || (editingCallId && !result.data?.length ? new Error('No tienes permiso para guardar este registro.') : null)
 
   if (error) {
     console.error('Error guardando llamada:', error)
@@ -708,7 +779,7 @@ async function saveCall(e) {
   setCallSaving(false)
 }
 function editCall(call) {
-  if (!canWrite) return
+  if (!canEditModule('calls')) return
   setEditingCallId(call.id)
 
   setCallForm({
@@ -733,7 +804,7 @@ function editCall(call) {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
   function editTask(task) {
-  if (!canWrite) return
+  if (!canEditModule('tasks')) return
   setEditingTaskId(task.id)
 
   setTaskForm({
@@ -758,7 +829,7 @@ function editCall(call) {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 function editCompany(company) {
-  if (!canWrite) return
+  if (!canEditModule('clients')) return
   setEditingCompanyId(company.id)
 
   setCompanyForm({
@@ -783,7 +854,7 @@ function editCompany(company) {
 }
 async function saveCompany(e) {
   e.preventDefault()
-  if (!canWrite) { setError('Esta cuenta solo permite consultar datos.'); return }
+  if (!canEditModule('clients')) { setError('Esta cuenta solo permite consultar datos.'); return }
   setCompanySaving(true)
   setError('')
 
@@ -793,13 +864,14 @@ if (editingCompanyId) {
   result = await supabase
     .from('companies')
     .update(companyForm)
-    .eq('id', editingCompanyId)
+    .eq('id', editingCompanyId).eq('organization_id', activeOrg).select('id')
 } else {
   result = await supabase
     .from('companies')
     .insert([
       {
         ...companyForm,
+        organization_id: activeOrg,
         owner_id: session.user.id
       }
     ])
@@ -1070,10 +1142,11 @@ const { error } = result
         </div>
 
       </header>
+{organizations.length > 1 && <div style={{padding:'12px 24px',background:'#f1f5f9'}}><label>Empresa: <select value={activeOrg} onChange={e => { accessRef.current = { ...accessRef.current, org: e.target.value }; clearCRMData(); setActiveOrg(e.target.value) }}>{organizations.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label></div>}
 <main className="crm-main">
   <aside className="sidebar">
     <nav className="sidebar-nav">
-<button
+{canViewModule('dashboard') && (<button
   className={`nav-item ${currentPage === 'dashboard' ? 'active' : ''}`}
 onClick={() => {
   setCurrentPage('dashboard')
@@ -1085,8 +1158,8 @@ onClick={() => {
 >
         <span>▦</span>
         Inicio
-      </button>
-<button
+      </button>)}
+{canViewModule('clients') && (<button
   className={`nav-item ${currentPage === 'clients' ? 'active' : ''}`}
   onClick={() => {
     setCurrentPage('clients')
@@ -1096,10 +1169,10 @@ onClick={() => {
 >
   <span>👥</span>
   Clientes
-</button>
+</button>)}
 
 
-<button
+{canViewModule('contacts') && (<button
   className={`nav-item ${currentPage === 'contacts' ? 'active' : ''}`}
 onClick={() => {
   setCurrentPage('contacts')
@@ -1109,9 +1182,9 @@ onClick={() => {
 >
   <span>♟</span>
   Contactos
-</button>
+</button>)}
 
-<button
+{canViewModule('opportunities') && (<button
   className={`nav-item ${currentPage === 'opportunities' ? 'active' : ''}`}
 onClick={() => {
   setCurrentPage('opportunities')
@@ -1123,9 +1196,9 @@ onClick={() => {
 >
   <span>◎</span>
   Oportunidades
-</button>
+</button>)}
 
-<button
+{canViewModule('calls') && (<button
   className={`nav-item ${currentPage === 'calls' ? 'active' : ''}`}
   onClick={() => {
     setCurrentPage('calls')
@@ -1137,16 +1210,16 @@ onClick={() => {
 >
   <span>☎</span>
   Llamadas
-</button>
+</button>)}
 
-<button className={`nav-item ${currentPage === 'agenda' ? 'active' : ''}`} onClick={() => {
+{canViewModule('agenda') && (<button className={`nav-item ${currentPage === 'agenda' ? 'active' : ''}`} onClick={() => {
   setCurrentPage('agenda')
   loadTasks()
   loadCompanies()
   loadContacts()
-}}><span>▦</span> Agenda</button>
+}}><span>▦</span> Agenda</button>)}
 
-<button
+{canViewModule('tasks') && (<button
   className={`nav-item ${currentPage === 'tasks' ? 'active' : ''}`}
   onClick={() => {
     setCurrentPage('tasks')
@@ -1158,9 +1231,9 @@ onClick={() => {
 >
   <span>✓</span>
   Tareas
-</button>
+</button>)}
 
-<button
+{canViewModule('reports') && (<button
   className={`nav-item ${currentPage === 'reports' ? 'active' : ''}`}
   onClick={() => {
     setCurrentPage('reports')
@@ -1172,12 +1245,17 @@ onClick={() => {
 >
   <span>▥</span>
   Informes
-</button>
-    </nav>
+</button>)}
+    {profile?.role === 'admin' && activeOrg && <button className={`nav-item ${currentPage === 'permissions' ? 'active' : ''}`} onClick={() => setCurrentPage('permissions')}><span>⚙</span> Permisos de usuarios</button>}
+</nav>
   </aside>
 
   <section className="dashboard">
-  {currentPage === 'clients' ? (
+  {currentPage === 'permissions' && profile?.role === 'admin' ? (
+    <ModulePermissions organizationId={activeOrg} onSaved={() => refreshPermissions(session.user.id)} />
+  ) : !canViewModule(currentPage) ? (
+    <div className="dashboard-heading"><div><h1>Sin acceso</h1><p>No tienes secciones habilitadas en esta empresa. Consulta con el administrador.</p></div></div>
+  ) : currentPage === 'clients' ? (
  <>
   <div className="clients-page">
     <div className="dashboard-heading">
@@ -1272,7 +1350,7 @@ onClick={() => {
 
 <div className="detail-wide" style={{ marginTop: '24px' }}>
   <h3>Contactos del cliente</h3>
-  {canWrite && (<button
+  {canEditModule('contacts') && (<button
     type="button"
     className="secondary-action"
     onClick={() => {
@@ -1314,7 +1392,7 @@ onClick={() => {
               <div><span>Móvil: </span>{contact.mobile ? <a href={`tel:${contact.mobile}`}>{contact.mobile}</a> : 'Sin móvil'}</div>
               <div style={{ overflowWrap: 'anywhere' }}><span>Correo: </span>{contact.email ? <a href={`mailto:${contact.email}`}>{contact.email}</a> : 'Sin correo'}</div>
             </div>
-            {canWrite && (<button
+            {canEditModule('contacts') && (<button
               type="button"
               className="secondary-action"
               style={{ marginTop: '16px' }}
@@ -1330,7 +1408,7 @@ onClick={() => {
     </div>
   )}
 </div>
-<ClientAttachments key={selectedCompany.id} company={selectedCompany} session={session} profile={profile} />
+<ClientAttachments key={selectedCompany.id} company={selectedCompany} session={session} profile={profile} allowEdit={canEditModule('clients')} />
   </div>
 )}
 {canWrite && showCompanyForm && (
@@ -2738,7 +2816,7 @@ service_ids: [],
     )}
   </>
 ) : currentPage === 'agenda' ? (
-  <Agenda session={session} profile={profile} tasks={tasks} companies={companies} contacts={contacts} onEditTask={(task) => { setCurrentPage('tasks'); editTask(task) }} />
+  <Agenda key={activeOrg} organizationId={activeOrg} allowEdit={canEditModule('agenda')} session={session} profile={profile} tasks={tasks} companies={companies} contacts={contacts} onEditTask={(task) => { if (canViewModule('tasks')) { setCurrentPage('tasks'); if (canEditModule('tasks')) editTask(task) } }} />
 ) : currentPage === 'tasks' ? (
   <>
     <div className="dashboard-heading">
@@ -3257,13 +3335,13 @@ priority: 'normal',
   )
 }
 
-function ClientAttachments({ company, session, profile }) {
+function ClientAttachments({ company, session, profile, allowEdit }) {
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState(false)
   const [message, setMessage] = useState('')
   const [pending, setPending] = useState(null)
-  const canUpload = !!profile?.active && profile.role !== 'demo'
+  const canUpload = !!allowEdit && !!profile?.active && profile.role !== 'demo'
   const canDelete = canUpload && profile.role === 'admin'
   const bucket = supabase.storage.from('crm-attachments')
   async function loadFiles() {
@@ -3366,7 +3444,7 @@ function AgendaDateTime({ label, value, onChange }) {
   </div>
 }
 
-function Agenda({ session, profile, tasks, companies, contacts, onEditTask }) {
+function Agenda({ session, profile, tasks, companies, contacts, onEditTask, organizationId, allowEdit }) {
   const [view, setView] = useState('month')
   const [anchor, setAnchor] = useState(new Date())
   const [meetings, setMeetings] = useState([])
@@ -3374,14 +3452,14 @@ function Agenda({ session, profile, tasks, companies, contacts, onEditTask }) {
   const [message, setMessage] = useState('')
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
-  const readOnly = profile?.role === 'demo'
+  const readOnly = !allowEdit || !profile?.active || profile?.role === 'demo'
   const localInput = (date) => {
     const d = new Date(date)
     return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
   }
   async function loadMeetings() {
     setBusy(true)
-    const { data, error } = await supabase.from('activities').select('*').eq('activity_type', 'meeting').order('activity_date')
+    const { data, error } = await supabase.from('activities').select('*').eq('activity_type', 'meeting').eq('organization_id', organizationId).order('activity_date')
     if (error) setMessage('No se han podido cargar las citas: ' + error.message)
     else setMeetings(data || [])
     setBusy(false)
@@ -3395,6 +3473,7 @@ function Agenda({ session, profile, tasks, companies, contacts, onEditTask }) {
   }
   async function saveMeeting(e) {
     e.preventDefault()
+    if (readOnly) return
     const start = new Date(form.activity_date), end = new Date(form.end_date)
     if (!form.subject.trim() || !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) {
       setMessage('Indica un título y una hora de finalización posterior al inicio.')
@@ -3403,18 +3482,19 @@ function Agenda({ session, profile, tasks, companies, contacts, onEditTask }) {
     setSaving(true)
     setMessage('')
     try {
-      let org = form.organization_id
+      let org = organizationId
       if (!form.id) {
         const { data, error } = await supabase.from('organization_members').select('organization_id').eq('user_id', session.user.id).eq('active', true)
         if (error) throw error
         const client = companies.find(c => c.id === form.company_id)
         const orgs = [...new Set((data || []).map(m => m.organization_id))]
-        org = client?.organization_id || (orgs.length === 1 ? orgs[0] : null)
+        org = organizationId
+        if (client && client.organization_id !== org) throw new Error('El cliente pertenece a otra empresa.')
         if (!org || !orgs.includes(org)) throw new Error('Selecciona un cliente de tu organización para guardar la cita.')
       }
       const payload = { subject: form.subject.trim(), description: form.description || null, company_id: form.company_id || null, contact_id: form.contact_id || null, activity_date: start.toISOString(), end_date: end.toISOString() }
       const query = form.id
-        ? supabase.from('activities').update(payload).eq('id', form.id).eq('activity_type', 'meeting')
+        ? supabase.from('activities').update(payload).eq('id', form.id).eq('organization_id', organizationId).eq('activity_type', 'meeting')
         : supabase.from('activities').insert({ ...payload, activity_type: 'meeting', user_id: session.user.id, organization_id: org })
       const { data, error } = await query.select('id')
       if (error) throw error
@@ -3497,6 +3577,79 @@ function Agenda({ session, profile, tasks, companies, contacts, onEditTask }) {
       </div>)}
     </div></div>
   </section>
+}
+
+
+const CRM_MODULES = [
+  ['dashboard','Inicio'], ['clients','Clientes'], ['contacts','Contactos'],
+  ['opportunities','Oportunidades'], ['calls','Llamadas'], ['agenda','Agenda'],
+  ['tasks','Tareas'], ['reports','Informes']
+]
+
+function ModulePermissions({ organizationId, onSaved }) {
+  const [users, setUsers] = useState([])
+  const [permissions, setPermissions] = useState([])
+  const [selectedUser, setSelectedUser] = useState('')
+  const [busy, setBusy] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+  useEffect(() => {
+    let cancelled = false
+    setBusy(true); setMessage(''); setUsers([]); setPermissions([]); setSelectedUser('')
+    async function load() {
+      try {
+        const result = await supabase.from('crm_module_permissions').select('*').eq('organization_id', organizationId)
+        if (result.error) throw result.error
+        const ids = [...new Set((result.data || []).map(p => p.user_id))]
+        const profiles = ids.length ? await supabase.from('profiles').select('id,full_name,role,active').in('id', ids).order('full_name') : { data: [] }
+        if (profiles.error) throw profiles.error
+        if (cancelled) return
+        setPermissions(result.data || []); setUsers(profiles.data || []); setSelectedUser(profiles.data?.[0]?.id || '')
+      } catch (err) { if (!cancelled) setMessage('No se han podido cargar los permisos: ' + err.message) }
+      finally { if (!cancelled) setBusy(false) }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [organizationId])
+  const user = users.find(u => u.id === selectedUser)
+  function permission(module) {
+    return permissions.find(p => p.user_id === selectedUser && p.module === module) || { organization_id: organizationId, user_id: selectedUser, module, can_view: false, can_edit: false }
+  }
+  function change(module, field, checked) {
+    setMessage('')
+    const row = { ...permission(module), [field]: checked }
+    if (field === 'can_view' && !checked) row.can_edit = false
+    if (field === 'can_edit' && checked) row.can_view = true
+    setPermissions(previous => [...previous.filter(p => !(p.user_id === selectedUser && p.module === module)), row])
+  }
+  async function save(e) {
+    e.preventDefault(); if (!user || saving) return
+    setSaving(true); setMessage('')
+    try {
+      const rows = CRM_MODULES.map(([module]) => {
+        const row = permission(module)
+        return { organization_id: organizationId, user_id: selectedUser, module, can_view: row.can_view, can_edit: user.role !== 'demo' && !['dashboard','reports'].includes(module) && row.can_edit }
+      })
+      const result = await supabase.from('crm_module_permissions').upsert(rows, { onConflict: 'organization_id,user_id,module' }).select('*')
+      if (result.error) throw result.error
+      if (result.data?.length !== rows.length) throw new Error('No tienes permiso para guardar todos los cambios.')
+      await onSaved()
+      setMessage('Permisos guardados. El usuario debe cerrar sesión y volver a entrar para actualizar el menú.')
+    } catch (err) { setMessage('No se han podido guardar: ' + err.message) }
+    finally { setSaving(false) }
+  }
+  return <div>
+    <div className="dashboard-heading"><div><p className="dashboard-kicker">GLOBALTEC CRM</p><h1>Permisos de usuarios</h1><p>Elige qué puede consultar y editar cada usuario en esta empresa.</p></div></div>
+    <p style={{color:'#526578'}}>Los permisos de edición siguen sujetos al rol del usuario. Las cuentas demo siempre son de lectura. Para elegir clientes o contactos en otras secciones, habilita también su consulta.</p>
+    {busy ? <p>Cargando usuarios…</p> : <form onSubmit={save} style={{background:'white',padding:24,borderRadius:16,border:'1px solid #dce6ec'}}>
+      <fieldset disabled={saving} style={{border:0,padding:0,margin:0}}>
+        <label style={{display:'block',marginBottom:20}}>Usuario <select value={selectedUser} onChange={e => { setSelectedUser(e.target.value); setMessage('') }} style={{padding:10,marginLeft:12,maxWidth:'100%'}}>{users.map(u => <option key={u.id} value={u.id}>{u.full_name || u.id} · {u.role}{!u.active ? ' · Inactivo' : ''}</option>)}</select></label>
+        {!users.length ? <p>No hay usuarios con permisos registrados en esta empresa.</p> : <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr><th style={{textAlign:'left',padding:12}}>Sección</th><th>Puede ver</th><th>Puede editar</th></tr></thead><tbody>{CRM_MODULES.map(([module,label]) => { const row = permission(module); const editable = user?.role !== 'demo' && !['dashboard','reports'].includes(module); return <tr key={module} style={{borderTop:'1px solid #e2e8f0'}}><td style={{padding:12}}>{label}</td><td style={{textAlign:'center'}}><input type="checkbox" aria-label={`Ver ${label}`} checked={row.can_view} onChange={e => change(module,'can_view',e.target.checked)} /></td><td style={{textAlign:'center'}}>{editable ? <input type="checkbox" aria-label={`Editar ${label}`} checked={row.can_edit} onChange={e => change(module,'can_edit',e.target.checked)} /> : <span>Solo consulta</span>}</td></tr> })}</tbody></table></div>}
+      </fieldset>
+      <button className="primary-action" disabled={saving || !user} style={{marginTop:20}} type="submit">{saving ? 'Guardando…' : 'Guardar permisos'}</button>
+    </form>}
+    {message && <p role="status" style={{marginTop:16}}>{message}</p>}
+  </div>
 }
 
 export default App
