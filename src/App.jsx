@@ -1,6 +1,22 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from './supabase'
 
+function CRMIcon({ name, className = '' }) {
+  const paths = {
+    dashboard: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
+    clients: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M16 3a4 4 0 0 1 0 8 M22 21v-2a4 4 0 0 0-3-3.87 M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
+    contacts: 'M20 21v-2a7 7 0 0 0-14 0v2 M17 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
+    opportunities: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0 M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0 M12 10v4 M10 12h4',
+    calls: 'M5 3h4l2 5-3 2a16 16 0 0 0 6 6l2-3 5 2v4a2 2 0 0 1-2 2C10 21 3 14 3 5a2 2 0 0 1 2-2',
+    agenda: 'M4 5h16v16H4z M4 10h16 M8 3v4 M16 3v4 M8 14h2 M14 14h2 M8 17h2',
+    tasks: 'M9 5h11v16H4V5h2 M9 3h6v4H9z M8 14l3 3 5-6',
+    reports: 'M4 3v18h17 M8 17v-5 M13 17V7 M18 17v-8',
+    permissions: 'M12 3v3 M12 18v3 M3 12h3 M18 12h3 M5.6 5.6l2.1 2.1 M16.3 16.3l2.1 2.1 M5.6 18.4l2.1-2.1 M16.3 7.7l2.1-2.1 M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0'
+  }
+  return <svg className={`crm-icon ${className}`} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name] || paths.dashboard} /></svg>
+}
+
+
 function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -1145,6 +1161,7 @@ const { error } = result
 {organizations.length > 1 && <div style={{padding:'12px 24px',background:'#f1f5f9'}}><label>Empresa: <select value={activeOrg} onChange={e => { accessRef.current = { ...accessRef.current, org: e.target.value }; clearCRMData(); setActiveOrg(e.target.value) }}>{organizations.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label></div>}
 <main className="crm-main">
   <aside className="sidebar">
+    <p className="sidebar-label">ESPACIO DE TRABAJO</p>
     <nav className="sidebar-nav">
 {canViewModule('dashboard') && (<button
   className={`nav-item ${currentPage === 'dashboard' ? 'active' : ''}`}
@@ -1156,7 +1173,7 @@ onClick={() => {
   loadCalls()
 }}
 >
-        <span>▦</span>
+        <CRMIcon name="dashboard" />
         Inicio
       </button>)}
 {canViewModule('clients') && (<button
@@ -1167,7 +1184,7 @@ onClick={() => {
     loadContacts()
   }}
 >
-  <span>👥</span>
+  <CRMIcon name="clients" />
   Clientes
 </button>)}
 
@@ -1180,7 +1197,7 @@ onClick={() => {
   loadContacts()
 }}
 >
-  <span>♟</span>
+  <CRMIcon name="contacts" />
   Contactos
 </button>)}
 
@@ -1194,7 +1211,7 @@ onClick={() => {
   loadOpportunityOptions()
 }}
 >
-  <span>◎</span>
+  <CRMIcon name="opportunities" />
   Oportunidades
 </button>)}
 
@@ -1208,7 +1225,7 @@ onClick={() => {
     loadOpportunities()
   }}
 >
-  <span>☎</span>
+  <CRMIcon name="calls" />
   Llamadas
 </button>)}
 
@@ -1217,7 +1234,7 @@ onClick={() => {
   loadTasks()
   loadCompanies()
   loadContacts()
-}}><span>▦</span> Agenda</button>)}
+}}><CRMIcon name="agenda" /> Agenda</button>)}
 
 {canViewModule('tasks') && (<button
   className={`nav-item ${currentPage === 'tasks' ? 'active' : ''}`}
@@ -1229,7 +1246,7 @@ onClick={() => {
     loadOpportunities()
   }}
 >
-  <span>✓</span>
+  <CRMIcon name="tasks" />
   Tareas
 </button>)}
 
@@ -1243,10 +1260,10 @@ onClick={() => {
     loadCalls()
   }}
 >
-  <span>▥</span>
+  <CRMIcon name="reports" />
   Informes
 </button>)}
-    {profile?.role === 'admin' && activeOrg && <button className={`nav-item ${currentPage === 'permissions' ? 'active' : ''}`} onClick={() => setCurrentPage('permissions')}><span>⚙</span> Permisos de usuarios</button>}
+    {profile?.role === 'admin' && activeOrg && <button className={`nav-item ${currentPage === 'permissions' ? 'active' : ''}`} onClick={() => setCurrentPage('permissions')}><CRMIcon name="permissions" /> Permisos de usuarios</button>}
 </nav>
   </aside>
 
@@ -3135,7 +3152,7 @@ priority: 'normal',
   <div className="dashboard-heading">
       <div>
         <p className="dashboard-kicker">GLOBALTEC CRM</p>
-        <h1>Panel de control</h1>
+        <h1>Tu negocio, de un vistazo.</h1>
         <p>Resumen de la actividad comercial.</p>
       </div>
 
@@ -3154,19 +3171,22 @@ priority: 'normal',
     </div>
 
     <div className="stats-grid">
-      <div className="stat-card">
+      <div className="stat-card stat-clients">
+        <CRMIcon name="clients" className="stat-icon" />
         <span>Clientes</span>
 <strong>{companies.length}</strong>
         <small>Total registrados</small>
       </div>
 
-      <div className="stat-card">
+      <div className="stat-card stat-opportunities">
+        <CRMIcon name="opportunities" className="stat-icon" />
         <span>Oportunidades</span>
 <strong>{opportunities.length}</strong>
         <small>En seguimiento</small>
       </div>
 
-      <div className="stat-card">
+      <div className="stat-card stat-tasks">
+        <CRMIcon name="tasks" className="stat-icon" />
         <span>Tareas pendientes</span>
         <strong><strong>
   {tasks.filter(
@@ -3178,7 +3198,8 @@ priority: 'normal',
         <small>Por completar</small>
       </div>
 
-      <div className="stat-card">
+      <div className="stat-card stat-calls">
+        <CRMIcon name="calls" className="stat-icon" />
         <span>Llamadas</span>
        <strong>{calls.length}</strong>
         <small>Registradas</small>
