@@ -3336,7 +3336,13 @@ function Agenda({ session, profile, tasks, companies, contacts, onEditTask }) {
       .agenda-hero{padding:24px;border-radius:20px;background:linear-gradient(120deg,#103b50,#087f8c);color:white;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
       .agenda-hero h1{margin:4px 0;font-size:30px;color:white}.agenda-hero p{margin:4px 0;color:#d2edf0}
       .agenda-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:18px 0}.agenda-toolbar strong{flex:1;min-width:180px;text-transform:capitalize}
-      .agenda-shell button{cursor:pointer}.agenda-control{padding:10px 15px;background:white;border:1px solid #cbd5e1;border-radius:10px;color:#123047}.agenda-control.active{background:#087f8c;color:white;border-color:#087f8c}
+      .agenda-shell button{cursor:pointer}
+      .agenda-shell .primary-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;border:0;border-radius:12px;background:#087f8c;color:white;font:inherit;font-size:14px;font-weight:700;min-height:44px;box-shadow:0 4px 12px rgba(8,127,140,.18);transition:background .15s,transform .15s}
+      .agenda-shell .primary-btn:hover{background:#066775;transform:translateY(-1px)}
+      .agenda-shell .primary-btn:focus-visible{outline:3px solid #fbbf24;outline-offset:3px}
+      .agenda-shell .primary-btn:disabled{opacity:.6;cursor:wait;transform:none}
+      .agenda-hero .primary-btn{background:white;color:#076b79;box-shadow:0 6px 18px rgba(0,0,0,.15);border:1px solid rgba(255,255,255,.65)}
+      .agenda-hero .primary-btn:hover{background:#e6f7f8}.agenda-control{padding:10px 15px;background:white;border:1px solid #cbd5e1;border-radius:10px;color:#123047}.agenda-control.active{background:#087f8c;color:white;border-color:#087f8c}
       .agenda-scroll{overflow-x:auto;background:white;border:1px solid #dde7ed;border-radius:16px}.agenda-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));min-width:840px}.agenda-grid.day{grid-template-columns:1fr;min-width:0}
       .agenda-day{min-height:145px;padding:10px;border-right:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0}.agenda-day.outside{background:#f8fafc}.agenda-date{background:transparent;border:0;border-radius:8px;padding:6px;font-weight:700;color:#123047}.agenda-date.today{background:#087f8c;color:white}
       .agenda-event{display:block;width:100%;text-align:left;border:0;border-left:3px solid currentColor;border-radius:7px;padding:8px;margin:6px 0;white-space:normal;overflow-wrap:anywhere;font-size:12px}.agenda-event small{display:block;margin-top:3px}.agenda-weekday{padding:12px;text-align:center;background:#f1f6f9;font-size:12px;font-weight:700}.agenda-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;margin:12px 0;color:#526578}
