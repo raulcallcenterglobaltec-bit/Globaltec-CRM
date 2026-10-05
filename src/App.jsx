@@ -41,6 +41,8 @@ function App() {
   const [modulePermissions, setModulePermissions] = useState([])
   const [organizations, setOrganizations] = useState([])
   const [activeOrg, setActiveOrg] = useState('')
+  const [showNewOrganization, setShowNewOrganization] = useState(false)
+  const canCreateOrganization = !!profile?.active && profile?.role === 'admin' && session?.user?.id === '4572a164-9b54-46b5-8382-4e50a8b4dfef'
   const [brandingAdmin, setBrandingAdmin] = useState(null)
   const organization = organizations.find(o => o.id === activeOrg)
   const primaryColor = brandingColor(organization?.settings?.branding?.primary_color, '#087f74')
@@ -1187,6 +1189,18 @@ const { error } = result
 
       </header>
 {organizations.length > 1 && <div style={{padding:'12px 24px',background:'#f1f5f9'}}><label>Empresa: <select value={activeOrg} onChange={e => { accessRef.current = { ...accessRef.current, org: e.target.value }; clearCRMData(); setActiveOrg(e.target.value) }}>{organizations.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label></div>}
+{canCreateOrganization && <div style={{ padding: '12px 24px', background: '#f1f5f9' }}>
+  <button type="button" className="primary-action" onClick={() => setShowNewOrganization(value => !value)}>{showNewOrganization ? 'Cerrar alta de empresa' : '+ Nueva empresa'}</button>
+  {showNewOrganization && <NewOrganization key={session.user.id} onCreated={async id => {
+    const userId = session.user.id
+    await refreshPermissions(userId)
+    if (accessRef.current.user !== userId) return
+    accessRef.current = { ...accessRef.current, org: id }
+    clearCRMData()
+    setActiveOrg(id)
+    setCurrentPage('dashboard')
+  }} />}
+</div>}
 <main className="crm-main">
   <aside className="sidebar">
     <p className="sidebar-label">ESPACIO DE TRABAJO</p>
@@ -3389,6 +3403,41 @@ priority: 'normal',
   )
 }
 
+
+function NewOrganization({ onCreated }) {
+  const [name, setName] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [created, setCreated] = useState(false)
+  const busy = useRef(false)
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  async function save(e) {
+    e.preventDefault()
+    if (busy.current || created) return
+    if (!name.trim()) { setError('Escribe el nombre de la empresa.'); return }
+    busy.current = true; setSaving(true); setError('')
+    try {
+      const { data, error: rpcError } = await supabase.rpc('crm_create_organization', { p_name: name.trim() })
+      if (rpcError) throw rpcError
+      if (!data) throw new Error('No se ha recibido el identificador de la empresa.')
+      if (!alive.current) return
+      setCreated(true)
+      await onCreated(data)
+    } catch (err) { if (alive.current) setError(err.message || 'No se ha podido dar de alta la empresa.') }
+    finally { busy.current = false; if (alive.current) setSaving(false) }
+  }
+  return <form className="dashboard-card" onSubmit={save} style={{ marginTop: 16, maxWidth: 620 }}>
+    <h2>Nueva empresa</h2>
+    <p>Se creará con sus siete etapas comerciales y tu acceso de administrador. Después podrás añadir su logo, colores y usuarios.</p>
+    <fieldset disabled={saving || created} style={{ border: 0, padding: 0, margin: '20px 0' }}>
+      <label className="form-field">Nombre de empresa<input value={name} onChange={e => setName(e.target.value)} required maxLength={150} autoFocus /></label>
+    </fieldset>
+    {error && <p role="alert" style={{ color: '#b42318' }}>{error}</p>}
+    {created && <p role="status">Empresa creada. Si no aparece en el selector, cierra sesión y vuelve a entrar.</p>}
+    <button className="primary-action" disabled={saving || created}>{saving ? 'Creando…' : created ? 'Empresa creada' : 'Crear empresa'}</button>
+  </form>
+}
 
 function BrandingSettings({ organization, onSaved }) {
   const [name, setName] = useState(organization.name || '')
