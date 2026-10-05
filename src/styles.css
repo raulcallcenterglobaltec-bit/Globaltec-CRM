@@ -1201,3 +1201,7 @@ button:disabled { cursor:not-allowed; opacity:.6; }
 .branding-preview-menu p { padding-left:12px; }
 .branding-error { color:#b42318; }
 @media(max-width:850px) { .branding-layout { grid-template-columns:1fr; } }
+.header .brand-logo {
+  height: 80px;
+  max-width: 180px;
+}
