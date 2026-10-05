@@ -1056,6 +1056,7 @@ onClick={() => {
   onClick={() => {
     setCurrentPage('clients')
     loadCompanies()
+    loadContacts()
   }}
 >
   <span>👥</span>
