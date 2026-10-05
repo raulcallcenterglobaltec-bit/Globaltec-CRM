@@ -3704,7 +3704,7 @@ function Agenda({ brandName, session, profile, tasks, companies, contacts, onEdi
       <label>Título<input required value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} /></label>
       <label>Cliente<select value={form.company_id} onChange={e => setForm({ ...form, company_id: e.target.value, contact_id: '' })}><option value="">Sin cliente</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
       <label>Contacto<select value={form.contact_id} onChange={e => setForm({ ...form, contact_id: e.target.value })}><option value="">Sin contacto</option>{contacts.filter(c => !form.company_id || c.company_id === form.company_id).map(c => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}</select></label>
-      <AgendaDateTime label="Inicio" value={form.activity_date} onChange={value => setForm({ ...form, activity_date: value })} />
+      <AgendaDateTime label="Inicio" value={form.activity_date} onChange={value => setForm(current => ({ ...current, activity_date: value, end_date: value }))} />
       <AgendaDateTime label="Finalización" value={form.end_date} onChange={value => setForm({ ...form, end_date: value })} />
       <label>Notas<textarea rows="3" value={form.description || ''} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
     </div></fieldset><div className="agenda-form-actions"><button type="button" disabled={saving} className="agenda-control" onClick={() => setForm(null)}>Cancelar</button>{!readOnly && <button disabled={saving} className="primary-btn" type="submit">{saving ? 'Guardando…' : 'Guardar cita'}</button>}</div></form>}
