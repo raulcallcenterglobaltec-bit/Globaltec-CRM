@@ -17,6 +17,20 @@ function CRMIcon({ name, className = '' }) {
 }
 
 
+function brandingColor(value, fallback) {
+  return /^#[0-9a-f]{6}$/i.test(value || '') ? value : fallback
+}
+function brandingInk(color) {
+  const rgb = color.slice(1).match(/../g).map(v => parseInt(v, 16) / 255)
+  const [r, g, b] = rgb.map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4)
+  return .2126 * r + .7152 * g + .0722 * b > .179 ? '#000000' : '#ffffff'
+}
+function BrandLogo({ url, name }) {
+  const [failed, setFailed] = useState(false)
+  if (!url || failed) return null
+  return <img className="brand-logo" src={url} alt={`Logotipo de ${name}`} onError={() => setFailed(true)} referrerPolicy="no-referrer" />
+}
+
 function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -27,6 +41,20 @@ function App() {
   const [modulePermissions, setModulePermissions] = useState([])
   const [organizations, setOrganizations] = useState([])
   const [activeOrg, setActiveOrg] = useState('')
+  const [brandingAdmin, setBrandingAdmin] = useState(null)
+  const organization = organizations.find(o => o.id === activeOrg)
+  const primaryColor = brandingColor(organization?.settings?.branding?.primary_color, '#087f74')
+  const sidebarColor = brandingColor(organization?.settings?.branding?.sidebar_color, '#142c48')
+  const canBrand = !!profile?.active && profile?.role !== 'demo' && brandingAdmin?.org === activeOrg && brandingAdmin?.user === session?.user?.id && brandingAdmin?.allowed
+  useEffect(() => {
+    let cancelled = false
+    setBrandingAdmin(null)
+    if (!activeOrg || !session?.user?.id || !profile?.active || profile?.role === 'demo') return
+    supabase.from('organization_members').select('role').eq('organization_id', activeOrg).eq('user_id', session.user.id).eq('active', true).maybeSingle().then(({ data, error }) => {
+      if (!cancelled) setBrandingAdmin({ org: activeOrg, user: session.user.id, allowed: !error && data?.role === 'admin' })
+    })
+    return () => { cancelled = true }
+  }, [activeOrg, session?.user?.id, profile?.active, profile?.role])
   const accessRef = useRef({ org: '', permissions: [], user: null })
   function canViewModule(module) {
     return !!profile?.active && modulePermissions.some(p => p.organization_id === activeOrg && p.module === module && p.can_view)
@@ -45,7 +73,7 @@ function App() {
   async function refreshPermissions(userId) {
     const [permissionsResult, orgResult] = await Promise.all([
       supabase.from('crm_module_permissions').select('*').eq('user_id', userId),
-      supabase.from('organizations').select('id,name').eq('active', true).order('name')
+      supabase.from('organizations').select('id,name,logo_url,settings').eq('active', true).order('name')
     ])
     if (accessRef.current.user !== userId) return
     if (permissionsResult.error || orgResult.error) {
@@ -62,7 +90,7 @@ function App() {
     clearCRMData()
     if (!activeOrg || !profile?.active) return
     const pages = ['dashboard','clients','contacts','opportunities','calls','agenda','tasks','reports']
-    if (!(currentPage === 'permissions' && profile.role === 'admin') && !canViewModule(currentPage)) {
+    if (!(currentPage === 'permissions' && profile.role === 'admin') && currentPage !== 'branding' && !canViewModule(currentPage)) {
       setCurrentPage(pages.find(canViewModule) || 'no-access')
     }
     loadCompanies(); loadContacts(); loadOpportunities(); loadTasks(); loadCalls()
@@ -1129,12 +1157,12 @@ const { error } = result
   }
 
   return (
-    <div className="app">
+    <div className="app" style={{ '--crm-teal': primaryColor, '--crm-sidebar': sidebarColor, '--crm-primary-ink': brandingInk(primaryColor), '--crm-sidebar-ink': brandingInk(sidebarColor) }}>
 
       <header className="header">
 
         <div>
-          <span className="brand">GLOBALTEC</span>
+          <BrandLogo key={`${activeOrg}:${organization?.logo_url || ''}`} url={organization?.logo_url} name={organization?.name || 'Empresa'} /><span className="brand">{organization?.name || 'GLOBALTEC'}</span>
           <span className="brand-subtitle"> CRM</span>
         </div>
 
@@ -1264,12 +1292,17 @@ onClick={() => {
   Informes
 </button>)}
     {profile?.role === 'admin' && activeOrg && <button className={`nav-item ${currentPage === 'permissions' ? 'active' : ''}`} onClick={() => setCurrentPage('permissions')}><CRMIcon name="permissions" /> Permisos de usuarios</button>}
+{canBrand && <button className={`nav-item ${currentPage === 'branding' ? 'active' : ''}`} onClick={() => setCurrentPage('branding')}><CRMIcon name="permissions" /> Personalización</button>}
 </nav>
   </aside>
 
   <section className="dashboard">
-  {currentPage === 'permissions' && profile?.role === 'admin' ? (
-    <ModulePermissions organizationId={activeOrg} onSaved={() => refreshPermissions(session.user.id)} />
+  {currentPage === 'branding' ? (
+    canBrand && organization ? <BrandingSettings key={`${activeOrg}:${session.user.id}`} organization={organization} onSaved={updated => {
+      if (accessRef.current.org === updated.id) setOrganizations(items => items.map(item => item.id === updated.id ? updated : item))
+    }} /> : <p>No tienes permiso para personalizar esta empresa.</p>
+  ) : currentPage === 'permissions' && profile?.role === 'admin' ? (
+    <ModulePermissions brandName={organization?.name} organizationId={activeOrg} onSaved={() => refreshPermissions(session.user.id)} />
   ) : !canViewModule(currentPage) ? (
     <div className="dashboard-heading"><div><h1>Sin acceso</h1><p>No tienes secciones habilitadas en esta empresa. Consulta con el administrador.</p></div></div>
   ) : currentPage === 'clients' ? (
@@ -1277,7 +1310,7 @@ onClick={() => {
   <div className="clients-page">
     <div className="dashboard-heading">
       <div>
-        <p className="dashboard-kicker">GLOBALTEC CRM</p>
+        <p className="dashboard-kicker">{organization?.name || 'GLOBALTEC'} CRM</p>
         <h1>Clientes</h1>
         <p>Gestión de empresas y clientes.</p>
       </div>
@@ -1698,7 +1731,7 @@ onClick={() => {
   <>
     <div className="dashboard-heading">
       <div>
-        <p className="dashboard-kicker">GLOBALTEC CRM</p>
+        <p className="dashboard-kicker">{organization?.name || 'GLOBALTEC'} CRM</p>
         <h1>Contactos</h1>
         <p>Gestión de personas de contacto de tus clientes.</p>
       </div>
@@ -1952,7 +1985,7 @@ onClick={() => {
   <>
     <div className="dashboard-heading">
       <div>
-        <p className="dashboard-kicker">GLOBALTEC CRM</p>
+        <p className="dashboard-kicker">{organization?.name || 'GLOBALTEC'} CRM</p>
         <h1>Oportunidades</h1>
         <p>Gestión y seguimiento de oportunidades comerciales.</p>
       </div>
@@ -2296,7 +2329,7 @@ service_ids: [],
   <>
     <div className="dashboard-heading">
       <div>
-        <p className="dashboard-kicker">GLOBALTEC CRM</p>
+        <p className="dashboard-kicker">{organization?.name || 'GLOBALTEC'} CRM</p>
         <h1>Informes</h1>
         <p>Resumen y análisis de la actividad comercial.</p>
       </div>
@@ -2535,7 +2568,7 @@ service_ids: [],
   <>
     <div className="dashboard-heading">
       <div>
-        <p className="dashboard-kicker">GLOBALTEC CRM</p>
+        <p className="dashboard-kicker">{organization?.name || 'GLOBALTEC'} CRM</p>
         <h1>Llamadas</h1>
         <p>Registro y seguimiento de llamadas.</p>
       </div>
@@ -2833,12 +2866,12 @@ service_ids: [],
     )}
   </>
 ) : currentPage === 'agenda' ? (
-  <Agenda key={activeOrg} organizationId={activeOrg} allowEdit={canEditModule('agenda')} session={session} profile={profile} tasks={tasks} companies={companies} contacts={contacts} onEditTask={(task) => { if (canViewModule('tasks')) { setCurrentPage('tasks'); if (canEditModule('tasks')) editTask(task) } }} />
+  <Agenda brandName={organization?.name} key={activeOrg} organizationId={activeOrg} allowEdit={canEditModule('agenda')} session={session} profile={profile} tasks={tasks} companies={companies} contacts={contacts} onEditTask={(task) => { if (canViewModule('tasks')) { setCurrentPage('tasks'); if (canEditModule('tasks')) editTask(task) } }} />
 ) : currentPage === 'tasks' ? (
   <>
     <div className="dashboard-heading">
       <div>
-        <p className="dashboard-kicker">GLOBALTEC CRM</p>
+        <p className="dashboard-kicker">{organization?.name || 'GLOBALTEC'} CRM</p>
         <h1>Tareas</h1>
         <p>Gestión y seguimiento de tareas pendientes.</p>
       </div>
@@ -3151,7 +3184,7 @@ priority: 'normal',
 <>
   <div className="dashboard-heading">
       <div>
-        <p className="dashboard-kicker">GLOBALTEC CRM</p>
+        <p className="dashboard-kicker">{organization?.name || 'GLOBALTEC'} CRM</p>
         <h1>Tu negocio, de un vistazo.</h1>
         <p>Resumen de la actividad comercial.</p>
       </div>
@@ -3356,6 +3389,51 @@ priority: 'normal',
   )
 }
 
+
+function BrandingSettings({ organization, onSaved }) {
+  const [name, setName] = useState(organization.name || '')
+  const [logo, setLogo] = useState(organization.logo_url || '')
+  const [primary, setPrimary] = useState(brandingColor(organization.settings?.branding?.primary_color, '#087f74'))
+  const [sidebar, setSidebar] = useState(brandingColor(organization.settings?.branding?.sidebar_color, '#142c48'))
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  function safeLogo(value) {
+    if (!value.trim()) return ''
+    try { const url = new URL(value.trim()); return url.protocol === 'https:' && !url.username && !url.password ? url.href : null } catch { return null }
+  }
+  async function save(e) {
+    e.preventDefault()
+    if (saving) return
+    setMessage(''); setError('')
+    const logoUrl = safeLogo(logo)
+    if (!name.trim()) { setError('Escribe el nombre de la empresa.'); return }
+    if (logoUrl === null) { setError('El logotipo debe tener un enlace HTTPS válido.'); return }
+    setSaving(true)
+    try {
+      const result = await supabase.rpc('crm_save_branding', { p_organization_id: organization.id, p_name: name.trim(), p_logo_url: logoUrl, p_primary_color: primary, p_sidebar_color: sidebar })
+      if (result.error) throw result.error
+      if (!alive.current) return
+      onSaved({ ...organization, name: name.trim(), logo_url: logoUrl || null, settings: { ...organization.settings, branding: { primary_color: primary, sidebar_color: sidebar } } })
+      setMessage('Personalización guardada.')
+    } catch (err) { if (alive.current) setError(err.message || 'No se han podido guardar los cambios.') }
+    finally { if (alive.current) setSaving(false) }
+  }
+  return <div className="branding-page">
+    <div className="dashboard-heading"><div><h1>Personalización</h1><p>Nombre, logotipo y colores de esta empresa.</p></div></div>
+    <div className="branding-layout"><form className="dashboard-card branding-form" onSubmit={save}>
+      <label className="form-field">Nombre de empresa<input value={name} onChange={e => setName(e.target.value)} maxLength={150} required disabled={saving} /></label>
+      <label className="form-field">Enlace HTTPS del logotipo<input type="url" value={logo} onChange={e => setLogo(e.target.value)} placeholder="https://…/logo.png" disabled={saving} /><small>Déjalo vacío para mostrar solo el nombre.</small></label>
+      <label className="branding-color">Color principal<input type="color" value={primary} onChange={e => setPrimary(e.target.value)} disabled={saving} /><span>{primary}</span></label>
+      <label className="branding-color">Color del menú<input type="color" value={sidebar} onChange={e => setSidebar(e.target.value)} disabled={saving} /><span>{sidebar}</span></label>
+      {error && <p role="alert" className="branding-error">{error}</p>}{message && <p role="status">{message}</p>}
+      <button className="primary-action" disabled={saving}>{saving ? 'Guardando…' : 'Guardar personalización'}</button>
+    </form><div className="dashboard-card branding-preview"><h2>Vista previa</h2><div className="branding-preview-header"><BrandLogo key={logo} url={safeLogo(logo)} name={name} /><strong>{name || 'Tu empresa'}</strong><span>CRM</span></div><div className="branding-preview-menu" style={{ background: sidebar, color: brandingInk(sidebar) }}><span>ESPACIO DE TRABAJO</span><div style={{ background: primary, color: brandingInk(primary) }}>Panel principal</div><p>Clientes</p><p>Agenda</p></div><p>Los cambios se aplican al guardar.</p></div></div>
+  </div>
+}
+
 function ClientAttachments({ company, session, profile, allowEdit }) {
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -3465,7 +3543,7 @@ function AgendaDateTime({ label, value, onChange }) {
   </div>
 }
 
-function Agenda({ session, profile, tasks, companies, contacts, onEditTask, organizationId, allowEdit }) {
+function Agenda({ brandName, session, profile, tasks, companies, contacts, onEditTask, organizationId, allowEdit }) {
   const [view, setView] = useState('month')
   const [anchor, setAnchor] = useState(new Date())
   const [meetings, setMeetings] = useState([])
@@ -3571,7 +3649,7 @@ function Agenda({ session, profile, tasks, companies, contacts, onEditTask, orga
       .agenda-form{padding:24px;background:white;border:1px solid #dce6ec;border-radius:16px;margin-bottom:20px}.agenda-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.agenda-fields label,.agenda-datetime-field{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:600}.agenda-fields input,.agenda-fields select,.agenda-fields textarea{width:100%;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:9px;font:inherit}.agenda-form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}@media(max-width:600px){.agenda-fields{grid-template-columns:1fr}}
       .agenda-datetime-controls{display:grid;grid-template-columns:minmax(0,1fr) 66px 8px 66px;gap:6px;align-items:center}.agenda-datetime-controls input{min-width:0}.agenda-datetime-controls select{padding:11px 6px}.agenda-fields{align-items:start}
     `}</style>
-    <div className="agenda-hero"><div><small>GLOBALTEC CRM · ORGANIZA TU DÍA</small><h1>Agenda</h1><p>Tus citas y tareas, en un solo calendario.</p></div>{!readOnly && <button className="primary-btn" onClick={() => newMeeting()}>+ Nueva cita</button>}</div>
+    <div className="agenda-hero"><div><small>{brandName || 'GLOBALTEC'} CRM · ORGANIZA TU DÍA</small><h1>Agenda</h1><p>Tus citas y tareas, en un solo calendario.</p></div>{!readOnly && <button className="primary-btn" onClick={() => newMeeting()}>+ Nueva cita</button>}</div>
     {message && <p role="alert" style={{ color: '#b91c1c' }}>{message}</p>}
     {form && <form className="agenda-form" onSubmit={saveMeeting}><h2>{form.id ? 'Editar cita' : 'Nueva cita'}</h2><fieldset disabled={saving || readOnly} style={{ border: 0, padding: 0, margin: 0 }}><div className="agenda-fields">
       <label>Título<input required value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} /></label>
@@ -3607,7 +3685,7 @@ const CRM_MODULES = [
   ['tasks','Tareas'], ['reports','Informes']
 ]
 
-function ModulePermissions({ organizationId, onSaved }) {
+function ModulePermissions({ brandName, organizationId, onSaved }) {
   const [users, setUsers] = useState([])
   const [permissions, setPermissions] = useState([])
   const [selectedUser, setSelectedUser] = useState('')
@@ -3660,7 +3738,7 @@ function ModulePermissions({ organizationId, onSaved }) {
     finally { setSaving(false) }
   }
   return <div>
-    <div className="dashboard-heading"><div><p className="dashboard-kicker">GLOBALTEC CRM</p><h1>Permisos de usuarios</h1><p>Elige qué puede consultar y editar cada usuario en esta empresa.</p></div></div>
+    <div className="dashboard-heading"><div><p className="dashboard-kicker">{brandName || 'GLOBALTEC'} CRM</p><h1>Permisos de usuarios</h1><p>Elige qué puede consultar y editar cada usuario en esta empresa.</p></div></div>
     <p style={{color:'#526578'}}>Los permisos de edición siguen sujetos al rol del usuario. Las cuentas demo siempre son de lectura. Para elegir clientes o contactos en otras secciones, habilita también su consulta.</p>
     {busy ? <p>Cargando usuarios…</p> : <form onSubmit={save} style={{background:'white',padding:24,borderRadius:16,border:'1px solid #dce6ec'}}>
       <fieldset disabled={saving} style={{border:0,padding:0,margin:0}}>
