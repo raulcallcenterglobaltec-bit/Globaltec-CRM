@@ -8,6 +8,7 @@ function App() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [profile, setProfile] = useState(null)
+  const canWrite = !!profile?.active && profile.role !== 'demo'
 const [currentPage, setCurrentPage] = useState('dashboard')
 const [companies, setCompanies] = useState([])
 const [companiesLoading, setCompaniesLoading] = useState(false)
@@ -401,6 +402,7 @@ async function loadOpportunityOptions() {
   }
 }
 function editContact(contact) {
+  if (!canWrite) return
   setEditingContactId(contact.id)
 
   setContactForm({
@@ -420,6 +422,7 @@ function editContact(contact) {
 }
 async function saveContact(e) {
   e.preventDefault()
+  if (!canWrite) { setError('Esta cuenta solo permite consultar datos.'); return }
   setContactSaving(true)
   setError('')
 
@@ -469,6 +472,7 @@ const { error } = result
 }
   async function saveOpportunity(e) {
   e.preventDefault()
+  if (!canWrite) { setError('Esta cuenta solo permite consultar datos.'); return }
   setOpportunitySaving(true)
   setError('')
 
@@ -563,6 +567,7 @@ if (opportunityId) {
   setOpportunitySaving(false)
 }
 async function editOpportunity(opportunity) {
+  if (!canWrite) return
   setEditingOpportunityId(opportunity.id)
 
   const { data: opportunityServices, error: servicesError } = await supabase
@@ -594,6 +599,7 @@ async function editOpportunity(opportunity) {
 }
 async function saveTask(e) {
   e.preventDefault()
+  if (!canWrite) { setError('Esta cuenta solo permite consultar datos.'); return }
   setTaskSaving(true)
   setError('')
 
@@ -648,6 +654,7 @@ async function saveTask(e) {
 }
 async function saveCall(e) {
   e.preventDefault()
+  if (!canWrite) { setError('Esta cuenta solo permite consultar datos.'); return }
   setCallSaving(true)
   setError('')
 
@@ -701,6 +708,7 @@ async function saveCall(e) {
   setCallSaving(false)
 }
 function editCall(call) {
+  if (!canWrite) return
   setEditingCallId(call.id)
 
   setCallForm({
@@ -725,6 +733,7 @@ function editCall(call) {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
   function editTask(task) {
+  if (!canWrite) return
   setEditingTaskId(task.id)
 
   setTaskForm({
@@ -749,6 +758,7 @@ function editCall(call) {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 function editCompany(company) {
+  if (!canWrite) return
   setEditingCompanyId(company.id)
 
   setCompanyForm({
@@ -773,6 +783,7 @@ function editCompany(company) {
 }
 async function saveCompany(e) {
   e.preventDefault()
+  if (!canWrite) { setError('Esta cuenta solo permite consultar datos.'); return }
   setCompanySaving(true)
   setError('')
 
@@ -1176,12 +1187,12 @@ onClick={() => {
         <p>Gestión de empresas y clientes.</p>
       </div>
 
-<button
+{canWrite && (<button
   className="primary-action"
   onClick={() => setShowCompanyForm(true)}
 >
   + Nuevo cliente
-</button>
+</button>)} 
     </div>
 </div>
 {selectedCompany && (
@@ -1261,7 +1272,7 @@ onClick={() => {
 
 <div className="detail-wide" style={{ marginTop: '24px' }}>
   <h3>Contactos del cliente</h3>
-  <button
+  {canWrite && (<button
     type="button"
     className="secondary-action"
     onClick={() => {
@@ -1277,7 +1288,7 @@ onClick={() => {
     }}
   >
     + Nuevo contacto
-  </button>
+  </button>)} 
   {contacts.filter(
     (contact) => contact.company_id === selectedCompany.id
   ).length === 0 ? (
@@ -1303,7 +1314,7 @@ onClick={() => {
               <div><span>Móvil: </span>{contact.mobile ? <a href={`tel:${contact.mobile}`}>{contact.mobile}</a> : 'Sin móvil'}</div>
               <div style={{ overflowWrap: 'anywhere' }}><span>Correo: </span>{contact.email ? <a href={`mailto:${contact.email}`}>{contact.email}</a> : 'Sin correo'}</div>
             </div>
-            <button
+            {canWrite && (<button
               type="button"
               className="secondary-action"
               style={{ marginTop: '16px' }}
@@ -1313,7 +1324,7 @@ onClick={() => {
               }}
             >
               Ver / editar
-            </button>
+            </button>)} 
           </div>
         ))}
     </div>
@@ -1322,7 +1333,7 @@ onClick={() => {
 <ClientAttachments key={selectedCompany.id} company={selectedCompany} session={session} profile={profile} />
   </div>
 )}
-{showCompanyForm && (
+{canWrite && showCompanyForm && (
   <div className="dashboard-card company-form-card">
     <div className="card-heading">
       <div>
@@ -1575,12 +1586,12 @@ onClick={() => {
 
       <div className="client-actions">
 
-<button
+{canWrite && (<button
   type="button"
   onClick={() => editCompany(company)}
 >
   Editar
-</button>
+</button>)} 
       </div>
     </div>
   ))}
@@ -1597,14 +1608,14 @@ onClick={() => {
         <p>Gestión de personas de contacto de tus clientes.</p>
       </div>
 
-<button
+{canWrite && (<button
   className="primary-action"
   onClick={() => setShowContactForm(true)}
 >
   + Nuevo contacto
-</button>
+</button>)} 
     </div>
-{showContactForm && (
+{canWrite && showContactForm && (
   <div className="dashboard-card company-form-card">
     <div className="card-heading">
       <div>
@@ -1830,12 +1841,12 @@ onClick={() => {
         </div>
 
 <div className="client-actions">
-  <button
+  {canWrite && (<button
     type="button"
     onClick={() => editContact(contact)}
   >
     Editar
-  </button>
+  </button>)} 
 </div>
       </div>
     ))}
@@ -1851,7 +1862,7 @@ onClick={() => {
         <p>Gestión y seguimiento de oportunidades comerciales.</p>
       </div>
 
-<button
+{canWrite && (<button
   className="primary-action"
   onClick={() => {
     setEditingOpportunityId(null)
@@ -1873,9 +1884,9 @@ service_ids: [],
   }}
 >
   + Nueva oportunidad
-</button>
+</button>)} 
     </div>
-{showOpportunityForm && (
+{canWrite && showOpportunityForm && (
   <div className="dashboard-card">
     <div className="card-heading">
       <div>
@@ -2174,12 +2185,12 @@ service_ids: [],
         </div>
 
 <div className="client-actions">
-  <button
+  {canWrite && (<button
     type="button"
     onClick={() => editOpportunity(opportunity)}
   >
     Editar
-  </button>
+  </button>)} 
 </div>
       </div>
     ))}
@@ -2434,7 +2445,7 @@ service_ids: [],
         <p>Registro y seguimiento de llamadas.</p>
       </div>
 
-      <button
+      {canWrite && (<button
         className="primary-action"
         onClick={() => {
           setEditingCallId(null)
@@ -2454,9 +2465,9 @@ service_ids: [],
         }}
       >
         + Nueva llamada
-      </button>
+      </button>)} 
     </div>
-{showCallForm && (
+{canWrite && showCallForm && (
   <div className="dashboard-card">
     <div className="card-heading">
       <div>
@@ -2714,12 +2725,12 @@ service_ids: [],
             </div>
 
 <div className="client-actions">
-  <button
+  {canWrite && (<button
     type="button"
     onClick={() => editCall(call)}
   >
     Editar
-  </button>
+  </button>)} 
 </div>
           </div>
         ))}
@@ -2737,7 +2748,7 @@ service_ids: [],
         <p>Gestión y seguimiento de tareas pendientes.</p>
       </div>
 
-      <button
+      {canWrite && (<button
         className="primary-action"
         onClick={() => {
           setEditingTaskId(null)
@@ -2757,9 +2768,9 @@ priority: 'normal',
         }}
       >
         + Nueva tarea
-      </button>
+      </button>)} 
     </div>
-{showTaskForm && (
+{canWrite && showTaskForm && (
   <div className="dashboard-card">
     <div className="card-heading">
       <div>
@@ -3029,12 +3040,12 @@ priority: 'normal',
             </div>
 
 <div className="client-actions">
-  <button
+  {canWrite && (<button
     type="button"
     onClick={() => editTask(task)}
   >
     Editar
-  </button>
+  </button>)} 
 </div>
           </div>
         ))}
@@ -3050,7 +3061,7 @@ priority: 'normal',
         <p>Resumen de la actividad comercial.</p>
       </div>
 
-<button
+{canWrite && (<button
   className="primary-action"
   onClick={() => {
     setCurrentPage('clients')
@@ -3061,7 +3072,7 @@ priority: 'normal',
   }}
 >
   + Nuevo cliente
-</button>
+</button>)} 
     </div>
 
     <div className="stats-grid">
