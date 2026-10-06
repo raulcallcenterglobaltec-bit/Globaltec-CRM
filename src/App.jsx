@@ -93,7 +93,7 @@ function App() {
     clearCRMData()
     if (!activeOrg || !profile?.active) return
     const pages = ['dashboard','clients','contacts','opportunities','calls','agenda','tasks','reports']
-    if (!(currentPage === 'permissions' && profile.role === 'admin') && currentPage !== 'branding' && !canViewModule(currentPage)) {
+    if (!(currentPage === 'permissions' && profile.role === 'admin') && !['branding','landing-forms'].includes(currentPage) && !canViewModule(currentPage)) {
       setCurrentPage(pages.find(canViewModule) || 'no-access')
     }
     loadCompanies(); loadContacts(); loadOpportunities(); loadTasks(); loadCalls()
@@ -1592,11 +1592,14 @@ onClick={() => {
 </button>)}
     {profile?.role === 'admin' && activeOrg && <button className={`nav-item ${currentPage === 'permissions' ? 'active' : ''}`} onClick={() => setCurrentPage('permissions')}><CRMIcon name="permissions" /> Permisos de usuarios</button>}
 {canBrand && <button className={`nav-item ${currentPage === 'branding' ? 'active' : ''}`} onClick={() => setCurrentPage('branding')}><CRMIcon name="permissions" /> Personalización</button>}
+{canBrand && <button className={`nav-item ${currentPage === 'landing-forms' ? 'active' : ''}`} onClick={() => setCurrentPage('landing-forms')}><CRMIcon name="contacts" /> Formularios y landings</button>}
 </nav>
   </aside>
 
   <section className="dashboard">
-  {currentPage === 'branding' ? (
+  {currentPage === 'landing-forms' ? (
+    canBrand && organization ? <LandingFormSettings key={`${activeOrg}:${session.user.id}`} organization={organization} /> : <p>No tienes permiso para configurar formularios de esta empresa.</p>
+  ) : currentPage === 'branding' ? (
     canBrand && organization ? <BrandingSettings key={`${activeOrg}:${session.user.id}`} organization={organization} onSourcesChanged={() => loadOpportunityOptions()} onSaved={updated => {
       if (accessRef.current.org === updated.id) setOrganizations(items => items.map(item => item.id === updated.id ? updated : item))
     }} /> : <p>No tienes permiso para personalizar esta empresa.</p>
@@ -4378,4 +4381,68 @@ function StageSettings({ organizationId, onChanged }) {
     {error && <p role="alert" style={{color:'#b42318'}}>{error}</p>}{message && <p role="status">{message}</p>}
     <p style={{color:'#64748b',fontSize:13}}>Las etapas desactivadas se conservan en los registros existentes y dejan de ofrecerse en nuevas oportunidades.</p>
   </section>
+}
+
+const LANDING_FIELDS = [['first_name','Nombre'],['last_name','Apellidos'],['company_name','Empresa'],['phone','Teléfono'],['email','Correo electrónico'],['message','Mensaje']]
+function LandingFormSettings({ organization }) {
+  const [forms,setForms] = useState([])
+  const [sources,setSources] = useState([])
+  const [stages,setStages] = useState([])
+  const [draft,setDraft] = useState(null)
+  const [preview,setPreview] = useState(null)
+  const [loading,setLoading] = useState(true)
+  const [working,setWorking] = useState(false)
+  const [error,setError] = useState('')
+  const [message,setMessage] = useState('')
+  const alive = useRef(true)
+  const pending = useRef(false)
+  useEffect(() => { alive.current=true; load(); return () => {alive.current=false} }, [organization.id])
+  async function load() {
+    setLoading(true);setError('')
+    try {
+      const results = await Promise.all([
+        supabase.from('crm_landing_forms').select('*').eq('organization_id',organization.id).order('created_at',{ascending:false}),
+        supabase.from('lead_sources').select('*').eq('organization_id',organization.id).order('name'),
+        supabase.from('pipeline_stages').select('*').eq('organization_id',organization.id).order('position')
+      ])
+      const failed=results.find(result => result.error);if(failed) throw failed.error
+      if(alive.current){setForms(results[0].data || []);setSources(results[1].data || []);setStages(results[2].data || [])}
+    } catch(err){if(alive.current)setError('No se ha podido cargar la configuración: '+err.message)}
+    finally{if(alive.current)setLoading(false)}
+  }
+  function newForm(){setDraft({name:'',title:'Contacta con nosotros',button_text:'Enviar',success_message:'Gracias. Nos pondremos en contacto contigo.',landing_url:'',source_id:'',stage_id:'',fields:['first_name','phone','email','message'],required_fields:['first_name','email'],active:true});setPreview(null);setError('');setMessage('')}
+  async function mutate(action, text){
+    if(pending.current)return
+    pending.current=true;setWorking(true);setError('');setMessage('')
+    try{const result=await action();if(result.error)throw result.error;if(!result.data?.length)throw new Error('No se ha confirmado el cambio. Comprueba los permisos de esta empresa.')
+      if(!alive.current)return
+      setForms(rows=>[...result.data,...rows.filter(row=>!result.data.some(saved=>saved.id===row.id))]);setDraft(null);setPreview(null);setMessage(text)
+    }catch(err){if(alive.current)setError(err.message)}finally{pending.current=false;if(alive.current)setWorking(false)}
+  }
+  function save(e){
+    e.preventDefault()
+    if(!draft.fields.includes('phone') && !draft.fields.includes('email')){setError('Incluye teléfono o correo para poder contactar.');return}
+    if(!draft.required_fields.includes('phone') && !draft.required_fields.includes('email')){setError('Marca teléfono o correo como obligatorio.');return}
+    const values={name:draft.name.trim(),title:draft.title.trim(),button_text:draft.button_text.trim(),success_message:draft.success_message.trim(),landing_url:draft.landing_url.trim() || null,source_id:draft.source_id || null,stage_id:draft.stage_id || null,fields:draft.fields,required_fields:draft.required_fields,active:draft.active}
+    if(!values.name || !values.title || !values.button_text || !values.success_message){setError('Completa el nombre y los textos del formulario.');return}
+    mutate(()=>draft.id ? supabase.from('crm_landing_forms').update(values).eq('organization_id',organization.id).eq('id',draft.id).select('*') : supabase.from('crm_landing_forms').insert({...values,organization_id:organization.id}).select('*'),'Configuración del formulario guardada.')
+  }
+  function toggleField(key,enabled){setDraft(row=>({...row,fields:enabled ? [...row.fields,key] : row.fields.filter(field=>field!==key),required_fields:enabled ? row.required_fields : row.required_fields.filter(field=>field!==key)}))}
+  const shown=preview || draft
+  return <div className="lead-source-settings">
+    <div className="dashboard-heading"><div><p className="dashboard-kicker">{organization.name} CRM</p><h1>Formularios y landings</h1><p>Configura los formularios que usarás para captar contactos de esta empresa.</p></div></div>
+    <div className="dashboard-card">
+      <div style={{display:'flex',gap:12,flexWrap:'wrap'}}><button className="primary-action" type="button" disabled={loading || working || !!error && !forms.length} onClick={newForm}>+ Nuevo formulario</button><button className="source-button" type="button" disabled={working || loading} onClick={load}>Actualizar listado</button></div>
+      <p style={{color:'#526578'}}>Esta sección guarda la configuración. La conexión para recibir contactos y generar enlaces se preparará en el siguiente paso.</p>
+      {loading ? <p>Cargando formularios…</p> : forms.map(form=><div key={form.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',padding:16,border:'1px solid #dce6ec',borderRadius:10,marginTop:12}}><div><strong>{form.name}</strong><small style={{display:'block',marginTop:6}}>{form.active ? 'Configuración activa' : 'Configuración inactiva'} · {form.fields.length} campos</small></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="source-button" type="button" disabled={working} onClick={()=>{setPreview(form);setDraft(null)}}>Vista previa</button><button className="source-button" type="button" disabled={working} onClick={()=>{setDraft({...form,landing_url:form.landing_url || ''});setPreview(null);setError('');setMessage('')}}>Editar</button><button className="source-button" type="button" disabled={working} onClick={()=>mutate(()=>supabase.from('crm_landing_forms').update({active:!form.active}).eq('organization_id',organization.id).eq('id',form.id).select('*'),form.active ? 'Configuración desactivada.' : 'Configuración reactivada.')}>{form.active ? 'Desactivar' : 'Reactivar'}</button></div></div>)}
+      {!loading && !error && !forms.length && <p>Todavía no hay formularios. Crea el primero.</p>}
+      {error && <p role="alert" style={{color:'#b42318'}}>{error}</p>}{message && <p role="status">{message}</p>}
+    </div>
+    {draft && <form className="dashboard-card" style={{marginTop:24}} onSubmit={save}><h2>{draft.id ? 'Editar formulario' : 'Nuevo formulario'}</h2><p>Empresa receptora: <strong>{organization.name}</strong></p><fieldset disabled={working} style={{border:0,padding:0,minWidth:0}}><div className="form-grid">
+      {[['name','Nombre interno'],['title','Título visible'],['button_text','Texto del botón'],['success_message','Mensaje tras el envío'],['landing_url','URL de la landing (opcional)']].map(([key,label])=><label className="form-field" key={key}>{label}<input type={key==='landing_url' ? 'url' : 'text'} required={key!=='landing_url'} maxLength={key==='success_message' ? 500 : 250} value={draft[key]} onChange={e=>setDraft({...draft,[key]:e.target.value})}/></label>)}
+      <label className="form-field">Origen de los contactos<select required value={draft.source_id || ''} onChange={e=>setDraft({...draft,source_id:e.target.value})}><option value="">Seleccionar origen</option>{sources.filter(row=>row.active || row.id===draft.source_id).map(row=><option key={row.id} value={row.id}>{row.name}{!row.active ? ' (inactivo)' : ''}</option>)}</select></label>
+      <label className="form-field">Etapa inicial de la oportunidad<select required value={draft.stage_id || ''} onChange={e=>setDraft({...draft,stage_id:e.target.value})}><option value="">Seleccionar etapa</option>{stages.filter(row=>row.active || row.id===draft.stage_id).map(row=><option key={row.id} value={row.id}>{row.name}{!row.active ? ' (inactiva)' : ''}</option>)}</select></label>
+    </div><h3>Campos del formulario</h3><p>El nombre es obligatorio. Marca qué otros campos mostrar y cuáles son obligatorios.</p><div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr><th style={{textAlign:'left'}}>Campo</th><th>Mostrar</th><th>Obligatorio</th></tr></thead><tbody>{LANDING_FIELDS.map(([key,label])=><tr key={key} style={{borderTop:'1px solid #dce6ec'}}><td style={{padding:'12px 0'}}>{label}</td><td style={{textAlign:'center'}}><input type="checkbox" aria-label={`Mostrar ${label}`} checked={draft.fields.includes(key)} disabled={key==='first_name'} onChange={e=>toggleField(key,e.target.checked)}/></td><td style={{textAlign:'center'}}><input type="checkbox" aria-label={`${label} obligatorio`} checked={draft.required_fields.includes(key)} disabled={key==='first_name' || !draft.fields.includes(key)} onChange={e=>setDraft({...draft,required_fields:e.target.checked ? [...draft.required_fields,key] : draft.required_fields.filter(field=>field!==key)})}/></td></tr>)}</tbody></table></div><div style={{display:'flex',gap:12,marginTop:20}}><button className="primary-action" type="submit">{working ? 'Guardando…' : 'Guardar formulario'}</button><button className="source-button" type="button" onClick={()=>setDraft(null)}>Cancelar</button></div></fieldset></form>}
+    {shown && <div className="dashboard-card" style={{marginTop:24}}><h2>Vista previa</h2><p>Ejemplo visual: aquí no se envían datos.</p><div style={{maxWidth:560,margin:'20px auto',padding:24,border:'1px solid #dce6ec',borderRadius:12}}><h3>{shown.title}</h3><div className="form-grid">{LANDING_FIELDS.filter(([key])=>shown.fields.includes(key)).map(([key,label])=><label className="form-field" key={key}>{label}{shown.required_fields.includes(key) ? ' *' : ''}{key==='message' ? <textarea disabled placeholder={label}/> : <input disabled placeholder={label}/>}</label>)}</div><button className="primary-action" type="button" disabled style={{marginTop:20}}>{shown.button_text}</button><p>{shown.success_message}</p></div>{preview && <button className="source-button" type="button" onClick={()=>setPreview(null)}>Cerrar vista previa</button>}</div>}
+  </div>
 }
