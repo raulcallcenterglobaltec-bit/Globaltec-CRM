@@ -707,7 +707,6 @@ async function loadOpportunityOptions() {
     supabase
       .from('services')
       .select('*').eq('organization_id', access.org)
-      .eq('active', true)
       .order('name', { ascending: true })
   ])
 
@@ -2456,10 +2455,10 @@ service_ids: [],
   <label>Servicios</label>
 
   <div className="services-selector">
-    {services.length === 0 ? (
+    {services.filter(service => service.active || opportunityForm.service_ids.includes(service.id)).length === 0 ? (
       <span>No hay servicios disponibles</span>
     ) : (
-      services.map((service) => (
+      services.filter(service => service.active || opportunityForm.service_ids.includes(service.id)).map((service) => (
         <label className="service-option" key={service.id}>
           <input
             type="checkbox"
@@ -2478,7 +2477,7 @@ service_ids: [],
             }}
           />
 
-          <span>{service.name}</span>
+          <span>{service.name}{!service.active ? ' (inactivo)' : ''}</span>
         </label>
       ))
     )}
@@ -3623,6 +3622,7 @@ function BrandingSettings({ organization, onSaved, onSourcesChanged }) {
       <button className="primary-action" disabled={saving}>{saving ? 'Guardando…' : 'Guardar personalización'}</button>
     </form><div className="dashboard-card branding-preview"><h2>Vista previa</h2><div className="branding-preview-header"><BrandLogo key={logo} url={safeLogo(logo)} name={name} /><strong>{name || 'Tu empresa'}</strong><span>CRM</span></div><div className="branding-preview-menu" style={{ background: sidebar, color: brandingInk(sidebar) }}><span>ESPACIO DE TRABAJO</span><div style={{ background: primary, color: brandingInk(primary) }}>Panel principal</div><p>Clientes</p><p>Agenda</p></div><p>Los cambios se aplican al guardar.</p></div></div>
     <LeadSourceSettings key={organization.id} organizationId={organization.id} onChanged={onSourcesChanged} />
+    <ServiceSettings key={`services-${organization.id}`} organizationId={organization.id} onChanged={onSourcesChanged} />
   </div>
 }
 
@@ -4226,5 +4226,76 @@ function LeadSourceSettings({ organizationId, onChanged }) {
     </div>)}{!sources.length && <p>Todavía no hay orígenes. Añade los habituales o crea los tuyos.</p>}</div>}
     {error && <p role="alert" style={{color:'#b42318'}}>{error}</p>}{message && <p role="status">{message}</p>}
     <p style={{color:'#64748b',fontSize:13}}>Los orígenes desactivados se conservan en los registros existentes y dejan de ofrecerse en nuevas oportunidades.</p>
+  </section>
+}
+
+function ServiceSettings({ organizationId, onChanged }) {
+  const [sources, setSources] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [working, setWorking] = useState(false)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [draft, setDraft] = useState(null)
+  const pending = useRef(false)
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    load()
+    return () => { alive.current = false }
+  }, [organizationId])
+  async function load() {
+    try {
+      const result = await supabase.from('services').select('*').eq('organization_id', organizationId).order('name')
+      if (result.error) throw result.error
+      if (alive.current) setSources(result.data || [])
+    } catch (err) { if (alive.current) setError('No se han podido cargar los servicios: ' + err.message) }
+    finally { if (alive.current) setLoading(false) }
+  }
+  const normalize = name => name.trim().toLocaleLowerCase('es-ES')
+  async function mutate(action, success) {
+    if (pending.current) return
+    pending.current = true; setWorking(true); setError(''); setMessage('')
+    try {
+      const result = await action()
+      if (result.error) throw result.error
+      if (!result.data?.length) throw new Error('No se ha confirmado el cambio. Comprueba los permisos de esta empresa.')
+      if (!alive.current) return
+      setSources(current => {
+        const ids = new Set(result.data.map(row => row.id))
+        return [...current.filter(row => !ids.has(row.id)), ...result.data].sort((a,b) => a.name.localeCompare(b.name, 'es'))
+      })
+      setDraft(null); setMessage(success)
+      await onChanged?.()
+    } catch (err) { if (alive.current) setError(err.message || 'No se ha podido guardar.') }
+    finally { pending.current = false; if (alive.current) setWorking(false) }
+  }
+  function save(e) {
+    e.preventDefault()
+    const name = draft.name.trim()
+    if (!name) { setError('Escribe el nombre del servicio.'); return }
+    if (sources.some(row => row.id !== draft.id && normalize(row.name) === normalize(name))) { setError('Ya existe un servicio con ese nombre en esta empresa. Puedes reactivarlo si está inactivo.'); return }
+    const values = { name, description: draft.description.trim() || null }
+    mutate(() => draft.id
+      ? supabase.from('services').update(values).eq('organization_id', organizationId).eq('id', draft.id).select('*')
+      : supabase.from('services').insert({ ...values, organization_id: organizationId, active: true }).select('*'), 'Servicio guardado.')
+  }
+  return <section className="dashboard-card lead-source-settings" style={{marginTop:24}}>
+    <div className="card-heading"><div><h2>Servicios de la empresa</h2><p>Añade los servicios que puedes ofrecer en las oportunidades de esta empresa.</p></div></div>
+    <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:18}}>
+      <button type="button" className="primary-action" disabled={loading || working || !!error && !sources.length} onClick={() => { setDraft({name:'',description:''}); setError(''); setMessage('') }}>+ Nuevo servicio</button>
+      <button type="button" className="source-button" disabled={loading || working} onClick={() => {setLoading(true);setError('');load()}}>Actualizar listado</button>
+    </div>
+    {draft && <form onSubmit={save} style={{padding:18,background:'#f3f7fa',borderRadius:12,marginBottom:18}}>
+      <fieldset disabled={working} style={{border:0,padding:0,margin:0}}>
+        <div className="form-grid"><label className="form-field">Nombre<input required maxLength={150} value={draft.name} onChange={e => setDraft({...draft,name:e.target.value})} /></label><label className="form-field">Descripción (opcional)<input maxLength={500} value={draft.description} onChange={e => setDraft({...draft,description:e.target.value})} /></label></div>
+        <div style={{display:'flex',gap:12,marginTop:16}}><button type="submit" className="primary-action">{working ? 'Guardando…' : 'Guardar servicio'}</button><button type="button" className="source-button" onClick={() => {setDraft(null);setError('')}}>Cancelar</button></div>
+      </fieldset>
+    </form>}
+    {loading ? <p>Cargando servicios…</p> : <div style={{display:'grid',gap:10}}>{sources.map(source => <div key={source.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',padding:14,border:'1px solid #dce6ec',borderRadius:10}}>
+      <div><strong>{source.name}</strong><small style={{display:'block',marginTop:5}}>{source.active ? 'Activo' : 'Inactivo'}{source.description ? ` · ${source.description}` : ''}</small></div>
+      <div style={{display:'flex',gap:8}}><button type="button" className="source-button" disabled={working} onClick={() => {setDraft({...source,description:source.description || ''});setError('');setMessage('')}}>Editar</button><button type="button" className="source-button" disabled={working} onClick={() => mutate(() => supabase.from('services').update({active:!source.active}).eq('organization_id',organizationId).eq('id',source.id).select('*'), source.active ? 'Servicio desactivado. Las oportunidades anteriores lo conservan.' : 'Servicio reactivado.')}>{source.active ? 'Desactivar' : 'Reactivar'}</button></div>
+    </div>)}{!sources.length && <p>Todavía no hay servicios. Crea el primero con «Nuevo servicio».</p>}</div>}
+    {error && <p role="alert" style={{color:'#b42318'}}>{error}</p>}{message && <p role="status">{message}</p>}
+    <p style={{color:'#64748b',fontSize:13}}>Los servicios desactivados se conservan en los registros existentes y dejan de ofrecerse en nuevas oportunidades.</p>
   </section>
 }
