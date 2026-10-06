@@ -1470,9 +1470,9 @@ const { error } = result
   .organization-toolbar { padding: 14px 24px; background: #f1f5f9; border-bottom: 1px solid #dbe5ef; }
   .organization-toolbar-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   .organization-selector { display: flex; align-items: center; gap: 12px; font-weight: 600; min-width: 0; }
-  .permission-select-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; max-width: 100%; font-size: 13px; font-weight: 600; color: #123047; }
-  .permission-user-field { margin-bottom: 20px; width: 420px; }
-  .permission-select-field select { width: 100%; min-width: 0; min-height: 42px; box-sizing: border-box; padding: 10px 36px 10px 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: white; color: #123047; font: inherit; font-weight: 400; cursor: pointer; }
+  .permission-select-field { display: flex; flex-direction: row; align-items: center; gap: 16px; width: 290px; min-width: 0; max-width: 100%; font-size: 13px; font-weight: 600; color: #123047; }
+  .permission-user-field { margin-bottom: 20px; width: 480px; }
+  .permission-select-field select { flex: 1; width: 0; min-width: 0; min-height: 42px; box-sizing: border-box; padding: 10px 36px 10px 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: white; color: #123047; font: inherit; font-weight: 400; cursor: pointer; }
   .permission-select-field select:focus-visible { outline: 3px solid var(--crm-teal, #087f74); outline-offset: 2px; }
   .permission-select-field select:disabled { opacity: .6; cursor: default; }
   .organization-selector select { box-sizing: border-box; min-height: 42px; max-width: 100%; width: 260px; padding: 10px 36px 10px 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: white; color: #102b46; font: inherit; }
