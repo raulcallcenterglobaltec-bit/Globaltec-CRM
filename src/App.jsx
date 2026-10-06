@@ -65,7 +65,7 @@ function App() {
     return canViewModule(module) && profile.role !== 'demo' && modulePermissions.some(p => p.organization_id === activeOrg && p.module === module && p.can_edit)
   }
   function clearCRMData() {
-    setClientSearch(''); setClientStatusFilter('all'); setContactSearch(''); setOpportunitySearch(''); setOpportunityStageFilter('all')
+    setClientSearch(''); setClientStatusFilter('all'); setContactSearch(''); setOpportunitySearch(''); setOpportunityStageFilter('all'); setCallSearch(''); setCallTypeFilter('all'); setCallStatusFilter('all')
     setCompanies([]); setContacts([]); setOpportunities([]); setTasks([]); setCalls([])
     setPipelineStages([]); setLeadSources([]); setServices([])
     setSelectedCompany(null); setShowCompanyForm(false); setShowContactForm(false)
@@ -194,6 +194,20 @@ const [taskSaving, setTaskSaving] = useState(false)
 const [editingTaskId, setEditingTaskId] = useState(null)
 const [calls, setCalls] = useState([])
 const [callsLoading, setCallsLoading] = useState(false)
+const [callSearch, setCallSearch] = useState('')
+const [callTypeFilter, setCallTypeFilter] = useState('all')
+const [callStatusFilter, setCallStatusFilter] = useState('all')
+const callSearchWords = normalizeClientSearch(callSearch).trim().split(/\s+/).filter(Boolean)
+const filteredCalls = calls.filter(call => {
+  const text = normalizeClientSearch([call.companies?.name, call.contacts?.first_name, call.contacts?.last_name, call.companies?.phone, call.contacts?.phone, call.contacts?.mobile].join(' '))
+  const compactPhones = [call.companies?.phone, call.contacts?.phone, call.contacts?.mobile].map(phone => String(phone || '').replace(/\D/g, ''))
+  const phoneQuery = callSearch.replace(/\D/g, '')
+  const searchMatches = callSearchWords.every(word => text.includes(word)) || (/^[+\d\s().-]+$/.test(callSearch.trim()) && phoneQuery && compactPhones.some(phone => phone.includes(phoneQuery)))
+  return (callTypeFilter === 'all' || call.direction === callTypeFilter) && (callStatusFilter === 'all' || call.status === callStatusFilter) && searchMatches
+})
+const callStatusLabels = { completed: 'Completada', missed: 'Perdida', cancelled: 'Cancelada', scheduled: 'Programada' }
+const callStatusColors = { completed: { background: '#dcfce7', color: '#166534' }, missed: { background: '#fee2e2', color: '#991b1b' }, cancelled: { background: '#f1f5f9', color: '#475569' }, scheduled: { background: '#fef3c7', color: '#92400e' } }
+
 const [showCallForm, setShowCallForm] = useState(false)
 const [callSaving, setCallSaving] = useState(false)
 const [editingCallId, setEditingCallId] = useState(null)
@@ -432,11 +446,14 @@ async function loadCalls() {
     .select(`
       *,
       companies (
-        name
+        name,
+        phone
       ),
       contacts (
         first_name,
-        last_name
+        last_name,
+        phone,
+        mobile
       ),
       opportunities (
         title
@@ -1251,6 +1268,9 @@ const { error } = result
   }} />}
 </div>}
 <style>{`
+  .clear-filter-button { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 10px 18px; margin-top: 14px; border: 0; border-radius: 10px; background: var(--crm-teal, #087f8c); color: var(--crm-primary-ink, white); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .clear-filter-button:hover { filter: brightness(.95); }
+  .clear-filter-button:focus-visible { outline: 3px solid #168bba; outline-offset: 3px; }
   .opportunity-stage-badge { display: inline-block; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
   .client-filter-toolbar { display: flex; align-items: end; gap: 14px; flex-wrap: wrap; margin: 20px 0; padding: 16px; background: white; border: 1px solid #dbe5ef; border-radius: 14px; }
   .client-filter-toolbar label { display: flex; flex-direction: column; gap: 7px; font-size: 13px; font-weight: 600; }
@@ -1778,7 +1798,7 @@ onClick={() => {
     <span>Acciones</span>
   </div>
 
-  {filteredCompanies.length === 0 && <div className="empty-state" style={{ padding: 24 }}><strong>No hay clientes que coincidan</strong><span>Prueba otra búsqueda o cambia el filtro de estado.</span><button type="button" onClick={() => { setClientSearch(''); setClientStatusFilter('all') }}>Limpiar filtros</button></div>}
+  {filteredCompanies.length === 0 && <div className="empty-state" style={{ padding: 24 }}><strong>No hay clientes que coincidan</strong><span>Prueba otra búsqueda o cambia el filtro de estado.</span><button type="button" className="clear-filter-button" onClick={() => { setClientSearch(''); setClientStatusFilter('all') }}>Limpiar filtros</button></div>}
   {filteredCompanies.map((company) => (
     <div className="client-row" key={company.id}>
 <div
@@ -2043,7 +2063,7 @@ onClick={() => {
       <span>Acciones</span>
     </div>
 
-    {filteredContacts.length === 0 && <div className="empty-state" style={{ padding: 24 }}><strong>No hay contactos que coincidan</strong><span>Prueba otra búsqueda.</span><button type="button" onClick={() => setContactSearch('')}>Limpiar búsqueda</button></div>}
+    {filteredContacts.length === 0 && <div className="empty-state" style={{ padding: 24 }}><strong>No hay contactos que coincidan</strong><span>Prueba otra búsqueda.</span><button type="button" className="clear-filter-button" onClick={() => setContactSearch('')}>Limpiar búsqueda</button></div>}
     {filteredContacts.map((contact) => (
       <div className="client-row" key={contact.id}>
         <div className="client-main">
@@ -2390,7 +2410,7 @@ service_ids: [],
       <span>Acciones</span>
     </div>
 
-    {filteredOpportunities.length === 0 && <div className="empty-state" style={{ padding: 24 }}><strong>No hay oportunidades que coincidan</strong><span>Prueba otra búsqueda o cambia la etapa.</span><button type="button" onClick={() => { setOpportunitySearch(''); setOpportunityStageFilter('all') }}>Limpiar filtros</button></div>}
+    {filteredOpportunities.length === 0 && <div className="empty-state" style={{ padding: 24 }}><strong>No hay oportunidades que coincidan</strong><span>Prueba otra búsqueda o cambia la etapa.</span><button type="button" className="clear-filter-button" onClick={() => { setOpportunitySearch(''); setOpportunityStageFilter('all') }}>Limpiar filtros</button></div>}
     {filteredOpportunities.map((opportunity) => (
       <div className="client-row" key={opportunity.id}>
         <div className="client-main">
@@ -2699,6 +2719,12 @@ service_ids: [],
         + Nueva llamada
       </button>)} 
     </div>
+<div className="client-filter-toolbar">
+  <label className="client-search-field" htmlFor="call-search"><span>Buscar llamadas</span><input id="call-search" type="search" placeholder="Cliente, contacto o teléfono…" value={callSearch} onChange={e => setCallSearch(e.target.value)} /></label>
+  <label htmlFor="call-type-filter"><span>Tipo</span><select id="call-type-filter" value={callTypeFilter} onChange={e => setCallTypeFilter(e.target.value)}><option value="all">Todos</option><option value="inbound">Entrantes</option><option value="outbound">Salientes</option></select></label>
+  <label htmlFor="call-status-filter"><span>Estado</span><select id="call-status-filter" value={callStatusFilter} onChange={e => setCallStatusFilter(e.target.value)}><option value="all">Todos</option>{Object.entries(callStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+  <span className="client-results-count" role="status">{callsLoading ? 'Cargando…' : `${filteredCalls.length} de ${calls.length} llamadas`}</span>
+</div>
 {canWrite && showCallForm && (
   <div className="dashboard-card">
     <div className="card-heading">
@@ -2927,7 +2953,8 @@ service_ids: [],
           <span>ACCIONES</span>
         </div>
 
-        {calls.map((call) => (
+        {filteredCalls.length === 0 && <div className="empty-state" style={{ padding: 24 }}><strong>No hay llamadas que coincidan</strong><span>Prueba otra búsqueda o cambia los filtros.</span><button type="button" className="clear-filter-button" onClick={() => { setCallSearch(''); setCallTypeFilter('all'); setCallStatusFilter('all') }}>Limpiar filtros</button></div>}
+        {filteredCalls.map((call) => (
           <div className="client-row" key={call.id} style={{ display: 'grid', gridTemplateColumns: '1.3fr 1.2fr 1.2fr 0.75fr 0.9fr 90px', minWidth: '760px', gap: '16px', alignItems: 'center' }}>
             <div>
               {call.started_at
@@ -2944,16 +2971,11 @@ service_ids: [],
             </div>
 
             <div>
-              {call.direction === 'inbound' ? 'Entrante' : 'Saliente'}
+              <span className="opportunity-stage-badge" style={call.direction === 'inbound' ? { background: '#dbeafe', color: '#1e40af' } : { background: '#ede9fe', color: '#5b21b6' }}>{call.direction === 'inbound' ? 'Entrante' : call.direction === 'outbound' ? 'Saliente' : call.direction || 'Sin tipo'}</span>
             </div>
 
             <div>
-              {{
-                completed: 'Completada',
-                missed: 'Perdida',
-                cancelled: 'Cancelada',
-                scheduled: 'Programada'
-              }[call.status] || call.status}
+              <span className="opportunity-stage-badge" style={callStatusColors[call.status] || callStatusColors.cancelled}>{callStatusLabels[call.status] || call.status || 'Sin estado'}</span>
             </div>
 
 <div className="client-actions">
