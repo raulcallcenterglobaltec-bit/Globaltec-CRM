@@ -3734,7 +3734,71 @@ const CRM_MODULES = [
   ['tasks','Tareas'], ['reports','Informes']
 ]
 
+function NewCRMUser({ organizationId, brandName, onCreated, onCancel }) {
+  const defaultPermissions = () => Object.fromEntries(CRM_MODULES.map(([module]) => [module, { can_view: true, can_edit: !['dashboard','reports'].includes(module) }]))
+  const [form, setForm] = useState({ full_name: '', email: '', password: '', role: 'agent' })
+  const [permissions, setPermissions] = useState(defaultPermissions)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const pending = useRef(false)
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  function changePermission(module, field, value) {
+    setPermissions(current => {
+      const row = { ...current[module], [field]: value }
+      if (field === 'can_view' && !value) row.can_edit = false
+      if (field === 'can_edit' && value) row.can_view = true
+      return { ...current, [module]: row }
+    })
+  }
+  async function create(e) {
+    e.preventDefault()
+    if (pending.current) return
+    pending.current = true; setSaving(true); setError('')
+    try {
+      const rows = Object.fromEntries(CRM_MODULES.map(([module]) => [module, {
+        can_view: permissions[module].can_view,
+        can_edit: form.role !== 'demo' && !['dashboard','reports'].includes(module) && permissions[module].can_edit,
+      }]))
+      const result = await supabase.functions.invoke('crm-create-user', { body: {
+        organization_id: organizationId, full_name: form.full_name.trim(),
+        email: form.email.trim(), password: form.password, role: form.role, permissions: rows,
+      } })
+      if (result.error) {
+        let message = 'No se ha podido confirmar el alta. Comprueba el listado antes de repetirla.'
+        try {
+          const payload = await result.error.context?.json()
+          if (payload?.error) message = payload.error
+        } catch { /* La conexión puede fallar antes de recibir una respuesta. */ }
+        throw new Error(message)
+      }
+      if (!result.data?.user?.id) throw new Error(result.data?.error || 'El servidor no ha confirmado el alta.')
+      if (!alive.current) return
+      setForm(current => ({ ...current, password: '' }))
+      onCreated(result.data.user, result.data.permissions)
+    } catch (err) { if (alive.current) setError(err.message) }
+    finally { pending.current = false; if (alive.current) setSaving(false) }
+  }
+  return <form onSubmit={create} style={{background:'white',padding:24,borderRadius:16,border:'1px solid #dce6ec',marginBottom:24}}>
+    <h2>Nuevo usuario</h2><p>Empresa: <strong>{brandName}</strong></p>
+    <fieldset disabled={saving} style={{border:0,padding:0,margin:0}}>
+      <div className="form-grid">
+        <label>Nombre<input required maxLength={150} value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} autoComplete="off" /></label>
+        <label>Correo electrónico<input type="email" required maxLength={254} value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} autoComplete="off" /></label>
+        <label>Contraseña inicial<input type="password" required minLength={12} maxLength={128} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} autoComplete="new-password" /><small>Mínimo 12 caracteres. Entrégala al usuario para que pueda iniciar sesión.</small></label>
+        <label>Rol<select value={form.role} onChange={e => { const role = e.target.value; setForm({ ...form, role }); if (role === 'demo') setPermissions(current => Object.fromEntries(Object.entries(current).map(([module,row]) => [module, { ...row, can_edit: false }])) ) }}><option value="agent">Agente</option><option value="admin">Administrador</option><option value="demo">Demo · solo consulta</option></select></label>
+      </div>
+      {form.role === 'admin' && <p>Un administrador puede gestionar usuarios y permisos de esta empresa.</p>}
+      <h3>Secciones permitidas</h3>
+      <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr><th style={{textAlign:'left',padding:12}}>Sección</th><th>Puede ver</th><th>Puede editar</th></tr></thead><tbody>{CRM_MODULES.map(([module,label]) => <tr key={module} style={{borderTop:'1px solid #e2e8f0'}}><td style={{padding:12}}>{label}</td><td style={{textAlign:'center'}}><input type="checkbox" aria-label={`Nuevo usuario: ver ${label}`} checked={permissions[module].can_view} onChange={e => changePermission(module,'can_view',e.target.checked)} /></td><td style={{textAlign:'center'}}>{form.role !== 'demo' && !['dashboard','reports'].includes(module) ? <input type="checkbox" aria-label={`Nuevo usuario: editar ${label}`} checked={permissions[module].can_edit} onChange={e => changePermission(module,'can_edit',e.target.checked)} /> : 'Solo consulta'}</td></tr>)}</tbody></table></div>
+      <div style={{display:'flex',gap:12,marginTop:20}}><button className="primary-action" type="submit">{saving ? 'Creando…' : 'Crear usuario'}</button><button type="button" onClick={onCancel}>Cancelar</button></div>
+    </fieldset>
+    {error && <p role="alert">{error}</p>}
+  </form>
+}
+
 function ModulePermissions({ brandName, organizationId, onSaved }) {
+  const [creating, setCreating] = useState(false)
   const [users, setUsers] = useState([])
   const [permissions, setPermissions] = useState([])
   const [selectedUser, setSelectedUser] = useState('')
@@ -3743,7 +3807,7 @@ function ModulePermissions({ brandName, organizationId, onSaved }) {
   const [message, setMessage] = useState('')
   useEffect(() => {
     let cancelled = false
-    setBusy(true); setMessage(''); setUsers([]); setPermissions([]); setSelectedUser('')
+    setBusy(true); setMessage(''); setUsers([]); setPermissions([]); setSelectedUser(''); setCreating(false)
     async function load() {
       try {
         const result = await supabase.from('crm_module_permissions').select('*').eq('organization_id', organizationId)
@@ -3788,6 +3852,12 @@ function ModulePermissions({ brandName, organizationId, onSaved }) {
   }
   return <div>
     <div className="dashboard-heading"><div><p className="dashboard-kicker">{brandName || 'GLOBALTEC'} CRM</p><h1>Permisos de usuarios</h1><p>Elige qué puede consultar y editar cada usuario en esta empresa.</p></div></div>
+    {!creating && <button className="primary-action" type="button" disabled={busy || saving} onClick={() => { setCreating(true); setMessage('') }} style={{marginBottom:20}}>+ Nuevo usuario</button>}
+    {creating && <NewCRMUser key={organizationId} organizationId={organizationId} brandName={brandName} onCancel={() => setCreating(false)} onCreated={(created, rows) => {
+      setUsers(current => [...current.filter(u => u.id !== created.id), created])
+      setPermissions(current => [...current.filter(p => p.user_id !== created.id), ...CRM_MODULES.map(([module]) => ({ organization_id: organizationId, user_id: created.id, module, ...rows[module] }))])
+      setSelectedUser(created.id); setCreating(false); setMessage('Usuario creado con su empresa y permisos. Ya puede iniciar sesión con su correo y contraseña.')
+    }} />}
     <p style={{color:'#526578'}}>Los permisos de edición siguen sujetos al rol del usuario. Las cuentas demo siempre son de lectura. Para elegir clientes o contactos en otras secciones, habilita también su consulta.</p>
     {busy ? <p>Cargando usuarios…</p> : <form onSubmit={save} style={{background:'white',padding:24,borderRadius:16,border:'1px solid #dce6ec'}}>
       <fieldset disabled={saving} style={{border:0,padding:0,margin:0}}>
