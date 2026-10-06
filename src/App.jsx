@@ -4433,7 +4433,7 @@ function LandingFormSettings({ organization }) {
     <div className="dashboard-heading"><div><p className="dashboard-kicker">{organization.name} CRM</p><h1>Formularios y landings</h1><p>Configura los formularios que usarás para captar contactos de esta empresa.</p></div></div>
     <div className="dashboard-card">
       <div style={{display:'flex',gap:12,flexWrap:'wrap'}}><button className="primary-action" type="button" disabled={loading || working || !!error && !forms.length} onClick={newForm}>+ Nuevo formulario</button><button className="source-button" type="button" disabled={working || loading} onClick={load}>Actualizar listado</button></div>
-      <p style={{color:'#526578'}}>Esta sección guarda la configuración. La conexión para recibir contactos y generar enlaces se preparará en el siguiente paso.</p>
+      <p style={{color:'#526578'}}>Guarda la configuración y abre «Vista previa» para enviar una prueba al CRM con tu sesión iniciada. Los enlaces públicos para las landings se prepararán después.</p>
       {loading ? <p>Cargando formularios…</p> : forms.map(form=><div key={form.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',padding:16,border:'1px solid #dce6ec',borderRadius:10,marginTop:12}}><div><strong>{form.name}</strong><small style={{display:'block',marginTop:6}}>{form.active ? 'Configuración activa' : 'Configuración inactiva'} · {form.fields.length} campos</small></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="source-button" type="button" disabled={working} onClick={()=>{setPreview(form);setDraft(null)}}>Vista previa</button><button className="source-button" type="button" disabled={working} onClick={()=>{setDraft({...form,landing_url:form.landing_url || ''});setPreview(null);setError('');setMessage('')}}>Editar</button><button className="source-button" type="button" disabled={working} onClick={()=>mutate(()=>supabase.from('crm_landing_forms').update({active:!form.active}).eq('organization_id',organization.id).eq('id',form.id).select('*'),form.active ? 'Configuración desactivada.' : 'Configuración reactivada.')}>{form.active ? 'Desactivar' : 'Reactivar'}</button></div></div>)}
       {!loading && !error && !forms.length && <p>Todavía no hay formularios. Crea el primero.</p>}
       {error && <p role="alert" style={{color:'#b42318'}}>{error}</p>}{message && <p role="status">{message}</p>}
@@ -4443,6 +4443,71 @@ function LandingFormSettings({ organization }) {
       <label className="form-field">Origen de los contactos<select required value={draft.source_id || ''} onChange={e=>setDraft({...draft,source_id:e.target.value})}><option value="">Seleccionar origen</option>{sources.filter(row=>row.active || row.id===draft.source_id).map(row=><option key={row.id} value={row.id}>{row.name}{!row.active ? ' (inactivo)' : ''}</option>)}</select></label>
       <label className="form-field">Etapa inicial de la oportunidad<select required value={draft.stage_id || ''} onChange={e=>setDraft({...draft,stage_id:e.target.value})}><option value="">Seleccionar etapa</option>{stages.filter(row=>row.active || row.id===draft.stage_id).map(row=><option key={row.id} value={row.id}>{row.name}{!row.active ? ' (inactiva)' : ''}</option>)}</select></label>
     </div><h3>Campos del formulario</h3><p>El nombre es obligatorio. Marca qué otros campos mostrar y cuáles son obligatorios.</p><div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr><th style={{textAlign:'left'}}>Campo</th><th>Mostrar</th><th>Obligatorio</th></tr></thead><tbody>{LANDING_FIELDS.map(([key,label])=><tr key={key} style={{borderTop:'1px solid #dce6ec'}}><td style={{padding:'12px 0'}}>{label}</td><td style={{textAlign:'center'}}><input type="checkbox" aria-label={`Mostrar ${label}`} checked={draft.fields.includes(key)} disabled={key==='first_name'} onChange={e=>toggleField(key,e.target.checked)}/></td><td style={{textAlign:'center'}}><input type="checkbox" aria-label={`${label} obligatorio`} checked={draft.required_fields.includes(key)} disabled={key==='first_name' || !draft.fields.includes(key)} onChange={e=>setDraft({...draft,required_fields:e.target.checked ? [...draft.required_fields,key] : draft.required_fields.filter(field=>field!==key)})}/></td></tr>)}</tbody></table></div><div style={{display:'flex',gap:12,marginTop:20}}><button className="primary-action" type="submit">{working ? 'Guardando…' : 'Guardar formulario'}</button><button className="source-button" type="button" onClick={()=>setDraft(null)}>Cancelar</button></div></fieldset></form>}
-    {shown && <div className="dashboard-card" style={{marginTop:24}}><h2>Vista previa</h2><p>Ejemplo visual: aquí no se envían datos.</p><div style={{maxWidth:560,margin:'20px auto',padding:24,border:'1px solid #dce6ec',borderRadius:12}}><h3>{shown.title}</h3><div className="form-grid">{LANDING_FIELDS.filter(([key])=>shown.fields.includes(key)).map(([key,label])=><label className="form-field" key={key}>{label}{shown.required_fields.includes(key) ? ' *' : ''}{key==='message' ? <textarea disabled placeholder={label}/> : <input disabled placeholder={label}/>}</label>)}</div><button className="primary-action" type="button" disabled style={{marginTop:20}}>{shown.button_text}</button><p>{shown.success_message}</p></div>{preview && <button className="source-button" type="button" onClick={()=>setPreview(null)}>Cerrar vista previa</button>}</div>}
+    {shown && <div className="dashboard-card" style={{marginTop:24}}><h2>Vista previa</h2>{preview ? <LandingFormTest key={`${organization.id}:${preview.id}`} form={preview}/> : <><p>Ejemplo visual: guarda el formulario y abre su vista previa para enviar una prueba.</p><div style={{maxWidth:560,margin:'20px auto',padding:24,border:'1px solid #dce6ec',borderRadius:12}}><h3>{shown.title}</h3><div className="form-grid">{LANDING_FIELDS.filter(([key])=>shown.fields.includes(key)).map(([key,label])=><label className="form-field" key={key}>{label}{shown.required_fields.includes(key) ? ' *' : ''}{key==='message' ? <textarea disabled placeholder={label}/> : <input disabled placeholder={label}/>}</label>)}</div><button className="primary-action" type="button" disabled style={{marginTop:20}}>{shown.button_text}</button><p>{shown.success_message}</p></div></>}{preview && <button className="source-button" type="button" onClick={()=>setPreview(null)}>Cerrar vista previa</button>}</div>}
+  </div>
+}
+
+function LandingFormTest({ form }) {
+  const [values, setValues] = useState({})
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+  const [retry, setRetry] = useState(false)
+  const attempt = useRef(null)
+  const busy = useRef(false)
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  async function send(event) {
+    event.preventDefault()
+    if (busy.current || success || !form.active) return
+    busy.current = true; setSending(true); setError('')
+    try {
+      if (!attempt.current) {
+        attempt.current = { form_id: form.id, request_id: crypto.randomUUID(),
+          values: Object.fromEntries(LANDING_FIELDS.filter(([key]) => form.fields.includes(key)).map(([key]) => [key, (values[key] || '').trim()])) }
+      }
+      const { data, error: invocationError } = await supabase.functions.invoke('crm-receive-form', { body: attempt.current })
+      if (invocationError) {
+        let details = null
+        const response = invocationError.context
+        if (response && typeof response.clone === 'function') {
+          try { details = await response.clone().json() } catch { /* Use the fallback message. */ }
+        }
+        // Validation/auth failures do not save a submission; allow correction.
+        if ([400, 401, 403, 405, 413, 415, 422].includes(response?.status)) {
+          attempt.current = null
+          if (alive.current) setRetry(false)
+        } else if (alive.current) setRetry(true)
+        throw new Error(details?.error || (response?.status === 401
+          ? 'Tu sesión no es válida. Vuelve a iniciar sesión en el CRM.'
+          : 'No se ha confirmado el guardado. Reintenta el mismo envío.'))
+      }
+      if (data == null || data?.error) {
+        if (alive.current) setRetry(true)
+        throw new Error(typeof data?.error === 'string' ? data.error : 'La función no confirmó el guardado. Reintenta el mismo envío.')
+      }
+      if (alive.current) { setSuccess(true); setRetry(false) }
+    } catch (err) {
+      if (attempt.current && alive.current) setRetry(true)
+      if (alive.current) setError(err.message || 'No se ha podido enviar la prueba.')
+    } finally {
+      busy.current = false
+      if (alive.current) setSending(false)
+    }
+  }
+  return <div style={{maxWidth:560,margin:'20px auto',padding:24,border:'1px solid #dce6ec',borderRadius:12}}>
+    <h3>{form.title}</h3>
+    <p>Prueba interna: el envío guarda datos reales en el CRM de esta empresa. Utiliza datos de prueba.</p>
+    {!form.active && <p role="status">Activa este formulario para poder enviar una prueba.</p>}
+    {success ? <><p role="status">{form.success_message}</p><p>Envío confirmado por el CRM.</p><button type="button" className="source-button" onClick={() => {attempt.current=null;setValues({});setSuccess(false);setError('');setRetry(false)}}>Nueva prueba</button></> : <form onSubmit={send}>
+      <fieldset disabled={sending || retry || !form.active} style={{border:0,padding:0,margin:0,minWidth:0}}><div className="form-grid">
+        {LANDING_FIELDS.filter(([key]) => form.fields.includes(key)).map(([key,label]) => <label className="form-field" key={key}>{label}{form.required_fields.includes(key) ? ' *' : ''}{key === 'message'
+          ? <textarea required={form.required_fields.includes(key)} maxLength={5000} value={values[key] || ''} onChange={e => setValues(row => ({...row,[key]:e.target.value}))}/>
+          : <input type={key === 'email' ? 'email' : key === 'phone' ? 'tel' : 'text'} required={form.required_fields.includes(key)} maxLength={key === 'phone' ? 50 : 250} value={values[key] || ''} onChange={e => setValues(row => ({...row,[key]:e.target.value}))}/>}</label>)}
+      </div></fieldset>
+      {error && <p role="alert" style={{color:'#b42318'}}>{error}</p>}
+      {retry && <p>Los datos se mantienen para reintentar el mismo envío sin duplicarlo.</p>}
+      <button className="primary-action" type="submit" disabled={sending || !form.active} style={{marginTop:20}}>{sending ? 'Enviando…' : retry ? 'Reintentar el mismo envío' : 'Enviar prueba al CRM'}</button>
+    </form>}
   </div>
 }
