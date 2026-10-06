@@ -4154,6 +4154,7 @@ function saveReportPDF({ title, company, period, headers, rows }) {
 
 function LeadSourceSettings({ organizationId, onChanged }) {
   const [sources, setSources] = useState([])
+  const [showList, setShowList] = useState(false)
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState(false)
   const [message, setMessage] = useState('')
@@ -4214,6 +4215,7 @@ function LeadSourceSettings({ organizationId, onChanged }) {
       <button type="button" className="primary-action" disabled={loading || working || !!error && !sources.length} onClick={() => { setDraft({name:'',description:''}); setError(''); setMessage('') }}>+ Nuevo origen</button>
       <button type="button" className="source-button" disabled={loading || working || !!error && !sources.length} onClick={addDefaults}>Añadir orígenes habituales</button>
       <button type="button" className="source-button" disabled={loading || working} onClick={() => {setLoading(true);setError('');load()}}>Actualizar listado</button>
+      <button type="button" className="source-button" aria-expanded={showList} onClick={() => setShowList(value => !value)}>{showList ? 'Ocultar listado' : 'Ver listado'}</button>
     </div>
     {draft && <form onSubmit={save} style={{padding:18,background:'#f3f7fa',borderRadius:12,marginBottom:18}}>
       <fieldset disabled={working} style={{border:0,padding:0,margin:0}}>
@@ -4221,10 +4223,10 @@ function LeadSourceSettings({ organizationId, onChanged }) {
         <div style={{display:'flex',gap:12,marginTop:16}}><button type="submit" className="primary-action">{working ? 'Guardando…' : 'Guardar origen'}</button><button type="button" className="source-button" onClick={() => {setDraft(null);setError('')}}>Cancelar</button></div>
       </fieldset>
     </form>}
-    {loading ? <p>Cargando orígenes…</p> : <div style={{display:'grid',gap:10}}>{sources.map(source => <div key={source.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',padding:14,border:'1px solid #dce6ec',borderRadius:10}}>
+    {showList && (loading ? <p>Cargando orígenes…</p> : <div style={{display:'grid',gap:10}}>{sources.map(source => <div key={source.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',padding:14,border:'1px solid #dce6ec',borderRadius:10}}>
       <div><strong>{source.name}</strong><small style={{display:'block',marginTop:5}}>{source.active ? 'Activo' : 'Inactivo'}{source.description ? ` · ${source.description}` : ''}</small></div>
       <div style={{display:'flex',gap:8}}><button type="button" className="source-button" disabled={working} onClick={() => {setDraft({...source,description:source.description || ''});setError('');setMessage('')}}>Editar</button><button type="button" className="source-button" disabled={working} onClick={() => mutate(() => supabase.from('lead_sources').update({active:!source.active}).eq('organization_id',organizationId).eq('id',source.id).select('*'), source.active ? 'Origen desactivado. Las oportunidades anteriores lo conservan.' : 'Origen reactivado.')}>{source.active ? 'Desactivar' : 'Reactivar'}</button></div>
-    </div>)}{!sources.length && <p>Todavía no hay orígenes. Añade los habituales o crea los tuyos.</p>}</div>}
+    </div>)}{!sources.length && <p>Todavía no hay orígenes. Añade los habituales o crea los tuyos.</p>}</div>)}
     {error && <p role="alert" style={{color:'#b42318'}}>{error}</p>}{message && <p role="status">{message}</p>}
     <p style={{color:'#64748b',fontSize:13}}>Los orígenes desactivados se conservan en los registros existentes y dejan de ofrecerse en nuevas oportunidades.</p>
   </section>
@@ -4232,6 +4234,7 @@ function LeadSourceSettings({ organizationId, onChanged }) {
 
 function ServiceSettings({ organizationId, onChanged }) {
   const [sources, setSources] = useState([])
+  const [showList, setShowList] = useState(false)
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState(false)
   const [message, setMessage] = useState('')
@@ -4285,6 +4288,7 @@ function ServiceSettings({ organizationId, onChanged }) {
     <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:18}}>
       <button type="button" className="primary-action" disabled={loading || working || !!error && !sources.length} onClick={() => { setDraft({name:'',description:''}); setError(''); setMessage('') }}>+ Nuevo servicio</button>
       <button type="button" className="source-button" disabled={loading || working} onClick={() => {setLoading(true);setError('');load()}}>Actualizar listado</button>
+      <button type="button" className="source-button" aria-expanded={showList} onClick={() => setShowList(value => !value)}>{showList ? 'Ocultar listado' : 'Ver listado'}</button>
     </div>
     {draft && <form onSubmit={save} style={{padding:18,background:'#f3f7fa',borderRadius:12,marginBottom:18}}>
       <fieldset disabled={working} style={{border:0,padding:0,margin:0}}>
@@ -4292,10 +4296,10 @@ function ServiceSettings({ organizationId, onChanged }) {
         <div style={{display:'flex',gap:12,marginTop:16}}><button type="submit" className="primary-action">{working ? 'Guardando…' : 'Guardar servicio'}</button><button type="button" className="source-button" onClick={() => {setDraft(null);setError('')}}>Cancelar</button></div>
       </fieldset>
     </form>}
-    {loading ? <p>Cargando servicios…</p> : <div style={{display:'grid',gap:10}}>{sources.map(source => <div key={source.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',padding:14,border:'1px solid #dce6ec',borderRadius:10}}>
+    {showList && (loading ? <p>Cargando servicios…</p> : <div style={{display:'grid',gap:10}}>{sources.map(source => <div key={source.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',padding:14,border:'1px solid #dce6ec',borderRadius:10}}>
       <div><strong>{source.name}</strong><small style={{display:'block',marginTop:5}}>{source.active ? 'Activo' : 'Inactivo'}{source.description ? ` · ${source.description}` : ''}</small></div>
       <div style={{display:'flex',gap:8}}><button type="button" className="source-button" disabled={working} onClick={() => {setDraft({...source,description:source.description || ''});setError('');setMessage('')}}>Editar</button><button type="button" className="source-button" disabled={working} onClick={() => mutate(() => supabase.from('services').update({active:!source.active}).eq('organization_id',organizationId).eq('id',source.id).select('*'), source.active ? 'Servicio desactivado. Las oportunidades anteriores lo conservan.' : 'Servicio reactivado.')}>{source.active ? 'Desactivar' : 'Reactivar'}</button></div>
-    </div>)}{!sources.length && <p>Todavía no hay servicios. Crea el primero con «Nuevo servicio».</p>}</div>}
+    </div>)}{!sources.length && <p>Todavía no hay servicios. Crea el primero con «Nuevo servicio».</p>}</div>)}
     {error && <p role="alert" style={{color:'#b42318'}}>{error}</p>}{message && <p role="status">{message}</p>}
     <p style={{color:'#64748b',fontSize:13}}>Los servicios desactivados se conservan en los registros existentes y dejan de ofrecerse en nuevas oportunidades.</p>
   </section>
@@ -4303,6 +4307,7 @@ function ServiceSettings({ organizationId, onChanged }) {
 
 function StageSettings({ organizationId, onChanged }) {
   const [sources, setSources] = useState([])
+  const [showList, setShowList] = useState(false)
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState(false)
   const [message, setMessage] = useState('')
@@ -4358,6 +4363,7 @@ function StageSettings({ organizationId, onChanged }) {
     <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:18}}>
       <button type="button" className="primary-action" disabled={loading || working || !!error && !sources.length} onClick={() => { setDraft({name:'',position:Math.max(0,...sources.map(row => row.position)) + 1,kind:'open'}); setError(''); setMessage('') }}>+ Nueva etapa</button>
       <button type="button" className="source-button" disabled={loading || working} onClick={() => {setLoading(true);setError('');load()}}>Actualizar listado</button>
+      <button type="button" className="source-button" aria-expanded={showList} onClick={() => setShowList(value => !value)}>{showList ? 'Ocultar listado' : 'Ver listado'}</button>
     </div>
     {draft && <form onSubmit={save} style={{padding:18,background:'#f3f7fa',borderRadius:12,marginBottom:18}}>
       <fieldset disabled={working} style={{border:0,padding:0,margin:0}}>
@@ -4365,10 +4371,10 @@ function StageSettings({ organizationId, onChanged }) {
         <div style={{display:'flex',gap:12,marginTop:16}}><button type="submit" className="primary-action">{working ? 'Guardando…' : 'Guardar etapa'}</button><button type="button" className="source-button" onClick={() => {setDraft(null);setError('')}}>Cancelar</button></div>
       </fieldset>
     </form>}
-    {loading ? <p>Cargando etapas…</p> : <div style={{display:'grid',gap:10}}>{sources.map(source => <div key={source.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',padding:14,border:'1px solid #dce6ec',borderRadius:10}}>
+    {showList && (loading ? <p>Cargando etapas…</p> : <div style={{display:'grid',gap:10}}>{sources.map(source => <div key={source.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',padding:14,border:'1px solid #dce6ec',borderRadius:10}}>
       <div><strong>{source.name}</strong><small style={{display:'block',marginTop:5}}>{source.active ? 'Activa' : 'Inactiva'}{` · Orden ${source.position} · ${source.is_won ? 'Ganada' : source.is_lost ? 'Perdida' : 'En curso'}`}</small></div>
       <div style={{display:'flex',gap:8}}><button type="button" className="source-button" disabled={working} onClick={() => {setDraft({...source,kind:source.is_won ? 'won' : source.is_lost ? 'lost' : 'open'});setError('');setMessage('')}}>Editar</button><button type="button" className="source-button" disabled={working} onClick={() => mutate(() => supabase.from('pipeline_stages').update({active:!source.active}).eq('organization_id',organizationId).eq('id',source.id).select('*'), source.active ? 'Etapa desactivada. Las oportunidades anteriores la conservan.' : 'Etapa reactivada.')}>{source.active ? 'Desactivar' : 'Reactivar'}</button></div>
-    </div>)}{!sources.length && <p>Todavía no hay etapas. Crea la primera con «Nueva etapa».</p>}</div>}
+    </div>)}{!sources.length && <p>Todavía no hay etapas. Crea la primera con «Nueva etapa».</p>}</div>)}
     {error && <p role="alert" style={{color:'#b42318'}}>{error}</p>}{message && <p role="status">{message}</p>}
     <p style={{color:'#64748b',fontSize:13}}>Las etapas desactivadas se conservan en los registros existentes y dejan de ofrecerse en nuevas oportunidades.</p>
   </section>
