@@ -65,7 +65,7 @@ function App() {
     return canViewModule(module) && profile.role !== 'demo' && modulePermissions.some(p => p.organization_id === activeOrg && p.module === module && p.can_edit)
   }
   function clearCRMData() {
-    setClientSearch(''); setClientStatusFilter('all')
+    setClientSearch(''); setClientStatusFilter('all'); setContactSearch('')
     setCompanies([]); setContacts([]); setOpportunities([]); setTasks([]); setCalls([])
     setPipelineStages([]); setLeadSources([]); setServices([])
     setSelectedCompany(null); setShowCompanyForm(false); setShowContactForm(false)
@@ -118,6 +118,13 @@ const [editingCompanyId, setEditingCompanyId] = useState(null)
 const [selectedCompany, setSelectedCompany] = useState(null)
 const [contacts, setContacts] = useState([])
 const [contactsLoading, setContactsLoading] = useState(false)
+const [contactSearch, setContactSearch] = useState('')
+const contactSearchWords = normalizeClientSearch(contactSearch).trim().split(/\s+/).filter(Boolean)
+const filteredContacts = contacts.filter(contact => {
+  const companyName = contact.companies?.name || companies.find(company => company.id === contact.company_id)?.name || ''
+  const text = normalizeClientSearch([contact.first_name, contact.last_name, companyName, contact.phone, contact.mobile, contact.email, contact.job_title].join(' '))
+  return contactSearchWords.every(word => text.includes(word))
+})
 const [showContactForm, setShowContactForm] = useState(false)
 const [contactSaving, setContactSaving] = useState(false)
 const [editingContactId, setEditingContactId] = useState(null)
@@ -1378,6 +1385,11 @@ onClick={() => {
 </button>)} 
     </div>
 </div>
+  <div className="client-filter-toolbar">
+    <label className="client-search-field" htmlFor="client-search"><span>Buscar clientes</span><input id="client-search" type="search" placeholder="Nombre, sector, teléfono, email o CIF…" value={clientSearch} onChange={e => setClientSearch(e.target.value)} /></label>
+    <label htmlFor="client-status-filter"><span>Estado</span><select id="client-status-filter" value={clientStatusFilter} onChange={e => setClientStatusFilter(e.target.value)}><option value="all">Todos</option><option value="activo">Activos</option><option value="inactivo">Inactivos</option></select></label>
+    <span className="client-results-count" role="status">{companiesLoading ? 'Cargando…' : `${filteredCompanies.length} de ${companies.length} clientes`}</span>
+  </div>
 {selectedCompany && (
   <div className="dashboard-card company-detail">
     <div className="company-detail-header">
@@ -1721,11 +1733,6 @@ onClick={() => {
     </form>
   </div>
 )}
-  <div className="client-filter-toolbar">
-    <label className="client-search-field" htmlFor="client-search"><span>Buscar clientes</span><input id="client-search" type="search" placeholder="Nombre, sector, teléfono, email o CIF…" value={clientSearch} onChange={e => setClientSearch(e.target.value)} /></label>
-    <label htmlFor="client-status-filter"><span>Estado</span><select id="client-status-filter" value={clientStatusFilter} onChange={e => setClientStatusFilter(e.target.value)}><option value="all">Todos</option><option value="activo">Activos</option><option value="inactivo">Inactivos</option></select></label>
-    <span className="client-results-count" role="status">{companiesLoading ? 'Cargando…' : `${filteredCompanies.length} de ${companies.length} clientes`}</span>
-  </div>
   {companiesLoading ? (
       <div className="dashboard-card">
         Cargando clientes...
@@ -1805,6 +1812,10 @@ onClick={() => {
   + Nuevo contacto
 </button>)} 
     </div>
+<div className="client-filter-toolbar">
+  <label className="client-search-field" htmlFor="contact-search"><span>Buscar contactos</span><input id="contact-search" type="search" placeholder="Nombre, empresa, teléfono o email…" value={contactSearch} onChange={e => setContactSearch(e.target.value)} /></label>
+  <span className="client-results-count" role="status">{contactsLoading ? 'Cargando…' : `${filteredContacts.length} de ${contacts.length} contactos`}</span>
+</div>
 {canWrite && showContactForm && (
   <div className="dashboard-card company-form-card">
     <div className="card-heading">
@@ -2008,7 +2019,8 @@ onClick={() => {
       <span>Acciones</span>
     </div>
 
-    {contacts.map((contact) => (
+    {filteredContacts.length === 0 && <div className="empty-state" style={{ padding: 24 }}><strong>No hay contactos que coincidan</strong><span>Prueba otra búsqueda.</span><button type="button" onClick={() => setContactSearch('')}>Limpiar búsqueda</button></div>}
+    {filteredContacts.map((contact) => (
       <div className="client-row" key={contact.id}>
         <div className="client-main">
           <strong>
