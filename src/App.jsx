@@ -125,6 +125,51 @@ const [editingCompanyId, setEditingCompanyId] = useState(null)
 const [selectedCompany, setSelectedCompany] = useState(null)
 const [contacts, setContacts] = useState([])
 const [contactsLoading, setContactsLoading] = useState(false)
+const [contactAlerts, setContactAlerts] = useState({ org: '', rows: [] })
+const watchContacts = canViewModule('contacts')
+useEffect(() => {
+  let cancelled = false
+  let running = false
+  let cursor = null
+  const seen = new Set()
+  setContactAlerts({ org: activeOrg, rows: [] })
+  if (!activeOrg || !session?.user?.id || !watchContacts) return
+  async function checkContacts() {
+    if (cancelled || running) return
+    running = true
+    try {
+      if (cursor === null) {
+        const { data, error } = await supabase.from('contacts').select('id,created_at').eq('organization_id', activeOrg).order('created_at', { ascending: false }).limit(1)
+        if (cancelled || error) return
+        cursor = data?.[0]?.created_at || '1970-01-01T00:00:00.000Z'
+        if (data?.[0]) seen.add(data[0].id)
+        return
+      }
+      const { data, error } = await supabase.from('contacts').select('id,first_name,last_name,created_at').eq('organization_id', activeOrg).gte('created_at', cursor).order('created_at', { ascending: true }).order('id', { ascending: true }).limit(200)
+      if (cancelled || error) return
+      const fresh = (data || []).filter(row => !seen.has(row.id))
+      for (const row of data || []) seen.add(row.id)
+      if (data?.length) {
+        const nextCursor = data[data.length - 1].created_at
+        if (nextCursor !== cursor) {
+          seen.clear()
+          for (const row of data.filter(row => row.created_at === nextCursor)) seen.add(row.id)
+          cursor = nextCursor
+        }
+      }
+      if (fresh.length) {
+        setContactAlerts(previous => ({ org: activeOrg, rows: [...fresh.reverse(), ...(previous.org === activeOrg ? previous.rows : [])].slice(0, 100) }))
+        loadContacts(); loadCompanies(); loadOpportunities()
+      }
+    } catch { /* Reintentar en la siguiente comprobación. */ } finally { running = false }
+  }
+  checkContacts()
+  const interval = window.setInterval(checkContacts, 15000)
+  const onFocus = () => checkContacts()
+  window.addEventListener('focus', onFocus)
+  return () => { cancelled = true; window.clearInterval(interval); window.removeEventListener('focus', onFocus) }
+}, [activeOrg, session?.user?.id, watchContacts])
+
 const [contactSearch, setContactSearch] = useState('')
 const contactSearchWords = normalizeClientSearch(contactSearch).trim().split(/\s+/).filter(Boolean)
 const filteredContacts = contacts.filter(contact => {
@@ -1604,6 +1649,14 @@ onClick={() => {
   </aside>
 
   <section className="dashboard">
+  {watchContacts && contactAlerts.org === activeOrg && contactAlerts.rows.length > 0 && (
+    <div role="status" aria-live="polite" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '16px 20px', marginBottom: 20, border: '2px solid #087f74', borderRadius: 14, background: '#e9faf4', color: '#12483d' }}>
+      <div style={{ flex: '1 1 240px' }}><strong style={{ fontSize: 18 }}>● {contactAlerts.rows.length === 1 ? 'Ha entrado un contacto nuevo' : `${contactAlerts.rows.length} contactos nuevos`}</strong><div style={{ marginTop: 4 }}>{[contactAlerts.rows[0].first_name, contactAlerts.rows[0].last_name].filter(Boolean).join(' ') || 'Nuevo contacto'}</div></div>
+      <button type="button" className="primary-action" onClick={() => { setContactSearch(''); setCurrentPage('contacts'); loadContacts(); setContactAlerts({ org: activeOrg, rows: [] }) }}>Ver contactos</button>
+      <button type="button" className="secondary-action" onClick={() => setContactAlerts({ org: activeOrg, rows: [] })}>Cerrar aviso</button>
+    </div>
+  )}
+
   {currentPage === 'landing-forms' ? (
     canBrand && organization ? <LandingFormSettings key={`${activeOrg}:${session.user.id}`} organization={organization} /> : <p>No tienes permiso para configurar formularios de esta empresa.</p>
   ) : currentPage === 'branding' ? (
