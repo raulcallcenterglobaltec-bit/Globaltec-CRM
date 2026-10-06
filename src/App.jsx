@@ -1316,7 +1316,7 @@ onClick={() => {
       if (accessRef.current.org === updated.id) setOrganizations(items => items.map(item => item.id === updated.id ? updated : item))
     }} /> : <p>No tienes permiso para personalizar esta empresa.</p>
   ) : currentPage === 'permissions' && profile?.role === 'admin' ? (
-    <ModulePermissions brandName={organization?.name} organizationId={activeOrg} onSaved={() => refreshPermissions(session.user.id)} />
+    <ModulePermissions key={`${activeOrg}:${session.user.id}`} actorId={session.user.id} brandName={organization?.name} organizationId={activeOrg} onSaved={() => refreshPermissions(session.user.id)} />
   ) : !canViewModule(currentPage) ? (
     <div className="dashboard-heading"><div><h1>Sin acceso</h1><p>No tienes secciones habilitadas en esta empresa. Consulta con el administrador.</p></div></div>
   ) : currentPage === 'clients' ? (
@@ -3797,7 +3797,7 @@ function NewCRMUser({ organizationId, brandName, onCreated, onCancel }) {
   </form>
 }
 
-function ModulePermissions({ brandName, organizationId, onSaved }) {
+function ModulePermissions({ actorId, brandName, organizationId, onSaved }) {
   const [creating, setCreating] = useState(false)
   const [users, setUsers] = useState([])
   const [permissions, setPermissions] = useState([])
@@ -3805,18 +3805,31 @@ function ModulePermissions({ brandName, organizationId, onSaved }) {
   const [busy, setBusy] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [draftRole, setDraftRole] = useState('agent')
+  const [managing, setManaging] = useState(false)
+  const pending = useRef(false)
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   useEffect(() => {
     let cancelled = false
     setBusy(true); setMessage(''); setUsers([]); setPermissions([]); setSelectedUser(''); setCreating(false)
     async function load() {
       try {
-        const result = await supabase.from('crm_module_permissions').select('*').eq('organization_id', organizationId)
+        const [result, members] = await Promise.all([
+          supabase.from('crm_module_permissions').select('*').eq('organization_id', organizationId),
+          supabase.from('organization_members').select('user_id,role,active').eq('organization_id', organizationId),
+        ])
         if (result.error) throw result.error
-        const ids = [...new Set((result.data || []).map(p => p.user_id))]
+        if (members.error) throw members.error
+        const ids = [...new Set((members.data || []).map(m => m.user_id))]
         const profiles = ids.length ? await supabase.from('profiles').select('id,full_name,role,active').in('id', ids).order('full_name') : { data: [] }
         if (profiles.error) throw profiles.error
         if (cancelled) return
-        setPermissions(result.data || []); setUsers(profiles.data || []); setSelectedUser(profiles.data?.[0]?.id || '')
+        const rows = (profiles.data || []).map(p => {
+          const member = members.data.find(m => m.user_id === p.id)
+          return { ...p, profileActive: p.active, profileRole: p.role, role: member.role, active: member.active }
+        })
+        setPermissions(result.data || []); setUsers(rows); setSelectedUser(rows[0]?.id || '')
       } catch (err) { if (!cancelled) setMessage('No se han podido cargar los permisos: ' + err.message) }
       finally { if (!cancelled) setBusy(false) }
     }
@@ -3824,6 +3837,31 @@ function ModulePermissions({ brandName, organizationId, onSaved }) {
     return () => { cancelled = true }
   }, [organizationId])
   const user = users.find(u => u.id === selectedUser)
+  useEffect(() => { setDraftRole(user?.role || 'agent') }, [selectedUser, user?.role])
+  const protectedUser = selectedUser === actorId || selectedUser === '4572a164-9b54-46b5-8382-4e50a8b4dfef'
+  const working = saving || managing
+  async function manageUser(nextRole, nextActive) {
+    if (!user || protectedUser || pending.current) return
+    const target = user.id
+    if (!nextActive && !window.confirm(`Desactivar a ${user.full_name || 'este usuario'} en ${brandName || 'esta empresa'}? Sus registros se conservarán.`)) return
+    pending.current = true; setManaging(true); setMessage('')
+    try {
+      const result = await supabase.rpc('crm_manage_user', {
+        p_organization_id: organizationId, p_user_id: target,
+        p_role: nextRole, p_active: nextActive,
+      })
+      if (result.error) throw result.error
+      if (result.data?.id !== target || result.data?.organization_id !== organizationId
+          || result.data?.role !== nextRole || result.data?.active !== nextActive) {
+        throw new Error('No se ha confirmado el cambio. Recarga el listado antes de repetirlo.')
+      }
+      if (!alive.current) return
+      setUsers(current => current.map(u => u.id === target ? { ...u, role: nextRole, active: nextActive } : u))
+      if (nextRole === 'demo') setPermissions(current => current.map(p => p.user_id === target ? { ...p, can_edit: false } : p))
+      setMessage(nextActive ? 'Usuario actualizado. Debe cerrar sesión y volver a entrar para actualizar su acceso.' : 'Usuario desactivado en esta empresa. Sus registros se conservan.')
+    } catch (err) { if (alive.current) setMessage('No se ha podido actualizar: ' + err.message) }
+    finally { pending.current = false; if (alive.current) setManaging(false) }
+  }
   function permission(module) {
     return permissions.find(p => p.user_id === selectedUser && p.module === module) || { organization_id: organizationId, user_id: selectedUser, module, can_view: false, can_edit: false }
   }
@@ -3835,7 +3873,8 @@ function ModulePermissions({ brandName, organizationId, onSaved }) {
     setPermissions(previous => [...previous.filter(p => !(p.user_id === selectedUser && p.module === module)), row])
   }
   async function save(e) {
-    e.preventDefault(); if (!user || saving) return
+    e.preventDefault(); if (!user || !user.active || !user.profileActive || pending.current) return
+    pending.current = true
     setSaving(true); setMessage('')
     try {
       const rows = CRM_MODULES.map(([module]) => {
@@ -3845,26 +3884,42 @@ function ModulePermissions({ brandName, organizationId, onSaved }) {
       const result = await supabase.from('crm_module_permissions').upsert(rows, { onConflict: 'organization_id,user_id,module' }).select('*')
       if (result.error) throw result.error
       if (result.data?.length !== rows.length) throw new Error('No tienes permiso para guardar todos los cambios.')
+      if (!alive.current) return
       await onSaved()
+      if (!alive.current) return
       setMessage('Permisos guardados. El usuario debe cerrar sesión y volver a entrar para actualizar el menú.')
-    } catch (err) { setMessage('No se han podido guardar: ' + err.message) }
-    finally { setSaving(false) }
+    } catch (err) { if (alive.current) setMessage('No se han podido guardar: ' + err.message) }
+    finally { pending.current = false; if (alive.current) setSaving(false) }
   }
   return <div>
     <div className="dashboard-heading"><div><p className="dashboard-kicker">{brandName || 'GLOBALTEC'} CRM</p><h1>Permisos de usuarios</h1><p>Elige qué puede consultar y editar cada usuario en esta empresa.</p></div></div>
-    {!creating && <button className="primary-action" type="button" disabled={busy || saving} onClick={() => { setCreating(true); setMessage('') }} style={{marginBottom:20}}>+ Nuevo usuario</button>}
+    {!creating && <button className="primary-action" type="button" disabled={busy || working} onClick={() => { setCreating(true); setMessage('') }} style={{marginBottom:20}}>+ Nuevo usuario</button>}
     {creating && <NewCRMUser key={organizationId} organizationId={organizationId} brandName={brandName} onCancel={() => setCreating(false)} onCreated={(created, rows) => {
-      setUsers(current => [...current.filter(u => u.id !== created.id), created])
+      setUsers(current => [...current.filter(u => u.id !== created.id), { ...created, profileActive: created.active, profileRole: created.role }])
       setPermissions(current => [...current.filter(p => p.user_id !== created.id), ...CRM_MODULES.map(([module]) => ({ organization_id: organizationId, user_id: created.id, module, ...rows[module] }))])
       setSelectedUser(created.id); setCreating(false); setMessage('Usuario creado con su empresa y permisos. Ya puede iniciar sesión con su correo y contraseña.')
     }} />}
     <p style={{color:'#526578'}}>Los permisos de edición siguen sujetos al rol del usuario. Las cuentas demo siempre son de lectura. Para elegir clientes o contactos en otras secciones, habilita también su consulta.</p>
     {busy ? <p>Cargando usuarios…</p> : <form onSubmit={save} style={{background:'white',padding:24,borderRadius:16,border:'1px solid #dce6ec'}}>
-      <fieldset disabled={saving} style={{border:0,padding:0,margin:0}}>
+      <fieldset disabled={working || creating} style={{border:0,padding:0,margin:0}}>
         <label style={{display:'block',marginBottom:20}}>Usuario <select value={selectedUser} onChange={e => { setSelectedUser(e.target.value); setMessage('') }} style={{padding:10,marginLeft:12,maxWidth:'100%'}}>{users.map(u => <option key={u.id} value={u.id}>{u.full_name || u.id} · {u.role}{!u.active ? ' · Inactivo' : ''}</option>)}</select></label>
-        {!users.length ? <p>No hay usuarios con permisos registrados en esta empresa.</p> : <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr><th style={{textAlign:'left',padding:12}}>Sección</th><th>Puede ver</th><th>Puede editar</th></tr></thead><tbody>{CRM_MODULES.map(([module,label]) => { const row = permission(module); const editable = user?.role !== 'demo' && !['dashboard','reports'].includes(module); return <tr key={module} style={{borderTop:'1px solid #e2e8f0'}}><td style={{padding:12}}>{label}</td><td style={{textAlign:'center'}}><input type="checkbox" aria-label={`Ver ${label}`} checked={row.can_view} onChange={e => change(module,'can_view',e.target.checked)} /></td><td style={{textAlign:'center'}}>{editable ? <input type="checkbox" aria-label={`Editar ${label}`} checked={row.can_edit} onChange={e => change(module,'can_edit',e.target.checked)} /> : <span>Solo consulta</span>}</td></tr> })}</tbody></table></div>}
+        {user && <section style={{padding:20,marginBottom:24,borderRadius:12,background:'#f3f7fa',border:'1px solid #dce6ec'}}>
+          <h2 style={{marginTop:0}}>Acceso del usuario</h2>
+          <p>Estado en esta empresa: <strong>{user.active ? 'Activo' : 'Inactivo'}</strong></p>
+          {!user.profileActive && <p>Su perfil está desactivado globalmente.</p>}
+          <div style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'end'}}>
+            <label>Rol<select aria-label="Rol del usuario seleccionado" value={draftRole} disabled={protectedUser} onChange={e => setDraftRole(e.target.value)}><option value="agent">Agente</option><option value="admin">Administrador</option><option value="demo">Demo · solo consulta</option></select></label>
+            <button type="button" className="primary-action" disabled={protectedUser || !user.profileActive || draftRole === user.role} onClick={() => manageUser(draftRole, user.active)}>{managing ? 'Actualizando…' : 'Guardar rol'}</button>
+            <button type="button" disabled={protectedUser || !user.profileActive} onClick={() => manageUser(user.role, !user.active)} style={{padding:'12px 18px',borderRadius:10,border:'1px solid #dce6ec',background:user.active ? '#fff1f0' : '#e5f7ee',color:user.active ? '#a92323' : '#176b43',cursor:'pointer'}}>{user.active ? 'Desactivar usuario' : 'Reactivar usuario'}</button>
+          </div>
+          {protectedUser && <p>La cuenta principal y tu propia cuenta están protegidas.</p>}
+          <p style={{marginBottom:0}}>La desactivación afecta a esta empresa y conserva los registros. Si el usuario pertenece a varias empresas, el cambio de rol se bloqueará para proteger los demás accesos.</p>
+        </section>}
+        <fieldset disabled={!user?.active || !user?.profileActive} style={{border:0,padding:0,margin:0}}>
+        {!users.length ? <p>No hay usuarios registrados en esta empresa.</p> : <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr><th style={{textAlign:'left',padding:12}}>Sección</th><th>Puede ver</th><th>Puede editar</th></tr></thead><tbody>{CRM_MODULES.map(([module,label]) => { const row = permission(module); const editable = user?.role !== 'demo' && !['dashboard','reports'].includes(module); return <tr key={module} style={{borderTop:'1px solid #e2e8f0'}}><td style={{padding:12}}>{label}</td><td style={{textAlign:'center'}}><input type="checkbox" aria-label={`Ver ${label}`} checked={row.can_view} onChange={e => change(module,'can_view',e.target.checked)} /></td><td style={{textAlign:'center'}}>{editable ? <input type="checkbox" aria-label={`Editar ${label}`} checked={row.can_edit} onChange={e => change(module,'can_edit',e.target.checked)} /> : <span>Solo consulta</span>}</td></tr> })}</tbody></table></div>}
+        </fieldset>
       </fieldset>
-      <button className="primary-action" disabled={saving || !user} style={{marginTop:20}} type="submit">{saving ? 'Guardando…' : 'Guardar permisos'}</button>
+      <button className="primary-action" disabled={working || creating || !user?.active || !user?.profileActive} style={{marginTop:20}} type="submit">{saving ? 'Guardando…' : 'Guardar permisos'}</button>
     </form>}
     {message && <p role="status" style={{marginTop:16}}>{message}</p>}
   </div>
