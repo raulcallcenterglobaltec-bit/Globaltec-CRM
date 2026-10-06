@@ -274,6 +274,63 @@ const [companyForm, setCompanyForm] = useState({
   status: 'activo',
   notes: ''
 })
+// Al salir de un módulo, descartar su formulario sin guardar registros.
+useEffect(() => {
+  if (currentPage !== 'clients') {
+    setShowCompanyForm(false)
+    setEditingCompanyId(null)
+    setCompanyForm({
+  name: '',
+  legal_name: '',
+  tax_id: '',
+  sector: '',
+  website: '',
+  phone: '',
+  email: '',
+  address: '',
+  city: '',
+  province: '',
+  postal_code: '',
+  country: 'España',
+  status: 'activo',
+  notes: ''
+})
+  }
+  if (currentPage !== 'contacts') {
+    setShowContactForm(false)
+    setEditingContactId(null)
+    setContactForm({
+  company_id: '',
+  first_name: '',
+  last_name: '',
+  job_title: '',
+  phone: '',
+  mobile: '',
+  email: '',
+  preferred_contact_method: 'telefono',
+  notes: ''
+})
+  }
+  if (currentPage !== 'opportunities') {
+    setShowOpportunityForm(false)
+    setEditingOpportunityId(null)
+    setOpportunityForm({
+  title: '',
+  company_id: '',
+  contact_id: '',
+ service_ids: [],
+  source_id: '',
+  stage_id: '',
+  estimated_value: '',
+  monthly_value: '',
+  probability: '',
+  expected_close_date: '',
+  description: '',
+  lost_reason: ''
+})
+  }
+}, [currentPage])
+
   const [recoveryMode, setRecoveryMode] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [repeatPassword, setRepeatPassword] = useState('')
