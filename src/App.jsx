@@ -3815,21 +3815,16 @@ function ModulePermissions({ actorId, brandName, organizationId, onSaved }) {
     setBusy(true); setMessage(''); setUsers([]); setPermissions([]); setSelectedUser(''); setCreating(false)
     async function load() {
       try {
-        const [result, members] = await Promise.all([
-          supabase.from('crm_module_permissions').select('*').eq('organization_id', organizationId),
-          supabase.from('organization_members').select('user_id,role,active').eq('organization_id', organizationId),
-        ])
-        if (result.error) throw result.error
-        if (members.error) throw members.error
-        const ids = [...new Set((members.data || []).map(m => m.user_id))]
-        const profiles = ids.length ? await supabase.from('profiles').select('id,full_name,role,active').in('id', ids).order('full_name') : { data: [] }
-        if (profiles.error) throw profiles.error
-        if (cancelled) return
-        const rows = (profiles.data || []).map(p => {
-          const member = members.data.find(m => m.user_id === p.id)
-          return { ...p, profileActive: p.active, profileRole: p.role, role: member.role, active: member.active }
+        const result = await supabase.rpc('crm_list_company_users', {
+          p_organization_id: organizationId,
         })
-        setPermissions(result.data || []); setUsers(rows); setSelectedUser(rows[0]?.id || '')
+        if (result.error) throw result.error
+        if (!Array.isArray(result.data?.users) || !Array.isArray(result.data?.permissions)) {
+          throw new Error('El servidor no ha devuelto un listado válido.')
+        }
+        if (cancelled) return
+        const rows = result.data.users
+        setPermissions(result.data.permissions); setUsers(rows); setSelectedUser(rows[0]?.id || '')
       } catch (err) { if (!cancelled) setMessage('No se han podido cargar los permisos: ' + err.message) }
       finally { if (!cancelled) setBusy(false) }
     }
