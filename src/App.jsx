@@ -565,7 +565,7 @@ const reportDate = value => {
   const date = new Date(value)
   return Number.isFinite(date.getTime()) ? date.toLocaleString('es-ES') : ''
 }
-function downloadReport() {
+function downloadReport(format = 'csv') {
   if (!canViewModule('reports') || !selectedExportType || !canViewModule(selectedExportType) || reportRangeError || reportLoading) return
   const definitions = {
     clients: { headers: ['Cliente', 'Razón social', 'CIF/NIF', 'Sector', 'Teléfono', 'Email', 'Estado', 'Localidad', 'Provincia', 'Fecha de alta'], values: row => [row.name, row.legal_name, row.tax_id, row.sector, row.phone, row.email, row.status, row.city, row.province, reportDate(row.created_at)] },
@@ -574,6 +574,10 @@ function downloadReport() {
     tasks: { headers: ['Tarea', 'Cliente', 'Estado', 'Prioridad', 'Vencimiento', 'Fecha de alta'], values: row => [row.title, row.companies?.name, taskStatusLabels[row.status] || row.status, taskPriorityLabels[row.priority] || row.priority, reportDate(row.due_date), reportDate(row.created_at)] }
   }
   const definition = definitions[selectedExportType]
+  if (format === 'pdf') {
+    saveReportPDF({ title: exportChoices.find(([key]) => key === selectedExportType)?.[1] || 'Informe', company: organization?.name || 'Empresa', period: reportPeriodText, headers: definition.headers, rows: reportData[selectedExportType].map(definition.values) })
+    return
+  }
   const cell = value => {
     let text = String(value ?? '')
     if (/^[\s]*[=+@-]/.test(text) || /^[\t\r\n]/.test(text)) text = "'" + text
@@ -1331,11 +1335,12 @@ const { error } = result
   }} />}
 </div>}
 <style>{`
-  .report-export-panel { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding: 18px; margin: 18px 0; border: 1px solid #dbe5ef; border-radius: 14px; background: white; }
+  .report-export-panel { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; padding: 18px; margin: 18px 0; border: 1px solid #dbe5ef; border-radius: 14px; background: white; }
   .report-export-panel > div { flex: 1; min-width: 200px; }
   .report-export-panel p { margin: 7px 0; font-size: 13px; line-height: 1.6; }
   .report-export-panel small { color: #64748b; }
-  .report-export-panel label { display: flex; flex-direction: column; gap: 7px; font-size: 13px; }
+  .report-export-panel label { display: flex; flex-direction: column; gap: 9px; font-size: 16px; font-weight: 700; min-width: 200px; margin: 0; }
+  .report-export-panel .primary-action, .report-export-panel select { height: 44px; box-sizing: border-box; margin: 0; }
   .report-export-panel select { padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 9px; background: white; font: inherit; }
   .report-bars-row { margin: 18px 0; }
   .report-bars-caption { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; margin-bottom: 8px; }
@@ -2570,9 +2575,10 @@ service_ids: [],
     </div>
 
     <div className="report-export-panel">
-      <div><strong>Descargar informe</strong><p>CSV para Excel · Empresa: {organization?.name}<br />Periodo: {reportPeriodText}</p><small>Clientes, oportunidades y tareas se filtran por fecha de alta; llamadas, por fecha de llamada.</small></div>
-      <label htmlFor="report-export-type"><span>Contenido</span><select id="report-export-type" value={selectedExportType || ''} onChange={e => setReportExportType(e.target.value)}>{exportChoices.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-      <button type="button" className="primary-action" disabled={!selectedExportType || !!reportRangeError || reportLoading} onClick={downloadReport}>{reportLoading ? 'Cargando datos…' : 'Descargar CSV'}</button>
+      <div><strong>Descargar informe</strong><p>CSV para Excel · PDF para compartir · Empresa: {organization?.name}<br />Periodo: {reportPeriodText}</p><small>Clientes, oportunidades y tareas se filtran por fecha de alta; llamadas, por fecha de llamada.</small></div>
+      <label htmlFor="report-export-type"><span>Tipo de informe</span><select id="report-export-type" value={selectedExportType || ''} onChange={e => setReportExportType(e.target.value)}>{exportChoices.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <button type="button" className="primary-action" disabled={!selectedExportType || !!reportRangeError || reportLoading} onClick={() => downloadReport('csv')}>{reportLoading ? 'Cargando datos…' : 'Descargar CSV'}</button>
+      <button type="button" className="primary-action" disabled={!selectedExportType || !!reportRangeError || reportLoading} onClick={() => downloadReport('pdf')}>Descargar PDF</button>
       {!exportChoices.length && <p>No tienes acceso a secciones que se puedan descargar.</p>}
     </div>
     {reportLoading && <p role="status">Cargando datos del informe…</p>}
@@ -2586,7 +2592,14 @@ service_ids: [],
         ['tasks', 'Tareas completadas', reportData.tasks.filter(row => row.status === 'completed').length, 'Finalizadas', 'tasks'],
         ['calls', 'Llamadas', reportData.calls.length, 'Total registradas', 'calls'],
         ['calls', 'Llamadas entrantes', reportData.calls.filter(row => row.direction === 'inbound').length, 'Recibidas', 'calls']
-      ].filter(([module]) => canViewModule(module)).map(([module, label, value, detail, icon]) => <div key={label} className={`stat-card stat-${module}`}><CRMIcon name={icon} className="stat-icon" /><span>{label}</span><strong>{reportLoading ? '…' : value}</strong><small>{detail}</small></div>)}
+      ].filter(([module]) => canViewModule(module)).map(([module, label, value, detail, icon]) => <button type="button" key={label} className={`stat-card stat-${module} dashboard-shortcut`} aria-label={`Ir a ${module === 'clients' ? 'Clientes' : module === 'opportunities' ? 'Oportunidades' : module === 'tasks' ? 'Tareas' : 'Llamadas'}`} onClick={() => {
+        if (!canViewModule(module)) return
+        setCurrentPage(module)
+        loadCompanies(); loadContacts()
+        if (module === 'opportunities') { loadOpportunities(); loadOpportunityOptions() }
+        if (module === 'tasks') { loadTasks(); loadOpportunities() }
+        if (module === 'calls') { loadCalls(); loadOpportunities() }
+      }}><CRMIcon name={icon} className="stat-icon" /><span>{label}</span><strong>{reportLoading ? '…' : value}</strong><small>{detail} · Ver sección →</small></button>)}
     </div>
     <div className="dashboard-grid">
       {canViewModule('calls') && <ReportBars title="Llamadas por tipo" description="Distribución en el periodo seleccionado" rows={[
@@ -3963,4 +3976,80 @@ export default App
 function ReportBars({ title, description, rows }) {
   const total = rows.reduce((sum, row) => sum + row.value, 0)
   return <div className="dashboard-card"><div className="card-heading"><div><h2>{title}</h2><p>{description}</p></div></div>{rows.map(row => <div className="report-bars-row" key={row.label}><div className="report-bars-caption"><span>{row.label}</span><strong>{row.value} · {total ? Math.round(row.value / total * 100) : 0}%</strong></div><div className="report-bars-track" aria-hidden="true"><div className="report-bars-fill" style={{ width: `${total ? row.value / total * 100 : 0}%`, background: row.color }} /></div></div>)}{!total && <p style={{ color: '#64748b', fontSize: 13 }}>No hay registros en este periodo.</p>}</div>
+}
+
+// PDF autónomo: tablas con salto de línea, páginas y fuente estándar con acentos.
+function saveReportPDF({ title, company, period, headers, rows }) {
+  const byteText = value => String(value ?? '').normalize('NFC').replace(/[\u2010-\u2015]/g, '-').replace(/[^\x20-\x7e\xa0-\xff\n]/g, '?')
+  const literal = value => byteText(value).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)')
+  const wrap = (value, limit) => {
+    const lines = []
+    for (const paragraph of byteText(value).split(/\r?\n/)) {
+      let line = ''
+      for (let word of paragraph.split(/\s+/)) {
+        if (line && line.length + word.length + 1 > limit) { lines.push(line); line = '' }
+        while (word.length > limit) { if (line) { lines.push(line); line = '' }; lines.push(word.slice(0, limit)); word = word.slice(limit) }
+        line = line ? line + ' ' + word : word
+      }
+      lines.push(line)
+    }
+    return lines.length ? lines : ['']
+  }
+  const width = 778 / headers.length, limit = Math.max(8, Math.floor((width - 10) / 4.2))
+  const pages = []
+  let commands = [], y = 0
+  const text = (value, x, top, size = 8) => commands.push(`BT /F1 ${size} Tf 0.12 0.18 0.25 rg 1 0 0 1 ${x} ${top} Tm (${literal(value)}) Tj ET`)
+  const line = top => commands.push(`0.82 0.86 0.9 RG 0.5 w 32 ${top} m 810 ${top} l S`)
+  const headerLines = headers.map(h => wrap(h, limit))
+  const headerHeight = Math.max(...headerLines.map(h => h.length)) * 10 + 12
+  const start = () => {
+    commands = []
+    text(`${company} - ${title}`, 32, 559, 15)
+    text(`Periodo: ${period}`, 32, 538, 10)
+    text(`Registros: ${rows.length} | Generado: ${new Date().toLocaleString('es-ES')}`, 32, 520, 8)
+    y = 500
+    commands.push(`0.92 0.95 0.98 rg 32 ${y - headerHeight} 778 ${headerHeight} re f`)
+    headerLines.forEach((cell, i) => cell.forEach((v, j) => text(v, 37 + i * width, y - 12 - j * 10)))
+    y -= headerHeight; line(y)
+  }
+  const finish = () => { text(`Pagina ${pages.length + 1}`, 740, 20, 8); pages.push(commands.join('\n')) }
+  start()
+  if (!rows.length) text('No hay registros en este periodo.', 32, y - 22, 10)
+  rows.forEach(row => {
+    const cells = headers.map((_, i) => wrap(row[i], limit))
+    const count = Math.max(...cells.map(c => c.length))
+    let offset = 0
+    while (offset < count) {
+      if (y - 22 < 40) { finish(); start() }
+      const take = Math.min(count - offset, Math.floor((y - 40 - 12) / 10))
+      cells.forEach((cell, i) => cell.slice(offset, offset + take).forEach((v, j) => text(v, 37 + i * width, y - 12 - j * 10)))
+      y -= take * 10 + 12; line(y); offset += take
+      if (offset < count) { finish(); start() }
+    }
+  })
+  finish()
+  const objects = [null, '', '<< /Type /Catalog /Pages 2 0 R >>', '', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>']
+  const kids = []
+  pages.forEach(content => {
+    const pageId = objects.length, streamId = pageId + 1
+    kids.push(`${pageId} 0 R`)
+    objects.push(`<< /Type /Page /Parent 3 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 4 0 R >> >> /Contents ${streamId} 0 R >>`)
+    objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`)
+  })
+  // IDs: catálogo 2, árbol de páginas 3, fuente 4.
+  objects[2] = '<< /Type /Catalog /Pages 3 0 R >>'
+  objects[3] = `<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${pages.length} >>`
+  objects[1] = '<< /Producer (Globaltec CRM) >>'
+  let pdf = '%PDF-1.4\n', offsets = [0]
+  for (let i = 1; i < objects.length; i++) { offsets.push(pdf.length); pdf += `${i} 0 obj\n${objects[i]}\nendobj\n` }
+  const xref = pdf.length
+  pdf += `xref\n0 ${objects.length}\n0000000000 65535 f \n` + offsets.slice(1).map(n => `${String(n).padStart(10, '0')} 00000 n \n`).join('')
+  pdf += `trailer\n<< /Size ${objects.length} /Root 2 0 R /Info 1 0 R >>\nstartxref\n${xref}\n%%EOF`
+  const bytes = Uint8Array.from(pdf, char => char.charCodeAt(0))
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${company}-${title}-${new Date().toISOString().slice(0, 10)}.pdf`.replace(/[<>:"/\\|?*]/g, '-')
+  document.body.appendChild(link); link.click(); link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
