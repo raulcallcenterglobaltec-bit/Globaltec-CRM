@@ -1498,7 +1498,7 @@ onClick={() => {
 
   <section className="dashboard">
   {currentPage === 'branding' ? (
-    canBrand && organization ? <BrandingSettings key={`${activeOrg}:${session.user.id}`} organization={organization} onSaved={updated => {
+    canBrand && organization ? <BrandingSettings key={`${activeOrg}:${session.user.id}`} organization={organization} onSourcesChanged={() => loadOpportunityOptions()} onSaved={updated => {
       if (accessRef.current.org === updated.id) setOrganizations(items => items.map(item => item.id === updated.id ? updated : item))
     }} /> : <p>No tienes permiso para personalizar esta empresa.</p>
   ) : currentPage === 'permissions' && profile?.role === 'admin' ? (
@@ -2344,9 +2344,9 @@ service_ids: [],
             }
           >
             <option value="">Sin origen</option>
-            {leadSources.map((source) => (
+            {leadSources.filter(source => source.active || source.id === opportunityForm.source_id).map((source) => (
               <option key={source.id} value={source.id}>
-                {source.name}
+                {source.name}{!source.active ? ' (inactivo)' : ''}
               </option>
             ))}
           </select>
@@ -3481,7 +3481,7 @@ function NewOrganization({ onCreated }) {
   </form>
 }
 
-function BrandingSettings({ organization, onSaved }) {
+function BrandingSettings({ organization, onSaved, onSourcesChanged }) {
   const [name, setName] = useState(organization.name || '')
   const [logo, setLogo] = useState(organization.logo_url || '')
   const [primary, setPrimary] = useState(brandingColor(organization.settings?.branding?.primary_color, '#087f74'))
@@ -3522,6 +3522,7 @@ function BrandingSettings({ organization, onSaved }) {
       {error && <p role="alert" className="branding-error">{error}</p>}{message && <p role="status">{message}</p>}
       <button className="primary-action" disabled={saving}>{saving ? 'Guardando…' : 'Guardar personalización'}</button>
     </form><div className="dashboard-card branding-preview"><h2>Vista previa</h2><div className="branding-preview-header"><BrandLogo key={logo} url={safeLogo(logo)} name={name} /><strong>{name || 'Tu empresa'}</strong><span>CRM</span></div><div className="branding-preview-menu" style={{ background: sidebar, color: brandingInk(sidebar) }}><span>ESPACIO DE TRABAJO</span><div style={{ background: primary, color: brandingInk(primary) }}>Panel principal</div><p>Clientes</p><p>Agenda</p></div><p>Los cambios se aplican al guardar.</p></div></div>
+    <LeadSourceSettings key={organization.id} organizationId={organization.id} onChanged={onSourcesChanged} />
   </div>
 }
 
@@ -4048,4 +4049,82 @@ function saveReportPDF({ title, company, period, headers, rows }) {
   link.download = `${company}-${title}-${new Date().toISOString().slice(0, 10)}.pdf`.replace(/[<>:"/\\|?*]/g, '-')
   document.body.appendChild(link); link.click(); link.remove()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+function LeadSourceSettings({ organizationId, onChanged }) {
+  const [sources, setSources] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [working, setWorking] = useState(false)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [draft, setDraft] = useState(null)
+  const pending = useRef(false)
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    load()
+    return () => { alive.current = false }
+  }, [organizationId])
+  async function load() {
+    try {
+      const result = await supabase.from('lead_sources').select('*').eq('organization_id', organizationId).order('name')
+      if (result.error) throw result.error
+      if (alive.current) setSources(result.data || [])
+    } catch (err) { if (alive.current) setError('No se han podido cargar los orígenes: ' + err.message) }
+    finally { if (alive.current) setLoading(false) }
+  }
+  const normalize = name => name.trim().toLocaleLowerCase('es-ES')
+  async function mutate(action, success) {
+    if (pending.current) return
+    pending.current = true; setWorking(true); setError(''); setMessage('')
+    try {
+      const result = await action()
+      if (result.error) throw result.error
+      if (!result.data?.length) throw new Error('No se ha confirmado el cambio. Comprueba los permisos de esta empresa.')
+      if (!alive.current) return
+      setSources(current => {
+        const ids = new Set(result.data.map(row => row.id))
+        return [...current.filter(row => !ids.has(row.id)), ...result.data].sort((a,b) => a.name.localeCompare(b.name, 'es'))
+      })
+      setDraft(null); setMessage(success)
+      await onChanged?.()
+    } catch (err) { if (alive.current) setError(err.message || 'No se ha podido guardar.') }
+    finally { pending.current = false; if (alive.current) setWorking(false) }
+  }
+  function save(e) {
+    e.preventDefault()
+    const name = draft.name.trim()
+    if (!name) { setError('Escribe el nombre del origen.'); return }
+    if (sources.some(row => row.id !== draft.id && normalize(row.name) === normalize(name))) { setError('Ya existe un origen con ese nombre en esta empresa. Puedes reactivarlo si está inactivo.'); return }
+    const values = { name, description: draft.description.trim() || null }
+    mutate(() => draft.id
+      ? supabase.from('lead_sources').update(values).eq('organization_id', organizationId).eq('id', draft.id).select('*')
+      : supabase.from('lead_sources').insert({ ...values, organization_id: organizationId, active: true }).select('*'), 'Origen guardado.')
+  }
+  function addDefaults() {
+    const names = ['Web', 'Instagram', 'Facebook', 'TikTok', 'YouTube', 'Llamada', 'Recomendación']
+    const missing = names.filter(name => !sources.some(row => normalize(row.name) === normalize(name)))
+    if (!missing.length) { setMessage('Los orígenes habituales ya están añadidos.'); return }
+    mutate(() => supabase.from('lead_sources').insert(missing.map(name => ({ name, organization_id: organizationId, active: true }))).select('*'), 'Orígenes habituales añadidos.')
+  }
+  return <section className="dashboard-card" style={{marginTop:24}}>
+    <div className="card-heading"><div><h2>Orígenes de oportunidades</h2><p>Configura de dónde llegan los contactos de esta empresa.</p></div></div>
+    <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:18}}>
+      <button type="button" className="primary-action" disabled={loading || working || !!error && !sources.length} onClick={() => { setDraft({name:'',description:''}); setError(''); setMessage('') }}>+ Nuevo origen</button>
+      <button type="button" className="agenda-control" disabled={loading || working || !!error && !sources.length} onClick={addDefaults}>Añadir orígenes habituales</button>
+      <button type="button" className="agenda-control" disabled={loading || working} onClick={() => {setLoading(true);setError('');load()}}>Actualizar listado</button>
+    </div>
+    {draft && <form onSubmit={save} style={{padding:18,background:'#f3f7fa',borderRadius:12,marginBottom:18}}>
+      <fieldset disabled={working} style={{border:0,padding:0,margin:0}}>
+        <div className="form-grid"><label className="form-field">Nombre<input required maxLength={150} value={draft.name} onChange={e => setDraft({...draft,name:e.target.value})} /></label><label className="form-field">Descripción (opcional)<input maxLength={500} value={draft.description} onChange={e => setDraft({...draft,description:e.target.value})} /></label></div>
+        <div style={{display:'flex',gap:12,marginTop:16}}><button type="submit" className="primary-action">{working ? 'Guardando…' : 'Guardar origen'}</button><button type="button" className="agenda-control" onClick={() => {setDraft(null);setError('')}}>Cancelar</button></div>
+      </fieldset>
+    </form>}
+    {loading ? <p>Cargando orígenes…</p> : <div style={{display:'grid',gap:10}}>{sources.map(source => <div key={source.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',padding:14,border:'1px solid #dce6ec',borderRadius:10}}>
+      <div><strong>{source.name}</strong><small style={{display:'block',marginTop:5}}>{source.active ? 'Activo' : 'Inactivo'}{source.description ? ` · ${source.description}` : ''}</small></div>
+      <div style={{display:'flex',gap:8}}><button type="button" className="agenda-control" disabled={working} onClick={() => {setDraft({...source,description:source.description || ''});setError('');setMessage('')}}>Editar</button><button type="button" className="agenda-control" disabled={working} onClick={() => mutate(() => supabase.from('lead_sources').update({active:!source.active}).eq('organization_id',organizationId).eq('id',source.id).select('*'), source.active ? 'Origen desactivado. Las oportunidades anteriores lo conservan.' : 'Origen reactivado.')}>{source.active ? 'Desactivar' : 'Reactivar'}</button></div>
+    </div>)}{!sources.length && <p>Todavía no hay orígenes. Añade los habituales o crea los tuyos.</p>}</div>}
+    {error && <p role="alert" style={{color:'#b42318'}}>{error}</p>}{message && <p role="status">{message}</p>}
+    <p style={{color:'#64748b',fontSize:13}}>Los orígenes desactivados se conservan en los registros existentes y dejan de ofrecerse en nuevas oportunidades.</p>
+  </section>
 }
