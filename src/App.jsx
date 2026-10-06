@@ -31,6 +31,13 @@ function BrandLogo({ url, name }) {
   return <img className="brand-logo" src={url} alt={`Logotipo de ${name}`} onError={() => setFailed(true)} referrerPolicy="no-referrer" />
 }
 
+const PUBLIC_FORM_ENDPOINT = `${supabase.supabaseUrl}/functions/v1/crm-public-form`
+
+function AppEntry() {
+  const formId = new URLSearchParams(window.location.search).get('form')
+  return formId !== null ? <PublicLandingForm formId={formId}/> : <App/>
+}
+
 function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -4072,7 +4079,7 @@ function ModulePermissions({ actorId, brandName, organizationId, onSaved }) {
   </div>
 }
 
-export default App
+export default AppEntry
 
 function ReportBars({ title, description, rows }) {
   const total = rows.reduce((sum, row) => sum + row.value, 0)
@@ -4433,8 +4440,8 @@ function LandingFormSettings({ organization }) {
     <div className="dashboard-heading"><div><p className="dashboard-kicker">{organization.name} CRM</p><h1>Formularios y landings</h1><p>Configura los formularios que usarás para captar contactos de esta empresa.</p></div></div>
     <div className="dashboard-card">
       <div style={{display:'flex',gap:12,flexWrap:'wrap'}}><button className="primary-action" type="button" disabled={loading || working || !!error && !forms.length} onClick={newForm}>+ Nuevo formulario</button><button className="source-button" type="button" disabled={working || loading} onClick={load}>Actualizar listado</button></div>
-      <p style={{color:'#526578'}}>Guarda la configuración y abre «Vista previa» para enviar una prueba al CRM con tu sesión iniciada. Los enlaces públicos para las landings se prepararán después.</p>
-      {loading ? <p>Cargando formularios…</p> : forms.map(form=><div key={form.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',padding:16,border:'1px solid #dce6ec',borderRadius:10,marginTop:12}}><div><strong>{form.name}</strong><small style={{display:'block',marginTop:6}}>{form.active ? 'Configuración activa' : 'Configuración inactiva'} · {form.fields.length} campos</small></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="source-button" type="button" disabled={working} onClick={()=>{setPreview(form);setDraft(null)}}>Vista previa</button><button className="source-button" type="button" disabled={working} onClick={()=>{setDraft({...form,landing_url:form.landing_url || ''});setPreview(null);setError('');setMessage('')}}>Editar</button><button className="source-button" type="button" disabled={working} onClick={()=>mutate(()=>supabase.from('crm_landing_forms').update({active:!form.active}).eq('organization_id',organization.id).eq('id',form.id).select('*'),form.active ? 'Configuración desactivada.' : 'Configuración reactivada.')}>{form.active ? 'Desactivar' : 'Reactivar'}</button></div></div>)}
+      <p style={{color:'#526578'}}>Abre «Vista previa» para hacer una prueba interna. Activa la recepción pública y copia el enlace para recibir solicitudes sin iniciar sesión.</p>
+      {loading ? <p>Cargando formularios…</p> : forms.map(form=><div key={form.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',padding:16,border:'1px solid #dce6ec',borderRadius:10,marginTop:12}}><div><strong>{form.name}</strong><small style={{display:'block',marginTop:6}}>{form.active ? 'Configuración activa' : 'Configuración inactiva'} · {form.fields.length} campos · {form.public_enabled && form.active ? 'Recepción pública activada' : 'Recepción pública desactivada'}</small></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><PublicFormActions form={form} organizationId={organization.id} working={working} mutate={mutate}/><button className="source-button" type="button" disabled={working} onClick={()=>{setPreview(form);setDraft(null)}}>Vista previa</button><button className="source-button" type="button" disabled={working} onClick={()=>{setDraft({...form,landing_url:form.landing_url || ''});setPreview(null);setError('');setMessage('')}}>Editar</button><button className="source-button" type="button" disabled={working} onClick={()=>mutate(()=>supabase.from('crm_landing_forms').update({active:!form.active}).eq('organization_id',organization.id).eq('id',form.id).select('*'),form.active ? 'Configuración desactivada.' : 'Configuración reactivada.')}>{form.active ? 'Desactivar' : 'Reactivar'}</button></div></div>)}
       {!loading && !error && !forms.length && <p>Todavía no hay formularios. Crea el primero.</p>}
       {error && <p role="alert" style={{color:'#b42318'}}>{error}</p>}{message && <p role="status">{message}</p>}
     </div>
@@ -4447,7 +4454,7 @@ function LandingFormSettings({ organization }) {
   </div>
 }
 
-function LandingFormTest({ form }) {
+function LandingFormTest({ form, publicMode = false }) {
   const [values, setValues] = useState({})
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
@@ -4466,7 +4473,16 @@ function LandingFormTest({ form }) {
         attempt.current = { form_id: form.id, request_id: crypto.randomUUID(),
           values: Object.fromEntries(LANDING_FIELDS.filter(([key]) => form.fields.includes(key)).map(([key]) => [key, (values[key] || '').trim()])) }
       }
-      const { data, error: invocationError } = await supabase.functions.invoke('crm-receive-form', { body: attempt.current })
+      let result
+      if (publicMode) {
+        const response = await fetch(PUBLIC_FORM_ENDPOINT, { method:'POST', credentials:'omit', headers:{'Content-Type':'application/json'}, body:JSON.stringify(attempt.current) })
+        let data
+        try { data = await response.clone().json() } catch { data = null }
+        result = response.ok ? {data} : {error:{context:response}}
+      } else {
+        result = await supabase.functions.invoke('crm-receive-form', { body: attempt.current })
+      }
+      const { data, error: invocationError } = result
       if (invocationError) {
         let details = null
         const response = invocationError.context
@@ -4482,7 +4498,7 @@ function LandingFormTest({ form }) {
           ? 'Tu sesión no es válida. Vuelve a iniciar sesión en el CRM.'
           : 'No se ha confirmado el guardado. Reintenta el mismo envío.'))
       }
-      if (data == null || data?.error) {
+      if (data?.success !== true || data?.error) {
         if (alive.current) setRetry(true)
         throw new Error(typeof data?.error === 'string' ? data.error : 'La función no confirmó el guardado. Reintenta el mismo envío.')
       }
@@ -4497,9 +4513,9 @@ function LandingFormTest({ form }) {
   }
   return <div style={{maxWidth:560,margin:'20px auto',padding:24,border:'1px solid #dce6ec',borderRadius:12}}>
     <h3>{form.title}</h3>
-    <p>Prueba interna: el envío guarda datos reales en el CRM de esta empresa. Utiliza datos de prueba.</p>
+    {!publicMode && <p>Prueba interna: el envío guarda datos reales en el CRM de esta empresa. Utiliza datos de prueba.</p>}
     {!form.active && <p role="status">Activa este formulario para poder enviar una prueba.</p>}
-    {success ? <><p role="status">{form.success_message}</p><p>Envío confirmado por el CRM.</p><button type="button" className="source-button" onClick={() => {attempt.current=null;setValues({});setSuccess(false);setError('');setRetry(false)}}>Nueva prueba</button></> : <form onSubmit={send}>
+    {success ? <><p role="status">{form.success_message}</p>{!publicMode && <p>Envío confirmado por el CRM.</p>}<button type="button" className="source-button" onClick={() => {attempt.current=null;setValues({});setSuccess(false);setError('');setRetry(false)}}>{publicMode ? 'Enviar otra solicitud' : 'Nueva prueba'}</button></> : <form onSubmit={send}>
       <fieldset disabled={sending || retry || !form.active} style={{border:0,padding:0,margin:0,minWidth:0}}><div className="form-grid">
         {LANDING_FIELDS.filter(([key]) => form.fields.includes(key)).map(([key,label]) => <label className="form-field" key={key}>{label}{form.required_fields.includes(key) ? ' *' : ''}{key === 'message'
           ? <textarea required={form.required_fields.includes(key)} maxLength={5000} value={values[key] || ''} onChange={e => setValues(row => ({...row,[key]:e.target.value}))}/>
@@ -4507,7 +4523,49 @@ function LandingFormTest({ form }) {
       </div></fieldset>
       {error && <p role="alert" style={{color:'#b42318'}}>{error}</p>}
       {retry && <p>Los datos se mantienen para reintentar el mismo envío sin duplicarlo.</p>}
-      <button className="primary-action" type="submit" disabled={sending || !form.active} style={{marginTop:20}}>{sending ? 'Enviando…' : retry ? 'Reintentar el mismo envío' : 'Enviar prueba al CRM'}</button>
+      <button className="primary-action" type="submit" disabled={sending || !form.active} style={{marginTop:20}}>{sending ? 'Enviando…' : retry ? 'Reintentar el mismo envío' : publicMode ? form.button_text : 'Enviar prueba al CRM'}</button>
     </form>}
   </div>
+}
+
+function PublicFormActions({ form, organizationId, working, mutate }) {
+  const [notice,setNotice] = useState('')
+  const link = new URL(window.location.href)
+  link.search = ''; link.hash = ''; link.searchParams.set('form',form.id)
+  const enabled = form.active && form.public_enabled
+  return <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+    <button type="button" className="source-button" disabled={working || !form.active && !form.public_enabled} onClick={() => {setNotice('');mutate(() => supabase.from('crm_landing_forms').update({public_enabled:!form.public_enabled}).eq('organization_id',organizationId).eq('id',form.id).select('*'),form.public_enabled ? 'Recepción pública desactivada.' : 'Recepción pública activada. Ya puedes copiar el enlace.')}}>{form.public_enabled ? 'Desactivar recepción pública' : 'Activar recepción pública'}</button>
+    {enabled && <><button type="button" className="source-button" disabled={working} onClick={async()=>{try {await navigator.clipboard.writeText(link.href);setNotice('Enlace copiado.')}catch{setNotice('Copia el enlace del campo que aparece debajo.')}}}>Copiar enlace</button><a className="source-button" href={link.href} target="_blank" rel="noopener noreferrer">Abrir formulario público</a><input aria-label="Enlace público del formulario" readOnly value={link.href} onFocus={e=>e.target.select()} style={{width:'100%',maxWidth:430,padding:8,border:'1px solid #dce6ec',borderRadius:8}}/></>}
+    {notice && <small role="status">{notice}</small>}
+  </div>
+}
+
+function PublicLandingForm({ formId }) {
+  const [form,setForm] = useState(null)
+  const [error,setError] = useState('')
+  const [loading,setLoading] = useState(true)
+  const [reload,setReload] = useState(0)
+  useEffect(() => {
+    const controller = new AbortController()
+    setLoading(true);setError('');setForm(null)
+    async function load() {
+      try {
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(formId)) throw new Error('Formulario no disponible.')
+        const response = await fetch(`${PUBLIC_FORM_ENDPOINT}?form_id=${encodeURIComponent(formId)}`, {credentials:'omit',signal:controller.signal})
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error || 'No se ha podido cargar el formulario.')
+        if (!Array.isArray(data.fields) || !Array.isArray(data.required_fields)) throw new Error('Formulario no disponible.')
+        if (!controller.signal.aborted) setForm({...data,active:true})
+      } catch(err) {
+        if (!controller.signal.aborted) setError(err.message || 'No se ha podido cargar el formulario.')
+      } finally { if (!controller.signal.aborted) setLoading(false) }
+    }
+    load()
+    return () => controller.abort()
+  }, [formId,reload])
+  return <main style={{minHeight:'100vh',background:'#edf5f6',padding:'32px 16px',boxSizing:'border-box',color:'#142c48'}}><section className="dashboard-card" style={{maxWidth:640,margin:'0 auto',padding:24}}>
+    {loading && <p role="status">Cargando formulario…</p>}
+    {error && <><p role="alert">{error}</p><button type="button" className="source-button" onClick={()=>setReload(value=>value+1)}>Volver a cargar</button></>}
+    {form && <LandingFormTest key={form.id} form={form} publicMode/>}
+  </section></main>
 }
