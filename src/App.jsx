@@ -65,7 +65,7 @@ function App() {
     return canViewModule(module) && profile.role !== 'demo' && modulePermissions.some(p => p.organization_id === activeOrg && p.module === module && p.can_edit)
   }
   function clearCRMData() {
-    setClientSearch(''); setClientStatusFilter('all'); setContactSearch(''); setOpportunitySearch(''); setOpportunityStageFilter('all'); setCallSearch(''); setCallTypeFilter('all'); setCallStatusFilter('all')
+    setClientSearch(''); setClientStatusFilter('all'); setContactSearch(''); setOpportunitySearch(''); setOpportunityStageFilter('all'); setCallSearch(''); setCallTypeFilter('all'); setCallStatusFilter('all'); setTaskSearch(''); setTaskStatusFilter('all'); setTaskPriorityFilter('all')
     setCompanies([]); setContacts([]); setOpportunities([]); setTasks([]); setCalls([])
     setPipelineStages([]); setLeadSources([]); setServices([])
     setSelectedCompany(null); setShowCompanyForm(false); setShowContactForm(false)
@@ -189,6 +189,18 @@ const [opportunityForm, setOpportunityForm] = useState({
 })
 const [tasks, setTasks] = useState([])
 const [tasksLoading, setTasksLoading] = useState(false)
+const [taskSearch, setTaskSearch] = useState('')
+const [taskStatusFilter, setTaskStatusFilter] = useState('all')
+const [taskPriorityFilter, setTaskPriorityFilter] = useState('all')
+const taskStatusLabels = { pending: 'Pendiente', in_progress: 'En curso', completed: 'Completada', cancelled: 'Cancelada' }
+const taskPriorityLabels = { low: 'Baja', normal: 'Normal', high: 'Alta', urgent: 'Urgente' }
+const taskStatusColors = { pending: { background: '#fef3c7', color: '#92400e' }, in_progress: { background: '#dbeafe', color: '#1e40af' }, completed: { background: '#dcfce7', color: '#166534' }, cancelled: { background: '#f1f5f9', color: '#475569' } }
+const taskPriorityColors = { low: { background: '#f1f5f9', color: '#475569' }, normal: { background: '#dbeafe', color: '#1e40af' }, high: { background: '#ffedd5', color: '#9a3412' }, urgent: { background: '#fee2e2', color: '#991b1b' } }
+const taskSearchWords = normalizeClientSearch(taskSearch).trim().split(/\s+/).filter(Boolean)
+const filteredTasks = tasks.filter(task => {
+  const text = normalizeClientSearch([task.title, task.companies?.name].join(' '))
+  return (taskStatusFilter === 'all' || (task.status || 'pending') === taskStatusFilter) && (taskPriorityFilter === 'all' || (task.priority || 'normal') === taskPriorityFilter) && taskSearchWords.every(word => text.includes(word))
+})
 const [showTaskForm, setShowTaskForm] = useState(false)
 const [taskSaving, setTaskSaving] = useState(false)
 const [editingTaskId, setEditingTaskId] = useState(null)
@@ -3024,6 +3036,12 @@ priority: 'normal',
         + Nueva tarea
       </button>)} 
     </div>
+<div className="client-filter-toolbar">
+  <label className="client-search-field" htmlFor="task-search"><span>Buscar tareas</span><input id="task-search" type="search" placeholder="Título o cliente…" value={taskSearch} onChange={e => setTaskSearch(e.target.value)} /></label>
+  <label htmlFor="task-status-filter"><span>Estado</span><select id="task-status-filter" value={taskStatusFilter} onChange={e => setTaskStatusFilter(e.target.value)}><option value="all">Todos</option>{Object.entries(taskStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+  <label htmlFor="task-priority-filter"><span>Prioridad</span><select id="task-priority-filter" value={taskPriorityFilter} onChange={e => setTaskPriorityFilter(e.target.value)}><option value="all">Todas</option>{Object.entries(taskPriorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+  <span className="client-results-count" role="status">{tasksLoading ? 'Cargando…' : `${filteredTasks.length} de ${tasks.length} tareas`}</span>
+</div>
 {canWrite && showTaskForm && (
   <div className="dashboard-card">
     <div className="card-heading">
@@ -3256,7 +3274,8 @@ priority: 'normal',
           <span>Acciones</span>
         </div>
 
-        {tasks.map((task) => (
+        {filteredTasks.length === 0 && <div className="empty-state" style={{ padding: 24 }}><strong>No hay tareas que coincidan</strong><span>Prueba otra búsqueda o cambia los filtros.</span><button type="button" className="clear-filter-button" onClick={() => { setTaskSearch(''); setTaskStatusFilter('all'); setTaskPriorityFilter('all') }}>Limpiar filtros</button></div>}
+        {filteredTasks.map((task) => (
           <div className="client-row" key={task.id}>
             <div className="client-main">
               <strong>{task.title}</strong>
@@ -3277,20 +3296,10 @@ priority: 'normal',
             </div>
 
             <div>
-              {{
-  pending: 'Pendiente',
-  in_progress: 'En curso',
-  completed: 'Completada',
-  cancelled: 'Cancelada'
-}[task.status] || 'Pendiente'}            </div>
+              <span className="opportunity-stage-badge" style={taskStatusColors[task.status] || taskStatusColors.pending}>{taskStatusLabels[task.status] || task.status || 'Pendiente'}</span>            </div>
 
             <div>
-{{
-  low: 'Baja',
-  normal: 'Normal',
-  high: 'Alta',
-  urgent: 'Urgente'
-}[task.priority] || 'Normal'}
+<span className="opportunity-stage-badge" style={taskPriorityColors[task.priority] || taskPriorityColors.normal}>{taskPriorityLabels[task.priority] || task.priority || 'Normal'}</span>
             </div>
 
 <div className="client-actions">
