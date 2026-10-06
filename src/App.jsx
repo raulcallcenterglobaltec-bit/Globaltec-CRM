@@ -1340,6 +1340,12 @@ const { error } = result
   }} />}
 </div>}
 <style>{`
+  .lead-source-settings .source-button, .lead-source-settings .primary-action { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; box-sizing: border-box; padding: 10px 16px; border: 1px solid #cbd5e1; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 600; line-height: 1.3; cursor: pointer; margin: 0; }
+  .lead-source-settings .source-button { background: #f3f7fa; color: #123047; box-shadow: 0 2px 5px #12304708; }
+  .lead-source-settings .primary-action { border-color: transparent; background: var(--crm-teal, #087f74); color: var(--crm-primary-ink, white); }
+  .lead-source-settings .source-button:hover:not(:disabled) { background: #e6eef4; border-color: #94a3b8; }
+  .lead-source-settings button:focus-visible { outline: 3px solid var(--crm-teal, #087f74); outline-offset: 3px; }
+  .lead-source-settings button:disabled { opacity: .55; cursor: default; }
   .form-field .agenda-datetime-field > span { display: block; margin-bottom: 8px; font-weight: 600; }
   .form-field .agenda-datetime-controls { display: grid; grid-template-columns: minmax(140px, 1fr) 76px 10px 76px; align-items: center; gap: 8px; }
   .form-field .agenda-datetime-controls input, .form-field .agenda-datetime-controls select { width: 100%; min-width: 0; box-sizing: border-box; }
@@ -4107,22 +4113,22 @@ function LeadSourceSettings({ organizationId, onChanged }) {
     if (!missing.length) { setMessage('Los orígenes habituales ya están añadidos.'); return }
     mutate(() => supabase.from('lead_sources').insert(missing.map(name => ({ name, organization_id: organizationId, active: true }))).select('*'), 'Orígenes habituales añadidos.')
   }
-  return <section className="dashboard-card" style={{marginTop:24}}>
+  return <section className="dashboard-card lead-source-settings" style={{marginTop:24}}>
     <div className="card-heading"><div><h2>Orígenes de oportunidades</h2><p>Configura de dónde llegan los contactos de esta empresa.</p></div></div>
     <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:18}}>
       <button type="button" className="primary-action" disabled={loading || working || !!error && !sources.length} onClick={() => { setDraft({name:'',description:''}); setError(''); setMessage('') }}>+ Nuevo origen</button>
-      <button type="button" className="agenda-control" disabled={loading || working || !!error && !sources.length} onClick={addDefaults}>Añadir orígenes habituales</button>
-      <button type="button" className="agenda-control" disabled={loading || working} onClick={() => {setLoading(true);setError('');load()}}>Actualizar listado</button>
+      <button type="button" className="source-button" disabled={loading || working || !!error && !sources.length} onClick={addDefaults}>Añadir orígenes habituales</button>
+      <button type="button" className="source-button" disabled={loading || working} onClick={() => {setLoading(true);setError('');load()}}>Actualizar listado</button>
     </div>
     {draft && <form onSubmit={save} style={{padding:18,background:'#f3f7fa',borderRadius:12,marginBottom:18}}>
       <fieldset disabled={working} style={{border:0,padding:0,margin:0}}>
         <div className="form-grid"><label className="form-field">Nombre<input required maxLength={150} value={draft.name} onChange={e => setDraft({...draft,name:e.target.value})} /></label><label className="form-field">Descripción (opcional)<input maxLength={500} value={draft.description} onChange={e => setDraft({...draft,description:e.target.value})} /></label></div>
-        <div style={{display:'flex',gap:12,marginTop:16}}><button type="submit" className="primary-action">{working ? 'Guardando…' : 'Guardar origen'}</button><button type="button" className="agenda-control" onClick={() => {setDraft(null);setError('')}}>Cancelar</button></div>
+        <div style={{display:'flex',gap:12,marginTop:16}}><button type="submit" className="primary-action">{working ? 'Guardando…' : 'Guardar origen'}</button><button type="button" className="source-button" onClick={() => {setDraft(null);setError('')}}>Cancelar</button></div>
       </fieldset>
     </form>}
     {loading ? <p>Cargando orígenes…</p> : <div style={{display:'grid',gap:10}}>{sources.map(source => <div key={source.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',padding:14,border:'1px solid #dce6ec',borderRadius:10}}>
       <div><strong>{source.name}</strong><small style={{display:'block',marginTop:5}}>{source.active ? 'Activo' : 'Inactivo'}{source.description ? ` · ${source.description}` : ''}</small></div>
-      <div style={{display:'flex',gap:8}}><button type="button" className="agenda-control" disabled={working} onClick={() => {setDraft({...source,description:source.description || ''});setError('');setMessage('')}}>Editar</button><button type="button" className="agenda-control" disabled={working} onClick={() => mutate(() => supabase.from('lead_sources').update({active:!source.active}).eq('organization_id',organizationId).eq('id',source.id).select('*'), source.active ? 'Origen desactivado. Las oportunidades anteriores lo conservan.' : 'Origen reactivado.')}>{source.active ? 'Desactivar' : 'Reactivar'}</button></div>
+      <div style={{display:'flex',gap:8}}><button type="button" className="source-button" disabled={working} onClick={() => {setDraft({...source,description:source.description || ''});setError('');setMessage('')}}>Editar</button><button type="button" className="source-button" disabled={working} onClick={() => mutate(() => supabase.from('lead_sources').update({active:!source.active}).eq('organization_id',organizationId).eq('id',source.id).select('*'), source.active ? 'Origen desactivado. Las oportunidades anteriores lo conservan.' : 'Origen reactivado.')}>{source.active ? 'Desactivar' : 'Reactivar'}</button></div>
     </div>)}{!sources.length && <p>Todavía no hay orígenes. Añade los habituales o crea los tuyos.</p>}</div>}
     {error && <p role="alert" style={{color:'#b42318'}}>{error}</p>}{message && <p role="status">{message}</p>}
     <p style={{color:'#64748b',fontSize:13}}>Los orígenes desactivados se conservan en los registros existentes y dejan de ofrecerse en nuevas oportunidades.</p>
