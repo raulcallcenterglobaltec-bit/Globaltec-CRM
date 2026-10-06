@@ -1335,6 +1335,10 @@ const { error } = result
   }} />}
 </div>}
 <style>{`
+  .form-field .agenda-datetime-field > span { display: block; margin-bottom: 8px; font-weight: 600; }
+  .form-field .agenda-datetime-controls { display: grid; grid-template-columns: minmax(140px, 1fr) 76px 10px 76px; align-items: center; gap: 8px; }
+  .form-field .agenda-datetime-controls input, .form-field .agenda-datetime-controls select { width: 100%; min-width: 0; box-sizing: border-box; }
+  @media (max-width: 480px) { .form-field .agenda-datetime-controls { grid-template-columns: minmax(0, 1fr) 65px 6px 65px; gap: 5px; } }
   .report-export-panel { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; padding: 18px; margin: 18px 0; border: 1px solid #dbe5ef; border-radius: 14px; background: white; }
   .report-export-panel > div { flex: 1; min-width: 200px; }
   .report-export-panel p { margin: 7px 0; font-size: 13px; line-height: 1.6; }
@@ -2770,17 +2774,7 @@ service_ids: [],
         </div>
 
         <div className="form-field">
-          <label>Fecha y hora</label>
-          <input
-            type="datetime-local"
-            value={callForm.started_at}
-            onChange={(e) =>
-              setCallForm({
-                ...callForm,
-                started_at: e.target.value
-              })
-            }
-          />
+          <AgendaDateTime label="Fecha y hora" required={false} value={callForm.started_at} onChange={value => setCallForm(current => ({ ...current, started_at: value }))} />
         </div>
 
         <div className="form-field">
@@ -3038,17 +3032,7 @@ priority: 'normal',
         </div>
 
         <div className="form-field">
-          <label>Fecha límite</label>
-          <input
-            type="datetime-local"
-            value={taskForm.due_date}
-            onChange={(e) =>
-              setTaskForm({
-                ...taskForm,
-                due_date: e.target.value
-              })
-            }
-          />
+          <AgendaDateTime label="Fecha límite" required={false} value={taskForm.due_date} onChange={value => setTaskForm(current => ({ ...current, due_date: value }))} />
         </div>
 
         <div className="form-field">
@@ -3619,14 +3603,14 @@ function ClientAttachments({ company, session, profile, allowEdit }) {
   </section>
 }
 
-function AgendaDateTime({ label, value, onChange }) {
+function AgendaDateTime({ label, value, onChange, required = true }) {
   const [date = '', time = '00:00'] = (value || '').split('T')
   const [hour = '00', minute = '00'] = time.split(':')
   const update = (nextDate, nextHour, nextMinute) => onChange(nextDate ? `${nextDate}T${nextHour}:${nextMinute}` : '')
   return <div className="agenda-datetime-field">
     <span>{label}</span>
     <div className="agenda-datetime-controls">
-      <input aria-label={`${label}: fecha`} type="date" required value={date} onChange={e => update(e.target.value, hour, minute)} />
+      <input aria-label={`${label}: fecha`} type="date" required={required} value={date} onChange={e => update(e.target.value, hour, minute)} />
       <select aria-label={`${label}: hora`} value={hour} onChange={e => update(date, e.target.value, minute)}>
         {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')).map(h => <option key={h} value={h}>{h}</option>)}
       </select>
