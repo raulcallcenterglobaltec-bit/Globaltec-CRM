@@ -222,11 +222,7 @@ useEffect(() => {
 
 const [contactSearch, setContactSearch] = useState('')
 const contactSearchWords = normalizeClientSearch(contactSearch).trim().split(/\s+/).filter(Boolean)
-const filteredContacts = contacts.filter(contact => {
-  const companyName = contact.companies?.name || companies.find(company => company.id === contact.company_id)?.name || ''
-  const text = normalizeClientSearch([contact.first_name, contact.last_name, companyName, contact.phone, contact.mobile, contact.email, contact.job_title, contactRequest(contact).message, contactRequest(contact).need].join(' '))
-  return contactSearchWords.every(word => text.includes(word))
-})
+
 const [showContactForm, setShowContactForm] = useState(false)
 const [contactSaving, setContactSaving] = useState(false)
 const [editingContactId, setEditingContactId] = useState(null)
@@ -271,6 +267,11 @@ const [editingOpportunityId, setEditingOpportunityId] = useState(null)
 const [pipelineStages, setPipelineStages] = useState([])
 const [leadSources, setLeadSources] = useState([])
 const [services, setServices] = useState([])
+const filteredContacts = contacts.filter(contact => {
+  const companyName = contact.companies?.name || companies.find(company => company.id === contact.company_id)?.name || ''
+  const text = normalizeClientSearch([contact.first_name, contact.last_name, companyName, contact.phone, contact.mobile, contact.email, contact.job_title, contactRequest(contact).message, contactRequest(contact).need].join(' '))
+  return contactSearchWords.every(word => text.includes(word))
+})
 const [opportunitySearch, setOpportunitySearch] = useState('')
 const [opportunityStageFilter, setOpportunityStageFilter] = useState('all')
 const opportunityStageOptions = Array.from(new Map([
