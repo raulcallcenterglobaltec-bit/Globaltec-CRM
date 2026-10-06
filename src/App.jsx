@@ -65,6 +65,7 @@ function App() {
     return canViewModule(module) && profile.role !== 'demo' && modulePermissions.some(p => p.organization_id === activeOrg && p.module === module && p.can_edit)
   }
   function clearCRMData() {
+    setClientSearch(''); setClientStatusFilter('all')
     setCompanies([]); setContacts([]); setOpportunities([]); setTasks([]); setCalls([])
     setPipelineStages([]); setLeadSources([]); setServices([])
     setSelectedCompany(null); setShowCompanyForm(false); setShowContactForm(false)
@@ -102,6 +103,15 @@ const [currentPage, setCurrentPage] = useState('dashboard')
   const canWrite = canEditModule(currentPage === 'dashboard' ? 'clients' : currentPage)
 const [companies, setCompanies] = useState([])
 const [companiesLoading, setCompaniesLoading] = useState(false)
+const [clientSearch, setClientSearch] = useState('')
+const [clientStatusFilter, setClientStatusFilter] = useState('all')
+const normalizeClientSearch = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+const clientSearchWords = normalizeClientSearch(clientSearch).trim().split(/\s+/).filter(Boolean)
+const filteredCompanies = companies.filter(company => {
+  const statusMatches = clientStatusFilter === 'all' || (company.status || 'activo').toLowerCase() === clientStatusFilter
+  const text = normalizeClientSearch([company.name, company.legal_name, company.tax_id, company.sector, company.phone, company.email].join(' '))
+  return statusMatches && clientSearchWords.every(word => text.includes(word))
+})
 const [showCompanyForm, setShowCompanyForm] = useState(false)
 const [companySaving, setCompanySaving] = useState(false)
 const [editingCompanyId, setEditingCompanyId] = useState(null)
@@ -1211,6 +1221,12 @@ const { error } = result
   }} />}
 </div>}
 <style>{`
+  .client-filter-toolbar { display: flex; align-items: end; gap: 14px; flex-wrap: wrap; margin: 20px 0; padding: 16px; background: white; border: 1px solid #dbe5ef; border-radius: 14px; }
+  .client-filter-toolbar label { display: flex; flex-direction: column; gap: 7px; font-size: 13px; font-weight: 600; }
+  .client-filter-toolbar .client-search-field { flex: 1; min-width: 180px; }
+  .client-filter-toolbar input, .client-filter-toolbar select { box-sizing: border-box; width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 9px; background: white; color: #123047; font: inherit; }
+  .client-results-count { font-size: 12px; color: #64748b; padding-bottom: 12px; }
+  .clients-list .client-actions { display: flex; gap: 6px; flex-wrap: wrap; }
   .organization-toolbar { padding: 14px 24px; background: #f1f5f9; border-bottom: 1px solid #dbe5ef; }
   .organization-toolbar-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   .organization-selector { display: flex; align-items: center; gap: 12px; font-weight: 600; min-width: 0; }
@@ -1705,6 +1721,11 @@ onClick={() => {
     </form>
   </div>
 )}
+  <div className="client-filter-toolbar">
+    <label className="client-search-field" htmlFor="client-search"><span>Buscar clientes</span><input id="client-search" type="search" placeholder="Nombre, sector, teléfono, email o CIF…" value={clientSearch} onChange={e => setClientSearch(e.target.value)} /></label>
+    <label htmlFor="client-status-filter"><span>Estado</span><select id="client-status-filter" value={clientStatusFilter} onChange={e => setClientStatusFilter(e.target.value)}><option value="all">Todos</option><option value="activo">Activos</option><option value="inactivo">Inactivos</option></select></label>
+    <span className="client-results-count" role="status">{companiesLoading ? 'Cargando…' : `${filteredCompanies.length} de ${companies.length} clientes`}</span>
+  </div>
   {companiesLoading ? (
       <div className="dashboard-card">
         Cargando clientes...
@@ -1726,7 +1747,8 @@ onClick={() => {
     <span>Acciones</span>
   </div>
 
-  {companies.map((company) => (
+  {filteredCompanies.length === 0 && <div className="empty-state" style={{ padding: 24 }}><strong>No hay clientes que coincidan</strong><span>Prueba otra búsqueda o cambia el filtro de estado.</span><button type="button" onClick={() => { setClientSearch(''); setClientStatusFilter('all') }}>Limpiar filtros</button></div>}
+  {filteredCompanies.map((company) => (
     <div className="client-row" key={company.id}>
 <div
   className="client-main client-main-clickable"
@@ -1753,6 +1775,7 @@ onClick={() => {
 
       <div className="client-actions">
 
+<button type="button" aria-label={`Ver ficha de ${company.name}`} onClick={() => setSelectedCompany(company)}>Ver ficha</button>
 {canWrite && (<button
   type="button"
   onClick={() => editCompany(company)}
@@ -3745,7 +3768,12 @@ function Agenda({ brandName, session, profile, tasks, companies, contacts, onEdi
       <label>Título<input required value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} /></label>
       <label>Cliente<select value={form.company_id} onChange={e => setForm({ ...form, company_id: e.target.value, contact_id: '' })}><option value="">Sin cliente</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
       <label>Contacto<select value={form.contact_id} onChange={e => setForm({ ...form, contact_id: e.target.value })}><option value="">Sin contacto</option>{contacts.filter(c => !form.company_id || c.company_id === form.company_id).map(c => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}</select></label>
-      <AgendaDateTime label="Inicio" value={form.activity_date} onChange={value => setForm(current => ({ ...current, activity_date: value, end_date: value }))} />
+      <AgendaDateTime label="Inicio" value={form.activity_date} onChange={value => setForm(current => {
+        if (!current) return current
+        const start = new Date(value)
+        const end = value && Number.isFinite(start.getTime()) ? localInput(new Date(start.getTime() + 3600000)) : ''
+        return { ...current, activity_date: value, end_date: current.id ? current.end_date : end }
+      })} />
       <AgendaDateTime label="Finalización" value={form.end_date} onChange={value => setForm({ ...form, end_date: value })} />
       <label>Notas<textarea rows="3" value={form.description || ''} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
     </div></fieldset><div className="agenda-form-actions"><button type="button" disabled={saving} className="agenda-control" onClick={() => setForm(null)}>Cancelar</button>{!readOnly && <button disabled={saving} className="primary-btn" type="submit">{saving ? 'Guardando…' : 'Guardar cita'}</button>}</div></form>}
