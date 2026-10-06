@@ -1295,7 +1295,7 @@ const { error } = result
     return (
       <div className="login-page">
         <div className="login-card">
-          <h2>Cargando Globaltec CRM...</h2>
+          <h2>Cargando Globaltec Marketing CRM...</h2>
         </div>
       </div>
     )
@@ -1307,7 +1307,7 @@ const { error } = result
         <div className="login-card">
 
           <div className="login-brand">
-            <strong>GLOBALTEC</strong>
+            <strong>Globaltec Marketing</strong>
             <span> CRM</span>
           </div>
 
@@ -1352,7 +1352,7 @@ const { error } = result
           </form>
 
           <div className="login-footer">
-            Globaltec CRM · Recuperación de acceso
+            Globaltec Marketing CRM · Recuperación de acceso
           </div>
 
         </div>
@@ -1366,7 +1366,7 @@ const { error } = result
         <div className="login-card">
 
           <div className="login-brand">
-            <strong>GLOBALTEC</strong>
+            <strong>Globaltec Marketing</strong>
             <span> CRM</span>
           </div>
 
@@ -1418,7 +1418,7 @@ const { error } = result
           </form>
 
           <div className="login-footer">
-            Globaltec CRM · Acceso privado
+            Globaltec Marketing CRM · Acceso privado
           </div>
 
         </div>
@@ -1432,7 +1432,7 @@ const { error } = result
       <header className="header">
 
         <div>
-          <BrandLogo key={`${activeOrg}:${organization?.logo_url || ''}`} url={organization?.logo_url} name={organization?.name || 'Empresa'} /><span className="brand">{organization?.name || 'GLOBALTEC'}</span>
+          <BrandLogo key={`${activeOrg}:${organization?.logo_url || ''}`} url={organization?.logo_url} name={organization?.name || 'Empresa'} /><span className="brand">{organization?.name || 'Globaltec Marketing'}</span>
           <span className="brand-subtitle"> CRM</span>
         </div>
 
@@ -1672,7 +1672,7 @@ onClick={() => {
   <div className="clients-page">
     <div className="dashboard-heading">
       <div>
-        <p className="dashboard-kicker">{organization?.name || 'GLOBALTEC'} CRM</p>
+        <p className="dashboard-kicker">{organization?.name || 'Globaltec Marketing'} CRM</p>
         <h1>Clientes</h1>
         <p>Gestión de empresas y clientes.</p>
       </div>
@@ -2100,7 +2100,7 @@ onClick={() => {
   <>
     <div className="dashboard-heading">
       <div>
-        <p className="dashboard-kicker">{organization?.name || 'GLOBALTEC'} CRM</p>
+        <p className="dashboard-kicker">{organization?.name || 'Globaltec Marketing'} CRM</p>
         <h1>Contactos</h1>
         <p>Gestión de personas de contacto de tus clientes.</p>
       </div>
@@ -2359,7 +2359,7 @@ onClick={() => {
   <>
     <div className="dashboard-heading">
       <div>
-        <p className="dashboard-kicker">{organization?.name || 'GLOBALTEC'} CRM</p>
+        <p className="dashboard-kicker">{organization?.name || 'Globaltec Marketing'} CRM</p>
         <h1>Oportunidades</h1>
         <p>Gestión y seguimiento de oportunidades comerciales.</p>
       </div>
@@ -2709,7 +2709,7 @@ service_ids: [],
   <>
     <div className="dashboard-heading">
       <div>
-        <p className="dashboard-kicker">{organization?.name || 'GLOBALTEC'} CRM</p>
+        <p className="dashboard-kicker">{organization?.name || 'Globaltec Marketing'} CRM</p>
         <h1>Informes</h1>
         <p>Resumen y análisis de la actividad comercial.</p>
       </div>
@@ -2791,7 +2791,7 @@ service_ids: [],
   <>
     <div className="dashboard-heading">
       <div>
-        <p className="dashboard-kicker">{organization?.name || 'GLOBALTEC'} CRM</p>
+        <p className="dashboard-kicker">{organization?.name || 'Globaltec Marketing'} CRM</p>
         <h1>Llamadas</h1>
         <p>Registro y seguimiento de llamadas.</p>
       </div>
@@ -3086,7 +3086,7 @@ service_ids: [],
   <>
     <div className="dashboard-heading">
       <div>
-        <p className="dashboard-kicker">{organization?.name || 'GLOBALTEC'} CRM</p>
+        <p className="dashboard-kicker">{organization?.name || 'Globaltec Marketing'} CRM</p>
         <h1>Tareas</h1>
         <p>Gestión y seguimiento de tareas pendientes.</p>
       </div>
@@ -3386,7 +3386,7 @@ priority: 'normal',
 <>
   <div className="dashboard-heading">
       <div>
-        <p className="dashboard-kicker">{organization?.name || 'GLOBALTEC'} CRM</p>
+        <p className="dashboard-kicker">{organization?.name || 'Globaltec Marketing'} CRM</p>
         <h1>Tu negocio, de un vistazo.</h1>
         <p>Resumen de la actividad comercial.</p>
       </div>
@@ -3905,7 +3905,7 @@ function Agenda({ brandName, session, profile, tasks, companies, contacts, onEdi
       .agenda-form{padding:24px;background:white;border:1px solid #dce6ec;border-radius:16px;margin-bottom:20px}.agenda-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.agenda-fields label,.agenda-datetime-field{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:600}.agenda-fields input,.agenda-fields select,.agenda-fields textarea{width:100%;box-sizing:border-box;padding:11px;border:1px solid #cbd5e1;border-radius:9px;font:inherit}.agenda-form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}@media(max-width:600px){.agenda-fields{grid-template-columns:1fr}}
       .agenda-datetime-controls{display:grid;grid-template-columns:minmax(0,1fr) 66px 8px 66px;gap:6px;align-items:center}.agenda-datetime-controls input{min-width:0}.agenda-datetime-controls select{padding:11px 6px}.agenda-fields{align-items:start}
     `}</style>
-    <div className="agenda-hero"><div><small>{brandName || 'GLOBALTEC'} CRM · ORGANIZA TU DÍA</small><h1>Agenda</h1><p>Tus citas y tareas, en un solo calendario.</p></div>{!readOnly && <button className="primary-btn" onClick={() => newMeeting()}>+ Nueva cita</button>}</div>
+    <div className="agenda-hero"><div><small>{brandName || 'Globaltec Marketing'} CRM · ORGANIZA TU DÍA</small><h1>Agenda</h1><p>Tus citas y tareas, en un solo calendario.</p></div>{!readOnly && <button className="primary-btn" onClick={() => newMeeting()}>+ Nueva cita</button>}</div>
     {message && <p role="alert" style={{ color: '#b91c1c' }}>{message}</p>}
     {form && <form className="agenda-form" onSubmit={saveMeeting}><h2>{form.id ? 'Editar cita' : 'Nueva cita'}</h2><fieldset disabled={saving || readOnly} style={{ border: 0, padding: 0, margin: 0 }}><div className="agenda-fields">
       <label>Título<input required value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} /></label>
@@ -4099,7 +4099,7 @@ function ModulePermissions({ actorId, brandName, organizationId, onSaved }) {
     finally { pending.current = false; if (alive.current) setSaving(false) }
   }
   return <div>
-    <div className="dashboard-heading"><div><p className="dashboard-kicker">{brandName || 'GLOBALTEC'} CRM</p><h1>Permisos de usuarios</h1><p>Elige qué puede consultar y editar cada usuario en esta empresa.</p></div></div>
+    <div className="dashboard-heading"><div><p className="dashboard-kicker">{brandName || 'Globaltec Marketing'} CRM</p><h1>Permisos de usuarios</h1><p>Elige qué puede consultar y editar cada usuario en esta empresa.</p></div></div>
     {!creating && <button className="primary-action" type="button" disabled={busy || working} onClick={() => { setCreating(true); setMessage('') }} style={{marginBottom:20}}>+ Nuevo usuario</button>}
     {creating && <NewCRMUser key={organizationId} organizationId={organizationId} brandName={brandName} onCancel={() => setCreating(false)} onCreated={(created, rows) => {
       setUsers(current => [...current.filter(u => u.id !== created.id), { ...created, profileActive: created.active, profileRole: created.role }])
@@ -4200,7 +4200,7 @@ function saveReportPDF({ title, company, period, headers, rows }) {
   // IDs: catálogo 2, árbol de páginas 3, fuente 4.
   objects[2] = '<< /Type /Catalog /Pages 3 0 R >>'
   objects[3] = `<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${pages.length} >>`
-  objects[1] = '<< /Producer (Globaltec CRM) >>'
+  objects[1] = '<< /Producer (Globaltec Marketing CRM) >>'
   let pdf = '%PDF-1.4\n', offsets = [0]
   for (let i = 1; i < objects.length; i++) { offsets.push(pdf.length); pdf += `${i} 0 obj\n${objects[i]}\nendobj\n` }
   const xref = pdf.length
