@@ -1470,6 +1470,11 @@ const { error } = result
   .organization-toolbar { padding: 14px 24px; background: #f1f5f9; border-bottom: 1px solid #dbe5ef; }
   .organization-toolbar-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   .organization-selector { display: flex; align-items: center; gap: 12px; font-weight: 600; min-width: 0; }
+  .permission-select-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; max-width: 100%; font-size: 13px; font-weight: 600; color: #123047; }
+  .permission-user-field { margin-bottom: 20px; width: 420px; }
+  .permission-select-field select { width: 100%; min-width: 0; min-height: 42px; box-sizing: border-box; padding: 10px 36px 10px 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: white; color: #123047; font: inherit; font-weight: 400; cursor: pointer; }
+  .permission-select-field select:focus-visible { outline: 3px solid var(--crm-teal, #087f74); outline-offset: 2px; }
+  .permission-select-field select:disabled { opacity: .6; cursor: default; }
   .organization-selector select { box-sizing: border-box; min-height: 42px; max-width: 100%; width: 260px; padding: 10px 36px 10px 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: white; color: #102b46; font: inherit; }
   button.stat-card.dashboard-shortcut { display: block; width: 100%; text-align: left; font-family: inherit; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease; }
   button.stat-card.dashboard-shortcut:not(:disabled):hover { transform: translateY(-3px); box-shadow: 0 8px 22px #082b7d18; }
@@ -4040,13 +4045,13 @@ function ModulePermissions({ actorId, brandName, organizationId, onSaved }) {
     <p style={{color:'#526578'}}>Los permisos de edición siguen sujetos al rol del usuario. Las cuentas demo siempre son de lectura. Para elegir clientes o contactos en otras secciones, habilita también su consulta.</p>
     {busy ? <p>Cargando usuarios…</p> : <form onSubmit={save} style={{background:'white',padding:24,borderRadius:16,border:'1px solid #dce6ec'}}>
       <fieldset disabled={working || creating} style={{border:0,padding:0,margin:0}}>
-        <label style={{display:'block',marginBottom:20}}>Usuario <select value={selectedUser} onChange={e => { setSelectedUser(e.target.value); setMessage('') }} style={{padding:10,marginLeft:12,maxWidth:'100%'}}>{users.map(u => <option key={u.id} value={u.id}>{u.full_name || u.id} · {u.role}{!u.active ? ' · Inactivo' : ''}</option>)}</select></label>
+        <label className="permission-select-field permission-user-field">Usuario <select value={selectedUser} onChange={e => { setSelectedUser(e.target.value); setMessage('') }} >{users.map(u => <option key={u.id} value={u.id}>{u.full_name || u.id} · {u.role}{!u.active ? ' · Inactivo' : ''}</option>)}</select></label>
         {user && <section style={{padding:20,marginBottom:24,borderRadius:12,background:'#f3f7fa',border:'1px solid #dce6ec'}}>
           <h2 style={{marginTop:0}}>Acceso del usuario</h2>
           <p>Estado en esta empresa: <strong>{user.active ? 'Activo' : 'Inactivo'}</strong></p>
           {!user.profileActive && <p>Su perfil está desactivado globalmente.</p>}
           <div style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'end'}}>
-            <label>Rol<select aria-label="Rol del usuario seleccionado" value={draftRole} disabled={protectedUser} onChange={e => setDraftRole(e.target.value)}><option value="agent">Agente</option><option value="admin">Administrador</option><option value="demo">Demo · solo consulta</option></select></label>
+            <label className="permission-select-field">Rol<select aria-label="Rol del usuario seleccionado" value={draftRole} disabled={protectedUser} onChange={e => setDraftRole(e.target.value)}><option value="agent">Agente</option><option value="admin">Administrador</option><option value="demo">Demo · solo consulta</option></select></label>
             <button type="button" className="primary-action" disabled={protectedUser || !user.profileActive || draftRole === user.role} onClick={() => manageUser(draftRole, user.active)}>{managing ? 'Actualizando…' : 'Guardar rol'}</button>
             <button type="button" disabled={protectedUser || !user.profileActive} onClick={() => manageUser(user.role, !user.active)} style={{padding:'12px 18px',borderRadius:10,border:'1px solid #dce6ec',background:user.active ? '#fff1f0' : '#e5f7ee',color:user.active ? '#a92323' : '#176b43',cursor:'pointer'}}>{user.active ? 'Desactivar usuario' : 'Reactivar usuario'}</button>
           </div>
