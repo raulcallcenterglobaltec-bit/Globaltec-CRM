@@ -1188,10 +1188,19 @@ const { error } = result
         </div>
 
       </header>
-{organizations.length > 1 && <div style={{padding:'12px 24px',background:'#f1f5f9'}}><label>Empresa: <select value={activeOrg} onChange={e => { accessRef.current = { ...accessRef.current, org: e.target.value }; clearCRMData(); setActiveOrg(e.target.value) }}>{organizations.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label></div>}
-{canCreateOrganization && <div style={{ padding: '12px 24px', background: '#f1f5f9' }}>
-  <button type="button" className="primary-action" onClick={() => setShowNewOrganization(value => !value)}>{showNewOrganization ? 'Cerrar alta de empresa' : '+ Nueva empresa'}</button>
-  {showNewOrganization && <NewOrganization key={session.user.id} onCreated={async id => {
+{(organizations.length > 1 || canCreateOrganization) && <div className="organization-toolbar">
+  <div className="organization-toolbar-row">
+    <label className="organization-selector" htmlFor="active-organization">
+      <span>Empresa</span>
+      <select id="active-organization" value={activeOrg} onChange={e => {
+        accessRef.current = { ...accessRef.current, org: e.target.value }
+        clearCRMData()
+        setActiveOrg(e.target.value)
+      }}>{organizations.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select>
+    </label>
+    {canCreateOrganization && <button type="button" className="primary-action" aria-expanded={showNewOrganization} onClick={() => setShowNewOrganization(value => !value)}>{showNewOrganization ? 'Cerrar alta de empresa' : '+ Nueva empresa'}</button>}
+  </div>
+  {canCreateOrganization && showNewOrganization && <NewOrganization key={session.user.id} onCreated={async id => {
     const userId = session.user.id
     await refreshPermissions(userId)
     if (accessRef.current.user !== userId) return
@@ -1201,6 +1210,22 @@ const { error } = result
     setCurrentPage('dashboard')
   }} />}
 </div>}
+<style>{`
+  .organization-toolbar { padding: 14px 24px; background: #f1f5f9; border-bottom: 1px solid #dbe5ef; }
+  .organization-toolbar-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .organization-selector { display: flex; align-items: center; gap: 12px; font-weight: 600; min-width: 0; }
+  .organization-selector select { box-sizing: border-box; min-height: 42px; max-width: 100%; width: 260px; padding: 10px 36px 10px 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: white; color: #102b46; font: inherit; }
+  button.stat-card.dashboard-shortcut { display: block; width: 100%; text-align: left; font-family: inherit; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease; }
+  button.stat-card.dashboard-shortcut:not(:disabled):hover { transform: translateY(-3px); box-shadow: 0 8px 22px #082b7d18; }
+  button.stat-card.dashboard-shortcut:focus-visible, .organization-selector select:focus-visible { outline: 3px solid #168bba; outline-offset: 3px; }
+  button.stat-card.dashboard-shortcut:disabled { cursor: default; }
+  @media (max-width: 540px) {
+    .organization-toolbar { padding: 12px 16px; }
+    .organization-selector { width: 100%; }
+    .organization-selector select { flex: 1; width: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { button.stat-card.dashboard-shortcut { transition: none; } }
+`}</style>
 <main className="crm-main">
   <aside className="sidebar">
     <p className="sidebar-label">ESPACIO DE TRABAJO</p>
@@ -3218,21 +3243,33 @@ priority: 'normal',
     </div>
 
     <div className="stats-grid">
-      <div className="stat-card stat-clients">
+      <button type="button" className="stat-card stat-clients dashboard-shortcut" aria-label="Ir a Clientes" disabled={!canViewModule('clients')} onClick={() => {
+          if (!canViewModule('clients')) return
+          setCurrentPage('clients')
+          loadCompanies(); loadContacts()
+        }}>
         <CRMIcon name="clients" className="stat-icon" />
         <span>Clientes</span>
 <strong>{companies.length}</strong>
         <small>Total registrados</small>
-      </div>
+      </button>
 
-      <div className="stat-card stat-opportunities">
+      <button type="button" className="stat-card stat-opportunities dashboard-shortcut" aria-label="Ir a Oportunidades" disabled={!canViewModule('opportunities')} onClick={() => {
+          if (!canViewModule('opportunities')) return
+          setCurrentPage('opportunities')
+          loadCompanies(); loadContacts(); loadOpportunities(); loadOpportunityOptions()
+        }}>
         <CRMIcon name="opportunities" className="stat-icon" />
         <span>Oportunidades</span>
 <strong>{opportunities.length}</strong>
         <small>En seguimiento</small>
-      </div>
+      </button>
 
-      <div className="stat-card stat-tasks">
+      <button type="button" className="stat-card stat-tasks dashboard-shortcut" aria-label="Ir a Tareas" disabled={!canViewModule('tasks')} onClick={() => {
+          if (!canViewModule('tasks')) return
+          setCurrentPage('tasks')
+          loadTasks(); loadCompanies(); loadContacts(); loadOpportunities()
+        }}>
         <CRMIcon name="tasks" className="stat-icon" />
         <span>Tareas pendientes</span>
         <strong><strong>
@@ -3243,14 +3280,18 @@ priority: 'normal',
   ).length}
 </strong></strong>
         <small>Por completar</small>
-      </div>
+      </button>
 
-      <div className="stat-card stat-calls">
+      <button type="button" className="stat-card stat-calls dashboard-shortcut" aria-label="Ir a Llamadas" disabled={!canViewModule('calls')} onClick={() => {
+          if (!canViewModule('calls')) return
+          setCurrentPage('calls')
+          loadCalls(); loadCompanies(); loadContacts(); loadOpportunities()
+        }}>
         <CRMIcon name="calls" className="stat-icon" />
         <span>Llamadas</span>
        <strong>{calls.length}</strong>
         <small>Registradas</small>
-      </div>
+      </button>
     </div>
 
     <div className="dashboard-grid">
