@@ -65,7 +65,7 @@ function App() {
     return canViewModule(module) && profile.role !== 'demo' && modulePermissions.some(p => p.organization_id === activeOrg && p.module === module && p.can_edit)
   }
   function clearCRMData() {
-    setClientSearch(''); setClientStatusFilter('all'); setContactSearch('')
+    setClientSearch(''); setClientStatusFilter('all'); setContactSearch(''); setOpportunitySearch(''); setOpportunityStageFilter('all')
     setCompanies([]); setContacts([]); setOpportunities([]); setTasks([]); setCalls([])
     setPipelineStages([]); setLeadSources([]); setServices([])
     setSelectedCompany(null); setShowCompanyForm(false); setShowContactForm(false)
@@ -149,6 +149,29 @@ const [editingOpportunityId, setEditingOpportunityId] = useState(null)
 const [pipelineStages, setPipelineStages] = useState([])
 const [leadSources, setLeadSources] = useState([])
 const [services, setServices] = useState([])
+const [opportunitySearch, setOpportunitySearch] = useState('')
+const [opportunityStageFilter, setOpportunityStageFilter] = useState('all')
+const opportunityStageOptions = Array.from(new Map([
+  ...pipelineStages.map(stage => [stage.id, stage.name]),
+  ...opportunities.filter(opportunity => opportunity.stage_id).map(opportunity => [opportunity.stage_id, opportunity.pipeline_stages?.name || pipelineStages.find(stage => stage.id === opportunity.stage_id)?.name || 'Etapa sin nombre'])
+]).entries()).map(([id, name]) => ({ id, name }))
+const opportunitySearchWords = normalizeClientSearch(opportunitySearch).trim().split(/\s+/).filter(Boolean)
+const filteredOpportunities = opportunities.filter(opportunity => {
+  const stageMatches = opportunityStageFilter === 'all' || (opportunityStageFilter === 'none' ? !opportunity.stage_id : opportunity.stage_id === opportunityStageFilter)
+  const text = normalizeClientSearch([opportunity.title, opportunity.companies?.name, opportunity.contacts?.first_name, opportunity.contacts?.last_name].join(' '))
+  return stageMatches && opportunitySearchWords.every(word => text.includes(word))
+})
+function opportunityStageColors(name) {
+  const text = normalizeClientSearch(name)
+  if (/ganad|cerrad.*gan|won/.test(text)) return { background: '#dcfce7', color: '#166534' }
+  if (/perdid|lost/.test(text)) return { background: '#fee2e2', color: '#991b1b' }
+  if (/seguimiento|negoci/.test(text)) return { background: '#fef3c7', color: '#92400e' }
+  if (/nuevo|new/.test(text)) return { background: '#dbeafe', color: '#1e40af' }
+  if (!name) return { background: '#f1f5f9', color: '#475569' }
+  const palette = [{ background: '#ede9fe', color: '#5b21b6' }, { background: '#cffafe', color: '#155e75' }, { background: '#fce7f3', color: '#9d174d' }]
+  const hash = Array.from(text).reduce((value, char) => (value * 31 + char.charCodeAt(0)) >>> 0, 0)
+  return palette[hash % palette.length]
+}
 
 const [opportunityForm, setOpportunityForm] = useState({
   title: '',
@@ -1228,6 +1251,7 @@ const { error } = result
   }} />}
 </div>}
 <style>{`
+  .opportunity-stage-badge { display: inline-block; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
   .client-filter-toolbar { display: flex; align-items: end; gap: 14px; flex-wrap: wrap; margin: 20px 0; padding: 16px; background: white; border: 1px solid #dbe5ef; border-radius: 14px; }
   .client-filter-toolbar label { display: flex; flex-direction: column; gap: 7px; font-size: 13px; font-weight: 600; }
   .client-filter-toolbar .client-search-field { flex: 1; min-width: 180px; }
@@ -2088,6 +2112,11 @@ service_ids: [],
   + Nueva oportunidad
 </button>)} 
     </div>
+<div className="client-filter-toolbar">
+  <label className="client-search-field" htmlFor="opportunity-search"><span>Buscar oportunidades</span><input id="opportunity-search" type="search" placeholder="Oportunidad, cliente o contacto…" value={opportunitySearch} onChange={e => setOpportunitySearch(e.target.value)} /></label>
+  <label htmlFor="opportunity-stage-filter"><span>Etapa</span><select id="opportunity-stage-filter" value={opportunityStageFilter} onChange={e => setOpportunityStageFilter(e.target.value)}><option value="all">Todas</option>{opportunityStageOptions.map(stage => <option key={stage.id} value={stage.id}>{stage.name}</option>)}<option value="none">Sin etapa</option></select></label>
+  <span className="client-results-count" role="status">{opportunitiesLoading ? 'Cargando…' : `${filteredOpportunities.length} de ${opportunities.length} oportunidades`}</span>
+</div>
 {canWrite && showOpportunityForm && (
   <div className="dashboard-card">
     <div className="card-heading">
@@ -2361,7 +2390,8 @@ service_ids: [],
       <span>Acciones</span>
     </div>
 
-    {opportunities.map((opportunity) => (
+    {filteredOpportunities.length === 0 && <div className="empty-state" style={{ padding: 24 }}><strong>No hay oportunidades que coincidan</strong><span>Prueba otra búsqueda o cambia la etapa.</span><button type="button" onClick={() => { setOpportunitySearch(''); setOpportunityStageFilter('all') }}>Limpiar filtros</button></div>}
+    {filteredOpportunities.map((opportunity) => (
       <div className="client-row" key={opportunity.id}>
         <div className="client-main">
           <strong>{opportunity.title}</strong>
@@ -2377,7 +2407,7 @@ service_ids: [],
         </div>
 
         <div>
-          {opportunity.pipeline_stages?.name || 'Sin etapa'}
+          <span className="opportunity-stage-badge" style={opportunityStageColors(opportunity.pipeline_stages?.name)}>{opportunity.pipeline_stages?.name || 'Sin etapa'}</span>
         </div>
 
         <div>
