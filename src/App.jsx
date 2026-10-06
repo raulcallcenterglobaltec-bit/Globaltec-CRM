@@ -83,6 +83,7 @@ function App() {
         setContacts(items => items.filter(item => item.id !== row.id))
         setContactAlerts(previous => previous.org === org ? { ...previous, rows: previous.rows.filter(item => item.id !== row.id) } : previous)
         if (editingContactId === row.id) { setShowContactForm(false); setEditingContactId(null) }
+        if (selectedContactId === row.id) { setSelectedContactId(null); setOpenedAlertContact(null) }
       } else if (module === 'opportunities') {
         setOpportunities(items => items.filter(item => item.id !== row.id))
         if (editingOpportunityId === row.id) { setShowOpportunityForm(false); setEditingOpportunityId(null) }
@@ -124,7 +125,7 @@ function App() {
     setClientSearch(''); setClientStatusFilter('all'); setContactSearch(''); setOpportunitySearch(''); setOpportunityStageFilter('all'); setCallSearch(''); setCallTypeFilter('all'); setCallStatusFilter('all'); setTaskSearch(''); setTaskStatusFilter('all'); setTaskPriorityFilter('all')
     setCompanies([]); setContacts([]); setOpportunities([]); setTasks([]); setCalls([])
     setPipelineStages([]); setLeadSources([]); setServices([])
-    setSelectedCompany(null); setShowCompanyForm(false); setShowContactForm(false)
+    setSelectedCompany(null); setSelectedContactId(null); setOpenedAlertContact(null); setShowCompanyForm(false); setShowContactForm(false)
     setShowOpportunityForm(false); setShowTaskForm(false); setShowCallForm(false)
     setEditingCompanyId(null); setEditingContactId(null); setEditingOpportunityId(null)
     setEditingTaskId(null); setEditingCallId(null)
@@ -194,7 +195,7 @@ useEffect(() => {
         if (data?.[0]) seen.add(data[0].id)
         return
       }
-      const { data, error } = await supabase.from('contacts').select('id,first_name,last_name,created_at').eq('organization_id', activeOrg).gte('created_at', cursor).order('created_at', { ascending: true }).order('id', { ascending: true }).limit(200)
+      const { data, error } = await supabase.from('contacts').select('*,companies(name)').eq('organization_id', activeOrg).gte('created_at', cursor).order('created_at', { ascending: true }).order('id', { ascending: true }).limit(200)
       if (cancelled || error) return
       const fresh = (data || []).filter(row => !seen.has(row.id))
       for (const row of data || []) seen.add(row.id)
@@ -223,12 +224,32 @@ const [contactSearch, setContactSearch] = useState('')
 const contactSearchWords = normalizeClientSearch(contactSearch).trim().split(/\s+/).filter(Boolean)
 const filteredContacts = contacts.filter(contact => {
   const companyName = contact.companies?.name || companies.find(company => company.id === contact.company_id)?.name || ''
-  const text = normalizeClientSearch([contact.first_name, contact.last_name, companyName, contact.phone, contact.mobile, contact.email, contact.job_title].join(' '))
+  const text = normalizeClientSearch([contact.first_name, contact.last_name, companyName, contact.phone, contact.mobile, contact.email, contact.job_title, contactRequest(contact).message, contactRequest(contact).need].join(' '))
   return contactSearchWords.every(word => text.includes(word))
 })
 const [showContactForm, setShowContactForm] = useState(false)
 const [contactSaving, setContactSaving] = useState(false)
 const [editingContactId, setEditingContactId] = useState(null)
+const [selectedContactId, setSelectedContactId] = useState(null)
+const [openedAlertContact, setOpenedAlertContact] = useState(null)
+const selectedContact = contacts.find(contact => contact.id === selectedContactId) || (openedAlertContact?.id === selectedContactId ? openedAlertContact : null)
+function contactRequest(contact) {
+  const linked = canViewModule('opportunities') ? opportunities.filter(item => item.contact_id === contact.id) : []
+  const messages = [...new Set([contact.notes, ...linked.map(item => item.description)].filter(value => typeof value === 'string' && value.trim()).map(value => value.trim()))]
+  const message = messages.join('\n\n')
+  // Las landings pueden guardar los campos como un mensaje con etiquetas.
+  const labelledNeed = message.match(/(?:^|\n)\s*(?:qué necesit(?:a|as|áis) cubrir|que necesit(?:a|as|ais) cubrir|necesita cubrir|cobertura(?: solicitada)?|servicio solicitado|servicio)\s*:\s*([^\n]+)/i)?.[1]
+  const need = contact.coverage || contact.needs || labelledNeed || ''
+  return { company: contact.companies?.name || companies.find(item => item.id === contact.company_id)?.name || 'Sin empresa', message, need, linked }
+}
+function openContactRequest(contact) {
+  if (!canViewModule('contacts') || contact.organization_id !== activeOrg) return
+  setShowContactForm(false); setEditingContactId(null)
+  setOpenedAlertContact(contact); setSelectedContactId(contact.id)
+  setContactSearch(''); setCurrentPage('contacts')
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
 
 const [contactForm, setContactForm] = useState({
   company_id: '',
@@ -378,6 +399,7 @@ const [companyForm, setCompanyForm] = useState({
 // Al salir de un módulo, descartar su formulario sin guardar registros.
 useEffect(() => {
   if (currentPage !== 'clients') {
+    setSelectedCompany(null)
     setShowCompanyForm(false)
     setEditingCompanyId(null)
     setCompanyForm({
@@ -398,6 +420,7 @@ useEffect(() => {
 })
   }
   if (currentPage !== 'contacts') {
+    setSelectedContactId(null); setOpenedAlertContact(null)
     setShowContactForm(false)
     setEditingContactId(null)
     setContactForm({
@@ -832,6 +855,7 @@ async function loadOpportunityOptions() {
 }
 function editContact(contact) {
   if (!canEditModule('contacts')) return
+  setSelectedContactId(null); setOpenedAlertContact(null)
   setEditingContactId(contact.id)
 
   setContactForm({
@@ -1701,8 +1725,8 @@ onClick={() => {
   {deleteNotice?.org === activeOrg && deleteNotice.module === currentPage && <div role={deleteNotice.error ? 'alert' : 'status'} style={{ padding: '12px 16px', marginBottom: 16, borderRadius: 10, background: deleteNotice.error ? '#fff0ed' : '#e9faf4', color: deleteNotice.error ? '#b42318' : '#12483d' }}>{deleteNotice.text}</div>}
   {watchContacts && contactAlerts.org === activeOrg && contactAlerts.rows.length > 0 && (
     <div role="status" aria-live="polite" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '16px 20px', marginBottom: 20, border: '2px solid #087f74', borderRadius: 14, background: '#e9faf4', color: '#12483d' }}>
-      <div style={{ flex: '1 1 240px' }}><strong style={{ fontSize: 18 }}>● {contactAlerts.rows.length === 1 ? 'Ha entrado un contacto nuevo' : `${contactAlerts.rows.length} contactos nuevos`}</strong><div style={{ marginTop: 4 }}>{[contactAlerts.rows[0].first_name, contactAlerts.rows[0].last_name].filter(Boolean).join(' ') || 'Nuevo contacto'}</div></div>
-      <button type="button" className="primary-action" onClick={() => { setContactSearch(''); setCurrentPage('contacts'); loadContacts(); setContactAlerts({ org: activeOrg, rows: [] }) }}>Ver contactos</button>
+      <div style={{ flex: '1 1 240px' }}><strong style={{ fontSize: 18 }}>● {contactAlerts.rows.length === 1 ? 'Ha entrado un contacto nuevo' : `${contactAlerts.rows.length} contactos nuevos`}</strong><div style={{ marginTop: 8 }}><strong>{[contactAlerts.rows[0].first_name, contactAlerts.rows[0].last_name].filter(Boolean).join(' ') || 'Nuevo contacto'}</strong><div>{contactRequest(contacts.find(item => item.id === contactAlerts.rows[0].id) || contactAlerts.rows[0]).company} · {contactAlerts.rows[0].phone || contactAlerts.rows[0].mobile || 'Sin teléfono'}</div><div style={{marginTop:6,whiteSpace:'pre-wrap'}}>Qué necesita cubrir: {contactRequest(contacts.find(item => item.id === contactAlerts.rows[0].id) || contactAlerts.rows[0]).need || contactRequest(contacts.find(item => item.id === contactAlerts.rows[0].id) || contactAlerts.rows[0]).message || 'Sin información'}</div></div></div>
+      <button type="button" className="primary-action" onClick={() => { openContactRequest(contacts.find(item => item.id === contactAlerts.rows[0].id) || contactAlerts.rows[0]); loadContacts(); loadOpportunities(); setContactAlerts(previous => ({...previous, rows:previous.rows.slice(1)})) }}>Ver solicitud</button>
       <button type="button" className="secondary-action" onClick={() => setContactAlerts({ org: activeOrg, rows: [] })}>Cerrar aviso</button>
     </div>
   )}
@@ -2167,6 +2191,29 @@ onClick={() => {
   <label className="client-search-field" htmlFor="contact-search"><span>Buscar contactos</span><input id="contact-search" type="search" placeholder="Nombre, empresa, teléfono o email…" value={contactSearch} onChange={e => setContactSearch(e.target.value)} /></label>
   <span className="client-results-count" role="status">{contactsLoading ? 'Cargando…' : `${filteredContacts.length} de ${contacts.length} contactos`}</span>
 </div>
+{selectedContact && (() => {
+  const request = contactRequest(selectedContact)
+  const phone = selectedContact.phone || selectedContact.mobile
+  const phoneTarget = String(phone || '').replace(/[^+0-9]/g, '')
+  return <section className="dashboard-card company-detail" aria-label="Solicitud del contacto" style={{marginBottom:24}}>
+    <div className="company-detail-header"><div><p className="dashboard-kicker">SOLICITUD DEL CONTACTO</p><h2>{[selectedContact.first_name, selectedContact.last_name].filter(Boolean).join(' ') || 'Contacto'}</h2><p>{request.company}</p></div><button type="button" className="secondary-action" onClick={() => {setSelectedContactId(null);setOpenedAlertContact(null)}}>Cerrar</button></div>
+    <div className="company-detail-grid">
+      <div><span>Nombre</span><strong>{[selectedContact.first_name,selectedContact.last_name].filter(Boolean).join(' ') || '—'}</strong></div>
+      <div><span>Empresa</span><strong>{request.company}</strong></div>
+      <div><span>Teléfono</span><strong>{phone || 'Sin teléfono'}</strong></div>
+      <div><span>Correo electrónico</span><strong>{selectedContact.email || 'Sin correo'}</strong></div>
+      <div className="detail-wide" style={{padding:18,background:'#eef8f6',borderRadius:12}}><span>Qué necesita cubrir</span><strong style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{request.need || request.message || 'Sin información guardada'}</strong></div>
+      <div className="detail-wide"><span>Cuéntanos sobre tu empresa · Mensaje recibido</span><p style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{request.message || 'Sin mensaje guardado'}</p></div>
+      {selectedContact.job_title && <div><span>Cargo</span><strong>{selectedContact.job_title}</strong></div>}
+      {request.linked.map(item => <div className="detail-wide" key={item.id}><span>Oportunidad asociada</span><strong>{item.title}</strong><p>{item.pipeline_stages?.name || 'Sin etapa'}{leadSources.find(source => source.id === item.source_id)?.name ? ` · ${leadSources.find(source => source.id === item.source_id).name}` : ''}</p></div>)}
+    </div>
+    <div style={{display:'flex',flexWrap:'wrap',gap:12,marginTop:24}}>
+      {phoneTarget && <a className="primary-action" href={`tel:${phoneTarget}`}>Llamar</a>}
+      {selectedContact.email && <a className="secondary-action" href={`mailto:${encodeURIComponent(selectedContact.email)}`}>Enviar correo</a>}
+      {canEditModule('contacts') && <button type="button" className="secondary-action" onClick={() => editContact(selectedContact)}>Editar datos</button>}
+    </div>
+  </section>
+})()}
 {canWrite && showContactForm && (
   <div className="dashboard-card company-form-card">
     <div className="card-heading">
@@ -2365,7 +2412,7 @@ onClick={() => {
     <div className="clients-table-header">
       <span>Contacto</span>
       <span>Empresa</span>
-      <span>Cargo</span>
+      <span>Qué necesita cubrir</span>
       <span>Teléfono</span>
       <span>Acciones</span>
     </div>
@@ -2385,7 +2432,7 @@ onClick={() => {
         </div>
 
         <div>
-          {contact.job_title || '—'}
+          <span style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',display:'-webkit-box',WebkitLineClamp:3,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{contactRequest(contact).need || contactRequest(contact).message || 'Sin información'}</span>
         </div>
 
         <div className="client-contact">
@@ -2394,12 +2441,7 @@ onClick={() => {
         </div>
 
 <div className="client-actions">
-  {canWrite && (<button
-    type="button"
-    onClick={() => editContact(contact)}
-  >
-    Editar
-  </button>)}
+  <button type="button" className="primary-action" onClick={() => openContactRequest(contact)}>Ver solicitud</button>
 {canDeleteModule('contacts') && <button type="button" disabled={!!deletingRecord} style={{ color: '#b42318', borderColor: '#f3b4ad' }} onClick={() => deleteRecord('contacts', contact)}>{deletingRecord === contact.id ? 'Eliminando…' : 'Eliminar'}</button>} 
 </div>
       </div>
