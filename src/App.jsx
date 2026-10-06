@@ -1346,6 +1346,13 @@ const { error } = result
   @media (max-width: 480px) { .form-field .agenda-datetime-controls { grid-template-columns: minmax(0, 1fr) 65px 6px 65px; gap: 5px; } }
   .report-export-panel { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; padding: 18px; margin: 18px 0; border: 1px solid #dbe5ef; border-radius: 14px; background: white; }
   .report-export-panel > div { flex: 1; min-width: 200px; }
+  .report-unified-panel { display: block; }
+  .report-unified-panel .report-summary { margin-bottom: 18px; }
+  .report-unified-panel .report-unified-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; min-width: 0; }
+  .report-unified-controls input[type="date"] { height: 44px; box-sizing: border-box; font: inherit; }
+  .report-unified-controls > p { flex-basis: 100%; }
+  @media (max-width: 600px) { .report-unified-controls label { flex: 1 1 100%; min-width: 0; } .report-unified-controls .primary-action { flex: 1 1 150px; } }
+
   .report-export-panel p { margin: 7px 0; font-size: 13px; line-height: 1.6; }
   .report-export-panel small { color: #64748b; }
   .report-export-panel label { display: flex; flex-direction: column; gap: 9px; font-size: 16px; font-weight: 700; min-width: 200px; margin: 0; }
@@ -2546,9 +2553,11 @@ service_ids: [],
       </div>
     </div>
 
-    <div className="report-filters" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
-      <span>Periodo:</span>
-      <select
+    <div className="report-export-panel report-unified-panel">
+      <div className="report-summary"><strong>Descargar informe</strong><p>Empresa: {organization?.name} · {reportPeriodText}</p><small>Clientes, oportunidades y tareas por fecha de alta; llamadas por fecha de llamada.</small></div>
+      <div className="report-unified-controls">
+        <label htmlFor="report-period"><span>Periodo</span>
+      <select id="report-period"
         value={reportPeriod}
         onChange={(e) => setReportPeriod(e.target.value)}
       >
@@ -2560,15 +2569,16 @@ service_ids: [],
         <option value="month">Este mes</option>
         <option value="custom">Personalizado</option>
       </select>
+        </label>
       {reportPeriod === 'custom' && (
         <>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <label >
             Desde
             <input type="date" value={reportFrom} max={reportTo || undefined}
               onChange={(e) => setReportFrom(e.target.value)}
               style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '8px' }} />
           </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <label >
             Hasta
             <input type="date" value={reportTo} min={reportFrom || undefined}
               onChange={(e) => setReportTo(e.target.value)}
@@ -2581,14 +2591,11 @@ service_ids: [],
           )}
         </>
       )}
-    </div>
-
-    <div className="report-export-panel">
-      <div><strong>Descargar informe</strong><p>CSV para Excel · PDF para compartir · Empresa: {organization?.name}<br />Periodo: {reportPeriodText}</p><small>Clientes, oportunidades y tareas se filtran por fecha de alta; llamadas, por fecha de llamada.</small></div>
       <label htmlFor="report-export-type"><span>Tipo de informe</span><select id="report-export-type" value={selectedExportType || ''} onChange={e => setReportExportType(e.target.value)}>{exportChoices.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <button type="button" className="primary-action" disabled={!selectedExportType || !!reportRangeError || reportLoading} onClick={() => downloadReport('csv')}>{reportLoading ? 'Cargando datos…' : 'Descargar CSV'}</button>
       <button type="button" className="primary-action" disabled={!selectedExportType || !!reportRangeError || reportLoading} onClick={() => downloadReport('pdf')}>Descargar PDF</button>
       {!exportChoices.length && <p>No tienes acceso a secciones que se puedan descargar.</p>}
+      </div>
     </div>
     {reportLoading && <p role="status">Cargando datos del informe…</p>}
     <div className="stats-grid">
