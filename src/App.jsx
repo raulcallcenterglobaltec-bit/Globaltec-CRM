@@ -3646,6 +3646,31 @@ function NewOrganization({ onCreated }) {
 function BrandingSettings({ organization, onSaved, onSourcesChanged }) {
   const [name, setName] = useState(organization.name || '')
   const [logo, setLogo] = useState(organization.logo_url || '')
+  const [logoFile, setLogoFile] = useState(null)
+  const [logoPreview, setLogoPreview] = useState('')
+  const logoInput = useRef(null)
+  const uploadedLogo = useRef(null)
+  useEffect(() => {
+    if (!logoFile) { setLogoPreview(''); return }
+    const url = URL.createObjectURL(logoFile)
+    setLogoPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [logoFile])
+  function chooseLogo(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || saving) return
+    setError(''); setMessage('')
+    if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) {
+      setError('Elige una imagen PNG, JPG, WebP o GIF.'); return
+    }
+    if (!file.size || file.size > 5 * 1024 * 1024) {
+      setError('La imagen debe ocupar entre 1 byte y 5 MB.'); return
+    }
+    uploadedLogo.current = null
+    setLogoFile(file)
+  }
+
   const [primary, setPrimary] = useState(brandingColor(organization.settings?.branding?.primary_color, '#087f74'))
   const [sidebar, setSidebar] = useState(brandingColor(organization.settings?.branding?.sidebar_color, '#142c48'))
   const [saving, setSaving] = useState(false)
@@ -3661,15 +3686,27 @@ function BrandingSettings({ organization, onSaved, onSourcesChanged }) {
     e.preventDefault()
     if (saving) return
     setMessage(''); setError('')
-    const logoUrl = safeLogo(logo)
+    let logoUrl = safeLogo(logo)
     if (!name.trim()) { setError('Escribe el nombre de la empresa.'); return }
-    if (logoUrl === null) { setError('El logotipo debe tener un enlace HTTPS válido.'); return }
+    if (!logoFile && logoUrl === null) { setError('Vuelve a elegir el logotipo para actualizarlo.'); return }
     setSaving(true)
     try {
+      if (logoFile) {
+        if (!uploadedLogo.current) {
+          const extension = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' }[logoFile.type]
+          const path = `${organization.id}/${crypto.randomUUID()}.${extension}`
+          const bucket = supabase.storage.from('crm-logos')
+          const { error: uploadError } = await bucket.upload(path, logoFile, { upsert: false, contentType: logoFile.type })
+          if (uploadError) throw new Error('No se ha podido subir el logo. Comprueba los permisos del almacenamiento e inténtalo de nuevo.')
+          uploadedLogo.current = bucket.getPublicUrl(path).data.publicUrl
+        }
+        logoUrl = uploadedLogo.current
+      }
       const result = await supabase.rpc('crm_save_branding', { p_organization_id: organization.id, p_name: name.trim(), p_logo_url: logoUrl, p_primary_color: primary, p_sidebar_color: sidebar })
       if (result.error) throw result.error
       if (!alive.current) return
       onSaved({ ...organization, name: name.trim(), logo_url: logoUrl || null, settings: { ...organization.settings, branding: { primary_color: primary, sidebar_color: sidebar } } })
+      setLogo(logoUrl || ''); setLogoFile(null); uploadedLogo.current = null
       setMessage('Personalización guardada.')
     } catch (err) { if (alive.current) setError(err.message || 'No se han podido guardar los cambios.') }
     finally { if (alive.current) setSaving(false) }
@@ -3678,12 +3715,12 @@ function BrandingSettings({ organization, onSaved, onSourcesChanged }) {
     <div className="dashboard-heading"><div><h1>Personalización</h1><p>Nombre, logotipo y colores de esta empresa.</p></div></div>
     <div className="branding-layout"><form className="dashboard-card branding-form" onSubmit={save}>
       <label className="form-field">Nombre de empresa<input value={name} onChange={e => setName(e.target.value)} maxLength={150} required disabled={saving} /></label>
-      <label className="form-field">Enlace HTTPS del logotipo<input type="url" value={logo} onChange={e => setLogo(e.target.value)} placeholder="https://…/logo.png" disabled={saving} /><small>Déjalo vacío para mostrar solo el nombre.</small></label>
+      <div className="form-field"><span>Logotipo de empresa</span><input ref={logoInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={chooseLogo} disabled={saving} style={{ display: 'none' }} /><button type="button" className="secondary-action" disabled={saving} onClick={() => logoInput.current?.click()}>Subir logo</button><small>{logoFile ? logoFile.name : 'Elige una imagen de tu ordenador. PNG, JPG, WebP o GIF · Máximo 5 MB.'}</small></div>
       <label className="branding-color">Color principal<input type="color" value={primary} onChange={e => setPrimary(e.target.value)} disabled={saving} /><span>{primary}</span></label>
       <label className="branding-color">Color del menú<input type="color" value={sidebar} onChange={e => setSidebar(e.target.value)} disabled={saving} /><span>{sidebar}</span></label>
       {error && <p role="alert" className="branding-error">{error}</p>}{message && <p role="status">{message}</p>}
       <button className="primary-action" disabled={saving}>{saving ? 'Guardando…' : 'Guardar personalización'}</button>
-    </form><div className="dashboard-card branding-preview"><h2>Vista previa</h2><div className="branding-preview-header"><BrandLogo key={logo} url={safeLogo(logo)} name={name} /><strong>{name || 'Tu empresa'}</strong><span>CRM</span></div><div className="branding-preview-menu" style={{ background: sidebar, color: brandingInk(sidebar) }}><span>ESPACIO DE TRABAJO</span><div style={{ background: primary, color: brandingInk(primary) }}>Panel principal</div><p>Clientes</p><p>Agenda</p></div><p>Los cambios se aplican al guardar.</p></div></div>
+    </form><div className="dashboard-card branding-preview"><h2>Vista previa</h2><div className="branding-preview-header"><BrandLogo key={logoPreview || logo} url={logoPreview || safeLogo(logo)} name={name} /><strong>{name || 'Tu empresa'}</strong><span>CRM</span></div><div className="branding-preview-menu" style={{ background: sidebar, color: brandingInk(sidebar) }}><span>ESPACIO DE TRABAJO</span><div style={{ background: primary, color: brandingInk(primary) }}>Panel principal</div><p>Clientes</p><p>Agenda</p></div><p>Los cambios se aplican al guardar.</p></div></div>
     <LeadSourceSettings key={organization.id} organizationId={organization.id} onChanged={onSourcesChanged} />
     <ServiceSettings key={`services-${organization.id}`} organizationId={organization.id} onChanged={onSourcesChanged} />
     <StageSettings key={`stages-${organization.id}`} organizationId={organization.id} onChanged={onSourcesChanged} />
