@@ -284,6 +284,8 @@ const [companyForm, setCompanyForm] = useState({
       setSession(session)
 
       if (session) {
+        // Una renovación o el retorno del foco no cambia el usuario ni su empresa.
+        if (accessRef.current.user === session.user.id) return
         accessRef.current = { org: '', permissions: [], user: session.user.id }
         setModulePermissions([]); setActiveOrg(''); clearCRMData()
         loadProfile(session.user.id)
@@ -304,6 +306,8 @@ const [companyForm, setCompanyForm] = useState({
       }
 
       if (session) {
+        // Una renovación o el retorno del foco no cambia el usuario ni su empresa.
+        if (accessRef.current.user === session.user.id) return
         accessRef.current = { org: '', permissions: [], user: session.user.id }
         setModulePermissions([]); setActiveOrg(''); clearCRMData()
         loadProfile(session.user.id)
