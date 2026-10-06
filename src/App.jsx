@@ -51,6 +51,55 @@ function App() {
   const [showNewOrganization, setShowNewOrganization] = useState(false)
   const canCreateOrganization = !!profile?.active && profile?.role === 'admin' && session?.user?.id === '4572a164-9b54-46b5-8382-4e50a8b4dfef'
   const [brandingAdmin, setBrandingAdmin] = useState(null)
+  const [deletingRecord, setDeletingRecord] = useState('')
+  const deleteBusy = useRef(false)
+  const [deleteNotice, setDeleteNotice] = useState(null)
+  useEffect(() => { setDeleteNotice(null) }, [activeOrg, session?.user?.id])
+  function canDeleteModule(module) {
+    return profile?.role === 'admin' && canBrand && canEditModule(module)
+  }
+  async function deleteRecord(module, row) {
+    if (!canDeleteModule(module) || deleteBusy.current || row.organization_id !== activeOrg) return
+    const label = module === 'clients' ? row.name : module === 'contacts' ? [row.first_name, row.last_name].filter(Boolean).join(' ') : module === 'opportunities' ? row.title : 'esta llamada'
+    if (!window.confirm(`¿Eliminar ${label || 'este registro'} definitivamente? Si tiene otros datos asociados, el borrado se bloqueará para que puedas resolverlos primero.`)) return
+    const org = activeOrg
+    const user = session.user.id
+    deleteBusy.current = true
+    setDeletingRecord(row.id)
+    setDeleteNotice(null)
+    try {
+      const { data, error: deleteError } = await supabase.rpc('crm_delete_record', { p_organization_id: org, p_module: module, p_record_id: row.id })
+      if (accessRef.current.org !== org || accessRef.current.user !== user) return
+      if (deleteError) {
+        const known = ['P0001','42501'].includes(deleteError.code)
+        throw new Error(known ? deleteError.message : 'No se ha podido confirmar el borrado. Actualiza el listado antes de reintentar.')
+      }
+      if (data?.success !== true || data?.id !== row.id) throw new Error('No se ha podido confirmar el borrado. Actualiza el listado antes de reintentar.')
+      if (module === 'clients') {
+        setCompanies(items => items.filter(item => item.id !== row.id))
+        if (selectedCompany?.id === row.id) setSelectedCompany(null)
+        if (editingCompanyId === row.id) { setShowCompanyForm(false); setEditingCompanyId(null) }
+      } else if (module === 'contacts') {
+        setContacts(items => items.filter(item => item.id !== row.id))
+        setContactAlerts(previous => previous.org === org ? { ...previous, rows: previous.rows.filter(item => item.id !== row.id) } : previous)
+        if (editingContactId === row.id) { setShowContactForm(false); setEditingContactId(null) }
+      } else if (module === 'opportunities') {
+        setOpportunities(items => items.filter(item => item.id !== row.id))
+        if (editingOpportunityId === row.id) { setShowOpportunityForm(false); setEditingOpportunityId(null) }
+      } else {
+        setCalls(items => items.filter(item => item.id !== row.id))
+        if (editingCallId === row.id) { setShowCallForm(false); setEditingCallId(null) }
+      }
+      setDeleteNotice({ org, module, error: false, text: 'Registro eliminado.' })
+      loadCompanies(); loadContacts(); loadOpportunities(); loadCalls(); loadTasks()
+    } catch (err) {
+      if (accessRef.current.org === org && accessRef.current.user === user) setDeleteNotice({ org, module, error: true, text: err.message || 'No se ha podido confirmar el borrado. Actualiza el listado antes de reintentar.' })
+    } finally {
+      deleteBusy.current = false
+      setDeletingRecord('')
+    }
+  }
+
   const organization = organizations.find(o => o.id === activeOrg)
   const primaryColor = brandingColor(organization?.settings?.branding?.primary_color, '#087f74')
   const sidebarColor = brandingColor(organization?.settings?.branding?.sidebar_color, '#142c48')
@@ -1649,6 +1698,7 @@ onClick={() => {
   </aside>
 
   <section className="dashboard">
+  {deleteNotice?.org === activeOrg && deleteNotice.module === currentPage && <div role={deleteNotice.error ? 'alert' : 'status'} style={{ padding: '12px 16px', marginBottom: 16, borderRadius: 10, background: deleteNotice.error ? '#fff0ed' : '#e9faf4', color: deleteNotice.error ? '#b42318' : '#12483d' }}>{deleteNotice.text}</div>}
   {watchContacts && contactAlerts.org === activeOrg && contactAlerts.rows.length > 0 && (
     <div role="status" aria-live="polite" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '16px 20px', marginBottom: 20, border: '2px solid #087f74', borderRadius: 14, background: '#e9faf4', color: '#12483d' }}>
       <div style={{ flex: '1 1 240px' }}><strong style={{ fontSize: 18 }}>● {contactAlerts.rows.length === 1 ? 'Ha entrado un contacto nuevo' : `${contactAlerts.rows.length} contactos nuevos`}</strong><div style={{ marginTop: 4 }}>{[contactAlerts.rows[0].first_name, contactAlerts.rows[0].last_name].filter(Boolean).join(' ') || 'Nuevo contacto'}</div></div>
@@ -2088,7 +2138,8 @@ onClick={() => {
   onClick={() => editCompany(company)}
 >
   Editar
-</button>)} 
+</button>)}
+{canDeleteModule('clients') && <button type="button" disabled={!!deletingRecord} style={{ color: '#b42318', borderColor: '#f3b4ad' }} onClick={() => deleteRecord('clients', company)}>{deletingRecord === company.id ? 'Eliminando…' : 'Eliminar'}</button>} 
       </div>
     </div>
   ))}
@@ -2348,7 +2399,8 @@ onClick={() => {
     onClick={() => editContact(contact)}
   >
     Editar
-  </button>)} 
+  </button>)}
+{canDeleteModule('contacts') && <button type="button" disabled={!!deletingRecord} style={{ color: '#b42318', borderColor: '#f3b4ad' }} onClick={() => deleteRecord('contacts', contact)}>{deletingRecord === contact.id ? 'Eliminando…' : 'Eliminar'}</button>} 
 </div>
       </div>
     ))}
@@ -2698,7 +2750,8 @@ service_ids: [],
     onClick={() => editOpportunity(opportunity)}
   >
     Editar
-  </button>)} 
+  </button>)}
+{canDeleteModule('opportunities') && <button type="button" disabled={!!deletingRecord} style={{ color: '#b42318', borderColor: '#f3b4ad' }} onClick={() => deleteRecord('opportunities', opportunity)}>{deletingRecord === opportunity.id ? 'Eliminando…' : 'Eliminar'}</button>} 
 </div>
       </div>
     ))}
@@ -3073,7 +3126,8 @@ service_ids: [],
     onClick={() => editCall(call)}
   >
     Editar
-  </button>)} 
+  </button>)}
+{canDeleteModule('calls') && <button type="button" disabled={!!deletingRecord} style={{ color: '#b42318', borderColor: '#f3b4ad' }} onClick={() => deleteRecord('calls', call)}>{deletingRecord === call.id ? 'Eliminando…' : 'Eliminar'}</button>} 
 </div>
           </div>
         ))}
