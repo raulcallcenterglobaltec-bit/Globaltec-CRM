@@ -329,6 +329,38 @@ useEffect(() => {
   lost_reason: ''
 })
   }
+  if (currentPage !== 'calls') {
+    setShowCallForm(false)
+    setEditingCallId(null)
+    setCallForm({
+  company_id: '',
+  contact_id: '',
+  opportunity_id: '',
+  assigned_to: '',
+  direction: 'inbound',
+  status: 'completed',
+  started_at: '',
+  duration_seconds: '',
+  outcome: '',
+  notes: ''
+})
+  }
+  if (currentPage !== 'tasks') {
+    setShowTaskForm(false)
+    setEditingTaskId(null)
+    setTaskForm({
+  title: '',
+  description: '',
+task_type: 'follow_up',
+status: 'pending',
+priority: 'normal',
+  due_date: '',
+  company_id: '',
+  contact_id: '',
+  opportunity_id: '',
+  assigned_to: ''
+})
+  }
 }, [currentPage])
 
   const [recoveryMode, setRecoveryMode] = useState(false)
