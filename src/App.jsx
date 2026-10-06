@@ -224,6 +224,7 @@ const [showCallForm, setShowCallForm] = useState(false)
 const [callSaving, setCallSaving] = useState(false)
 const [editingCallId, setEditingCallId] = useState(null)
 const [reportPeriod, setReportPeriod] = useState('all')
+const [reportExportType, setReportExportType] = useState('clients')
 const [reportFrom, setReportFrom] = useState('')
 const [reportTo, setReportTo] = useState('')
 const reportRangeError = reportPeriod === 'custom'
@@ -537,6 +538,56 @@ if (reportPeriod === 'yesterday') {
   }
 
   return true
+}
+
+const reportData = {
+  clients: canViewModule('clients') ? companies.filter(row => row.organization_id === activeOrg && isInReportPeriod(row.created_at)) : [],
+  opportunities: canViewModule('opportunities') ? opportunities.filter(row => row.organization_id === activeOrg && isInReportPeriod(row.created_at)) : [],
+  calls: canViewModule('calls') ? calls.filter(row => row.organization_id === activeOrg && isInReportPeriod(row.started_at)) : [],
+  tasks: canViewModule('tasks') ? tasks.filter(row => row.organization_id === activeOrg && isInReportPeriod(row.created_at)) : []
+}
+const exportChoices = [['clients', 'Clientes'], ['opportunities', 'Oportunidades'], ['calls', 'Llamadas'], ['tasks', 'Tareas']].filter(([module]) => canViewModule(module))
+const selectedExportType = exportChoices.some(([module]) => module === reportExportType) ? reportExportType : exportChoices[0]?.[0]
+const reportLoading = companiesLoading || opportunitiesLoading || callsLoading || tasksLoading
+const reportPeriodText = (() => {
+  const now = new Date(), from = new Date(now)
+  const format = date => date.toLocaleDateString('es-ES')
+  if (reportPeriod === 'all') return 'Todo el historial'
+  if (reportPeriod === 'custom') return reportRangeError || `Del ${format(new Date(reportFrom + 'T00:00:00'))} al ${format(new Date(reportTo + 'T00:00:00'))}`
+  if (reportPeriod === 'today') return `Hoy · ${format(now)}`
+  if (reportPeriod === 'yesterday') { from.setDate(from.getDate() - 1); return `Ayer · ${format(from)}` }
+  if (reportPeriod === 'month') return now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+  from.setDate(from.getDate() - (reportPeriod === '7days' ? 7 : 30))
+  return `Desde ${format(from)} · últimos ${reportPeriod === '7days' ? 7 : 30} días`
+})()
+const reportDate = value => {
+  if (!value) return ''
+  const date = new Date(value)
+  return Number.isFinite(date.getTime()) ? date.toLocaleString('es-ES') : ''
+}
+function downloadReport() {
+  if (!canViewModule('reports') || !selectedExportType || !canViewModule(selectedExportType) || reportRangeError || reportLoading) return
+  const definitions = {
+    clients: { headers: ['Cliente', 'Razón social', 'CIF/NIF', 'Sector', 'Teléfono', 'Email', 'Estado', 'Localidad', 'Provincia', 'Fecha de alta'], values: row => [row.name, row.legal_name, row.tax_id, row.sector, row.phone, row.email, row.status, row.city, row.province, reportDate(row.created_at)] },
+    opportunities: { headers: ['Oportunidad', 'Cliente', 'Contacto', 'Etapa', 'Valor estimado EUR', 'Cuota mensual EUR', 'Fecha de alta'], values: row => [row.title, row.companies?.name, [row.contacts?.first_name, row.contacts?.last_name].filter(Boolean).join(' '), row.pipeline_stages?.name, Number(row.estimated_value || 0).toLocaleString('es-ES'), Number(row.monthly_value || 0).toLocaleString('es-ES'), reportDate(row.created_at)] },
+    calls: { headers: ['Fecha', 'Cliente', 'Contacto', 'Tipo', 'Estado', 'Duración segundos', 'Resultado', 'Notas'], values: row => [reportDate(row.started_at), row.companies?.name, [row.contacts?.first_name, row.contacts?.last_name].filter(Boolean).join(' '), row.direction === 'inbound' ? 'Entrante' : row.direction === 'outbound' ? 'Saliente' : row.direction, callStatusLabels[row.status] || row.status, row.duration_seconds, row.outcome, row.notes] },
+    tasks: { headers: ['Tarea', 'Cliente', 'Estado', 'Prioridad', 'Vencimiento', 'Fecha de alta'], values: row => [row.title, row.companies?.name, taskStatusLabels[row.status] || row.status, taskPriorityLabels[row.priority] || row.priority, reportDate(row.due_date), reportDate(row.created_at)] }
+  }
+  const definition = definitions[selectedExportType]
+  const cell = value => {
+    let text = String(value ?? '')
+    if (/^[\s]*[=+@-]/.test(text) || /^[\t\r\n]/.test(text)) text = "'" + text
+    return '"' + text.replace(/"/g, '""') + '"'
+  }
+  const rows = [['Empresa', 'Periodo', ...definition.headers], ...reportData[selectedExportType].map(row => [organization?.name || '', reportPeriodText, ...definition.values(row)])]
+  const csv = '\uFEFF' + rows.map(row => row.map(cell).join(';')).join('\r\n')
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+  const link = document.createElement('a')
+  link.href = url
+  const companyName = (organization?.name || 'empresa').replace(/[^a-z0-9áéíóúñ_-]+/gi, '-')
+  link.download = `${companyName}-${selectedExportType}-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link); link.click(); link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 async function loadOpportunityOptions() {
   const access = accessRef.current
@@ -1280,6 +1331,16 @@ const { error } = result
   }} />}
 </div>}
 <style>{`
+  .report-export-panel { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding: 18px; margin: 18px 0; border: 1px solid #dbe5ef; border-radius: 14px; background: white; }
+  .report-export-panel > div { flex: 1; min-width: 200px; }
+  .report-export-panel p { margin: 7px 0; font-size: 13px; line-height: 1.6; }
+  .report-export-panel small { color: #64748b; }
+  .report-export-panel label { display: flex; flex-direction: column; gap: 7px; font-size: 13px; }
+  .report-export-panel select { padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 9px; background: white; font: inherit; }
+  .report-bars-row { margin: 18px 0; }
+  .report-bars-caption { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; margin-bottom: 8px; }
+  .report-bars-track { height: 10px; border-radius: 999px; background: #edf2f7; overflow: hidden; }
+  .report-bars-fill { height: 100%; border-radius: inherit; }
   .clear-filter-button { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 10px 18px; margin-top: 14px; border: 0; border-radius: 10px; background: var(--crm-teal, #087f8c); color: var(--crm-primary-ink, white); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
   .clear-filter-button:hover { filter: brightness(.95); }
   .clear-filter-button:focus-visible { outline: 3px solid #168bba; outline-offset: 3px; }
@@ -2508,196 +2569,31 @@ service_ids: [],
       )}
     </div>
 
+    <div className="report-export-panel">
+      <div><strong>Descargar informe</strong><p>CSV para Excel · Empresa: {organization?.name}<br />Periodo: {reportPeriodText}</p><small>Clientes, oportunidades y tareas se filtran por fecha de alta; llamadas, por fecha de llamada.</small></div>
+      <label htmlFor="report-export-type"><span>Contenido</span><select id="report-export-type" value={selectedExportType || ''} onChange={e => setReportExportType(e.target.value)}>{exportChoices.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <button type="button" className="primary-action" disabled={!selectedExportType || !!reportRangeError || reportLoading} onClick={downloadReport}>{reportLoading ? 'Cargando datos…' : 'Descargar CSV'}</button>
+      {!exportChoices.length && <p>No tienes acceso a secciones que se puedan descargar.</p>}
+    </div>
+    {reportLoading && <p role="status">Cargando datos del informe…</p>}
     <div className="stats-grid">
-      <div className="stat-card">
-        <span>Clientes</span>
-      <strong>
-  {companies.filter((company) =>
-    isInReportPeriod(company.created_at)
-  ).length}
-</strong>
-        <small>Total registrados</small>
-      </div>
-
-      <div className="stat-card">
-        <span>Oportunidades</span>
-        <strong>
-  {opportunities.filter((opportunity) =>
-    isInReportPeriod(opportunity.created_at)
-  ).length}
-</strong>
-        <small>Total registradas</small>
-      </div>
-
-      <div className="stat-card">
-        <span>Valor oportunidades</span>
-        <strong>
-{opportunities
-  .filter((opportunity) =>
-    isInReportPeriod(opportunity.created_at)
-  )
-  .reduce(
-    (total, opportunity) =>
-      total + Number(opportunity.estimated_value || 0),
-    0
-  )
-  .toLocaleString('es-ES')} €
-        </strong>
-        <small>Valor estimado total</small>
-      </div>
-
-      <div className="stat-card">
-        <span>Cuota mensual</span>
-        <strong>
-{opportunities
-  .filter((opportunity) =>
-    isInReportPeriod(opportunity.created_at)
-  )
-  .reduce(
-    (total, opportunity) =>
-      total + Number(opportunity.monthly_value || 0),
-    0
-  )
-  .toLocaleString('es-ES')} €
-        </strong>
-        <small>Potencial mensual</small>
-      </div>
-
-      <div className="stat-card">
-        <span>Tareas pendientes</span>
-        <strong>
-          {tasks.filter(
-            (task) =>
-              task.status === 'pending' ||
-              task.status === 'in_progress'
-          ).length}
-        </strong>
-        <small>Por completar</small>
-      </div>
-
-<div className="stat-card">
-  <span>Tareas completadas</span>
-  <strong>
-    {tasks.filter(
-      (task) =>
-        task.status === 'completed' &&
-        isInReportPeriod(task.created_at)
-    ).length}
-  </strong>
-  <small>Finalizadas</small>
-</div>
-
-      <div className="stat-card">
-        <span>Llamadas</span>
-        <strong>
-          {calls.filter((call) =>
-            isInReportPeriod(call.started_at)
-          ).length}
-        </strong>
-        <small>Total registradas</small>
-      </div>
-
-      <div className="stat-card">
-        <span>Llamadas entrantes</span>
-        <strong>
-          {calls.filter(
-            (call) =>
-              call.direction === 'inbound' &&
-              isInReportPeriod(call.started_at)
-          ).length}
-        </strong>
-        <small>Recibidas</small>
-      </div>
+      {[
+        ['clients', 'Clientes', reportData.clients.length, 'Total registrados', 'clients'],
+        ['opportunities', 'Oportunidades', reportData.opportunities.length, 'Total registradas', 'opportunities'],
+        ['opportunities', 'Valor oportunidades', reportData.opportunities.reduce((sum, row) => sum + Number(row.estimated_value || 0), 0).toLocaleString('es-ES') + ' €', 'Valor estimado total', 'opportunities'],
+        ['opportunities', 'Cuota mensual', reportData.opportunities.reduce((sum, row) => sum + Number(row.monthly_value || 0), 0).toLocaleString('es-ES') + ' €', 'Potencial mensual', 'opportunities'],
+        ['tasks', 'Tareas pendientes', reportData.tasks.filter(row => ['pending', 'in_progress'].includes(row.status)).length, 'Por completar', 'tasks'],
+        ['tasks', 'Tareas completadas', reportData.tasks.filter(row => row.status === 'completed').length, 'Finalizadas', 'tasks'],
+        ['calls', 'Llamadas', reportData.calls.length, 'Total registradas', 'calls'],
+        ['calls', 'Llamadas entrantes', reportData.calls.filter(row => row.direction === 'inbound').length, 'Recibidas', 'calls']
+      ].filter(([module]) => canViewModule(module)).map(([module, label, value, detail, icon]) => <div key={label} className={`stat-card stat-${module}`}><CRMIcon name={icon} className="stat-icon" /><span>{label}</span><strong>{reportLoading ? '…' : value}</strong><small>{detail}</small></div>)}
     </div>
-
     <div className="dashboard-grid">
-      <div className="dashboard-card">
-        <div className="card-heading">
-          <div>
-            <h2>Llamadas por tipo</h2>
-            <p>Distribución de llamadas registradas</p>
-          </div>
-        </div>
-
-        <div className="report-list">
-          <div className="report-row">
-            <span>Entrantes</span>
-            <strong>
-              {calls.filter(
-                (call) =>
-                  call.direction === 'inbound' &&
-                  isInReportPeriod(call.started_at)
-              ).length}
-            </strong>
-          </div>
-
-          <div className="report-row">
-            <span>Salientes</span>
-<strong>
-  {calls.filter(
-    (call) =>
-      call.direction === 'outbound' &&
-      isInReportPeriod(call.started_at)
-  ).length}
-</strong>
-</div>
-</div>
-</div>
-
-<div className="dashboard-card">
-  <div className="card-heading">
-    <div>
-      <h2>Estado de tareas</h2>
-      <p>Situación actual de las tareas</p>
-    </div>
-  </div>
-
-  <div className="report-list">
-  <div className="report-row">
-    <span>Pendientes</span>
-    <strong>
-      {tasks.filter(
-        (task) =>
-          task.status === 'pending' &&
-          isInReportPeriod(task.created_at)
-      ).length}
-    </strong>
-  </div>
-
-  <div className="report-row">
-    <span>En curso</span>
-    <strong>
-      {tasks.filter(
-        (task) =>
-          task.status === 'in_progress' &&
-          isInReportPeriod(task.created_at)
-      ).length}
-    </strong>
-  </div>
-
-  <div className="report-row">
-    <span>Completadas</span>
-    <strong>
-      {tasks.filter(
-        (task) =>
-          task.status === 'completed' &&
-          isInReportPeriod(task.created_at)
-      ).length}
-    </strong>
-  </div>
-
-  <div className="report-row">
-    <span>Canceladas</span>
-    <strong>
-      {tasks.filter(
-        (task) =>
-          task.status === 'cancelled' &&
-          isInReportPeriod(task.created_at)
-      ).length}
-    </strong>
-  </div>
-</div>
-      </div>
+      {canViewModule('calls') && <ReportBars title="Llamadas por tipo" description="Distribución en el periodo seleccionado" rows={[
+        { label: 'Entrantes', value: reportData.calls.filter(row => row.direction === 'inbound').length, color: '#2563eb' },
+        { label: 'Salientes', value: reportData.calls.filter(row => row.direction === 'outbound').length, color: '#7c3aed' }
+      ]} />}
+      {canViewModule('tasks') && <ReportBars title="Estado de tareas" description="Estado actual de las tareas dadas de alta en el periodo" rows={Object.entries(taskStatusLabels).map(([status, label]) => ({ label, value: reportData.tasks.filter(row => (row.status || 'pending') === status).length, color: { pending: '#d97706', in_progress: '#2563eb', completed: '#059669', cancelled: '#64748b' }[status] }))} />}
     </div>
   </>
 ) : currentPage === 'calls' ? (
@@ -4063,3 +3959,8 @@ function ModulePermissions({ actorId, brandName, organizationId, onSaved }) {
 }
 
 export default App
+
+function ReportBars({ title, description, rows }) {
+  const total = rows.reduce((sum, row) => sum + row.value, 0)
+  return <div className="dashboard-card"><div className="card-heading"><div><h2>{title}</h2><p>{description}</p></div></div>{rows.map(row => <div className="report-bars-row" key={row.label}><div className="report-bars-caption"><span>{row.label}</span><strong>{row.value} · {total ? Math.round(row.value / total * 100) : 0}%</strong></div><div className="report-bars-track" aria-hidden="true"><div className="report-bars-fill" style={{ width: `${total ? row.value / total * 100 : 0}%`, background: row.color }} /></div></div>)}{!total && <p style={{ color: '#64748b', fontSize: 13 }}>No hay registros en este periodo.</p>}</div>
+}
