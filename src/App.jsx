@@ -1332,6 +1332,7 @@ const { error } = result
     clearCRMData()
     setActiveOrg(id)
     setCurrentPage('dashboard')
+    setShowNewOrganization(false)
   }} />}
 </div>}
 <style>{`
