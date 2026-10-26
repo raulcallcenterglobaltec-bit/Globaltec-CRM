@@ -1,0 +1,30 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Avisos · CRM Globaltec</title><link rel="stylesheet" href="./assets/notifications.css"><link rel="stylesheet" href="./assets/globaltec-diseno-20261015.css">
+<link rel="stylesheet" href="./assets/notifications-editor.css">
+</head><body>
+<header><a href="./">← Volver al CRM</a><span>CONFIGURACIÓN</span></header>
+<main><div class="heading"><div><p class="eyebrow">TU EMPRESA, SIEMPRE INFORMADA</p><h1>Avisos de nuevos leads</h1><p>Configura el correo y Telegram en un mismo lugar.</p></div><label>Empresa<select id="organization" disabled><option>Cargando…</option></select></label></div>
+<p id="notice" role="status" aria-live="polite">Comprobando acceso…</p>
+<form id="configuration" hidden><div class="cards">
+<section class="card"><div class="card-heading"><span class="channel-icon">@</span><div><h2>Correo electrónico</h2><p>Recibe las nuevas solicitudes en tu correo.</p></div></div>
+<label class="toggle"><input type="checkbox" name="email_enabled">Activar avisos por correo</label>
+<div><strong>Correos destinatarios</strong><div id="recipients"></div><button type="button" id="add-recipient" class="secondary">+ Añadir correo</button><p class="hint">Cada aviso se envía por separado a todos los destinatarios. Máximo 10 correos.</p></div>
+<label>Título del aviso<input name="email_title" maxlength="250"></label>
+<details><summary>Cuenta de envío</summary><p class="hint">Deja el servidor vacío para conservar la cuenta que ya está configurada.</p>
+<label>Nombre del remitente<input name="smtp_name" maxlength="250"></label>
+<label>Correo del remitente<input name="smtp_from" type="email" maxlength="250" autocomplete="off"></label>
+<label>Servidor de correo<input name="smtp_host" maxlength="250" placeholder="mail.tuempresa.es" autocomplete="off"></label>
+<div class="field-pair"><label>Puerto<input name="smtp_port" type="number" min="1" max="65535"></label><label class="toggle"><input name="smtp_secure" type="checkbox">SSL desde el inicio</label></div>
+<label>Usuario de correo<input name="smtp_user" maxlength="250" autocomplete="off"></label>
+<label>Contraseña de correo<input id="smtp_password" type="password" autocomplete="new-password" maxlength="1000" placeholder="Vacío conserva la contraseña guardada"></label><p id="smtp-secret-state" class="hint"></p>
+</details><button type="button" class="secondary" data-action="test_email">Enviar correo de prueba</button></section>
+<section class="card"><div class="card-heading"><span class="channel-icon telegram">↗</span><div><h2>Telegram</h2><p>Envía el aviso al grupo de tu equipo.</p></div></div>
+<label class="toggle"><input type="checkbox" name="telegram_enabled">Activar avisos en Telegram</label>
+<label>Título del aviso<input name="telegram_title" maxlength="250"></label>
+<label>Identificador del grupo<input name="chat_id" placeholder="-100…" maxlength="30" autocomplete="off"></label>
+<button type="button" class="secondary" data-action="groups">Buscar grupos del bot</button><div id="groups" aria-live="polite"></div>
+<details><summary>Conexión del bot</summary><label>Token del bot<input id="telegram_token" type="password" maxlength="200" autocomplete="new-password" placeholder="Vacío conserva el token guardado"></label><p id="telegram-secret-state" class="hint"></p><p class="hint">Añade el bot al grupo y envía /start dentro de él antes de buscar.</p></details>
+<button type="button" class="secondary" data-action="test_telegram">Enviar mensaje de prueba</button></section></div>
+<section class="card shared notice-content"><h2>Contenido del aviso</h2><p class="hint">Estos ajustes se aplican al texto de los avisos de esta empresa, tanto en Telegram como por correo.</p><label class="toggle"><input type="checkbox" name="hide_empty" checked>Ocultar automáticamente los campos vacíos</label><div id="notice-fields" class="notice-field-grid"></div><h3>Nombre del origen por landing</h3><p class="hint">Elige el nombre que aparecerá en «Origen». Por ejemplo: Global Técnicos · Climatización Sevilla. Si lo dejas vacío, se usa el nombre de la empresa cuando el origen sea un identificador.</p><div id="origin-labels" class="origin-labels"></div><div class="notice-preview-controls"><label>Formulario del ejemplo<select id="preview-form" aria-label="Formulario del ejemplo"></select></label><button type="button" class="secondary" data-action="preview">Ver ejemplo del aviso</button></div><p class="hint">Guarda los cambios antes de ver el ejemplo. El ejemplo usa datos ficticios y no envía mensajes.</p><pre id="message-preview" class="message-preview" hidden aria-live="polite"></pre></section><section class="card shared"><h2>Enlace incluido en los avisos</h2><label>Dirección del CRM<input name="crm_url" type="url" maxlength="300" placeholder="Opcional: déjalo vacío para no incluir enlaces"></label><p class="hint">Opcional. Si lo dejas vacío, los avisos y las pruebas se enviarán sin enlace al CRM. Si indicas una dirección, debe comenzar por https://.</p></section>
+<div class="save-bar"><p id="changes">La configuración se guarda para esta empresa.</p><button type="submit" class="primary" id="save">Guardar configuración</button></div></form>
+<section id="history" class="card" hidden><div class="history-heading"><h2>Últimas pruebas y cambios</h2><button class="secondary" id="refresh-history">Actualizar</button></div><div id="history-list"></div></section>
+</main><script type="module" src="./assets/notifications-editor.js"></script></body></html>

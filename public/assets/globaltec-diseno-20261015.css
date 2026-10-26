@@ -1,0 +1,79 @@
+/* Globaltec: capa visual reversible sobre la entrega confirmada del 14/10. */
+body{background:#f2f5f9;color:#172b42}
+.app .header{padding:18px 28px;gap:16px;box-shadow:0 2px 12px #142c4808}
+.app .dashboard{background:#f2f5f9;padding:28px;min-width:0}
+.app .dashboard-heading{gap:16px;flex-wrap:wrap;margin-bottom:24px}
+.app .dashboard-heading h1{letter-spacing:-.8px;line-height:1.2}
+.app .sidebar{border-right:1px solid #ffffff12;padding-top:24px}
+.app .nav-item{min-height:46px;border-radius:12px;transition:background .15s,box-shadow .15s}
+.app .nav-item.active{box-shadow:0 3px 12px #00000012}
+.app .nav-group-label{letter-spacing:1px;line-height:1.5}
+.app .dashboard-card,.app .form-card,.app .table-card{border-radius:16px;border-color:#dce4ed;box-shadow:0 4px 20px #142c4806}
+.app .stat-card{border-radius:16px;box-shadow:0 5px 18px #142c4808}
+.app .stat-card:hover{box-shadow:0 8px 24px #142c4814}
+.app .primary-action,.app .secondary-action,.app .primary-btn,.app .secondary-btn{min-height:42px;border-radius:10px;line-height:1.35}
+.app input:not([type=checkbox]):not([type=radio]):not([type=color]),.app select,.app textarea{border-radius:9px;max-width:100%;font:inherit}
+.app input:focus-visible,.app select:focus-visible,.app textarea:focus-visible,.app button:focus-visible,.app summary:focus-visible,.app a:focus-visible{outline:3px solid var(--crm-teal,#087f74);outline-offset:3px}
+.app table{border-collapse:separate;border-spacing:0}
+.app th{background:#f4f7fa;color:#40546c;font-size:12px;letter-spacing:.15px}
+.app td,.app th{padding:13px 14px}
+.app tbody tr:hover td{background:#f7fafc}
+.app .role-badge{white-space:nowrap}
+@media(min-width:1100px){.app .dashboard{padding:32px 36px}.app .sidebar:not(.sidebar-collapsed){width:244px}}
+@media(max-width:900px){.app .header{padding:14px 18px;flex-wrap:wrap}.app .user-area{flex-wrap:wrap;gap:8px}.app .dashboard{padding:22px}.app .dashboard-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){.app .header{padding:12px 16px}.app .dashboard{padding:18px 14px}.app .sidebar{padding:10px 12px;width:100%;max-width:100%;overflow-x:auto}.app .sidebar-nav{gap:6px}.app .nav-item{border-radius:9px}.app .dashboard-heading h1{font-size:26px}.app .dashboard-heading>div{min-width:0;max-width:100%}.app .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.app .stat-card{padding:18px 14px}.app .stat-card strong{font-size:30px}.app .dashboard-card{padding:18px}.app .primary-action,.app .secondary-action{white-space:normal}.app .brand-subtitle{overflow-wrap:anywhere}}
+@media(max-width:380px){.app .stats-grid{grid-template-columns:minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){.app *{transition:none!important;scroll-behavior:auto!important}}
+.globaltec-connection-warning{padding:12px 20px;border-bottom:1px solid #d7a95c;background:#fff4d9;color:#65430c;font:500 14px/1.5 system-ui,sans-serif}
+.globaltec-connection-warning[hidden]{display:none}
+
+
+/* Navegación con ratón; barra nativa inferior conservada. */
+.app .lead-board,.app .opportunity-board{max-width:100%;min-width:0;scroll-snap-type:none;scrollbar-width:auto;scrollbar-color:var(--crm-teal,#087f74) #dce4ed}
+.globaltec-board-panning,.globaltec-board-panning *{cursor:grabbing!important;user-select:none!important}
+
+.app .opportunity-lost-reason{padding:16px;border:2px solid #b42318;border-radius:12px;background:#fff1f0;box-sizing:border-box}.app .opportunity-lost-reason label{color:#b42318;font-weight:700}.app .opportunity-lost-reason textarea{border:1px solid #b42318;background:#fff;color:#172b42}.app .opportunity-lost-reason textarea:focus-visible{outline-color:#b42318}
+
+.app .lead-avatar{width:56px;height:56px;min-width:56px;flex:0 0 56px;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;border-radius:50%;font-size:14px;vertical-align:middle}
+.app .lead-avatar img{width:100%;height:100%;display:block;object-fit:cover}
+.member-photo-manager{margin:18px 0;max-width:750px}
+.member-photo-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.member-photo-heading h2{margin:0}
+.member-photo-manager>label{display:block;font-weight:600;margin:16px 0 8px}
+.member-photo-manager>select{width:100%;padding:10px;border:1px solid #cbd8e3}
+.member-photo-preview{display:flex;align-items:center;gap:16px;margin:20px 0}
+.app .member-photo-preview .lead-avatar{width:128px;height:128px;min-width:128px;flex-basis:128px;font-size:30px;background:#e2eeed;color:#19334d}
+.member-photo-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.member-photo-upload{display:inline-flex;align-items:center;position:relative;overflow:hidden;cursor:pointer;box-sizing:border-box}
+.member-photo-upload input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.member-photo-upload:focus-within{outline:3px solid var(--crm-teal,#087f74);outline-offset:3px}
+
+/* REV11: las tarjetas de formularios se ajustan al contenido. */
+.lead-source-settings .dashboard-card { min-height: 0; }
+.lead-source-settings > details.dashboard-card > summary { cursor: pointer; }
+.lead-source-settings > details.dashboard-card:not([open]) { padding-block: 18px; }
+.lead-source-settings > p.dashboard-card[role="status"] { margin: 0 0 20px; padding: 14px 18px; line-height: 1.5; }
+
+.landing-forms-list { margin-top: 16px; }
+.landing-forms-list > summary { display: inline-block; cursor: pointer; list-style: none; }
+.landing-forms-list > summary::-webkit-details-marker { display: none; }
+.landing-forms-list .forms-list-hide { display: none; }
+.landing-forms-list[open] .forms-list-show { display: none; }
+.landing-forms-list[open] .forms-list-hide { display: inline; }
+
+/* REV18: listados plegados de permisos e historial. */
+.globaltec-collapsible > summary { display: inline-flex; cursor: pointer; list-style: none; align-items: center; margin-bottom: 12px; }
+.globaltec-collapsible > summary::-webkit-details-marker { display: none; }
+.globaltec-collapsible > summary .collapse-hide { display: none; }
+.globaltec-collapsible[open] > summary .collapse-show { display: none; }
+.globaltec-collapsible[open] > summary .collapse-hide { display: inline; }
+.globaltec-collapsible:not([open]) > summary { margin-bottom: 0; }
+.history-settings .history-empty-card { margin-top: 18px; padding-top: 16px; border-top: 1px solid #dce6ec; }
+
+/* REV21: acciones alineadas y botón del historial independiente. */
+.globaltec-permission-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.globaltec-permission-actions > button { margin: 0; }
+.history-settings-disclosure { background: transparent; border: 0; padding: 0; box-shadow: none; }
+.history-settings-disclosure > summary { margin: 0; }
+.history-settings-disclosure[open] > summary { margin-bottom: 18px; }
+.history-settings-disclosure > .history-settings-card { margin-top: 0; }

@@ -1719,6 +1719,7 @@ onClick={() => {
     {profile?.role === 'admin' && activeOrg && <button className={`nav-item ${currentPage === 'permissions' ? 'active' : ''}`} onClick={() => setCurrentPage('permissions')}><CRMIcon name="permissions" /> Permisos de usuarios</button>}
 {canBrand && <button className={`nav-item ${currentPage === 'branding' ? 'active' : ''}`} onClick={() => setCurrentPage('branding')}><CRMIcon name="permissions" /> Personalización</button>}
 {canBrand && <button className={`nav-item ${currentPage === 'landing-forms' ? 'active' : ''}`} onClick={() => setCurrentPage('landing-forms')}><CRMIcon name="contacts" /> Formularios y landings</button>}
+{canBrand && <a className="nav-item" href={`${import.meta.env.BASE_URL}notificaciones.html?org=${encodeURIComponent(activeOrg)}`}><span aria-hidden="true">✉</span> Correo y Telegram</a>}
 </nav>
   </aside>
 
