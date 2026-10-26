@@ -134,11 +134,14 @@
   }
   function install(){
     scheduled=false;
+    for(const button of root.querySelectorAll('.crm-opp-dashboard-button')){
+      if(button.closest('.dashboard-heading')?.querySelector('h1')?.textContent.trim()!=='Oportunidades')button.remove();
+    }
     for(const heading of root.querySelectorAll('.dashboard-heading')){
       if(heading.querySelector('.dashboard-heading')||!heading.getClientRects().length||heading.querySelector('h1')?.textContent.trim()!=='Oportunidades')continue;
       if(heading.querySelector('.crm-opp-dashboard-button'))continue;
       const group=heading.querySelector('.lead-heading-actions');if(!group)continue;
-      const button=el('button','Panel comercial','crm-opp-dashboard-button');button.type='button';button.onclick=open;group.prepend(button);
+      const button=el('button','Panel comercial','crm-opp-dashboard-button');button.type='button';button.onclick=()=>{if(heading.querySelector('h1')?.textContent.trim()==='Oportunidades')open();else button.remove();};group.prepend(button);
     }
   }
   const css=document.createElement('style');css.textContent=`
@@ -155,5 +158,5 @@
     .crm-opp-dialog footer button{padding:10px 14px;border:1px solid #087f74;border-radius:9px;color:#08776e;background:#fff;cursor:pointer;font-weight:700}
     @media(max-width:720px){.crm-opp-metrics{grid-template-columns:repeat(2,1fr)}.crm-opp-filters{grid-template-columns:1fr}.crm-opp-dialog{padding:15px}.crm-opp-item{flex-wrap:wrap}}`;
   document.head.append(css);
-  new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(install);}).observe(root,{childList:true,subtree:true});install();
+  new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(install);}).observe(root,{childList:true,characterData:true,subtree:true});install();
 })();

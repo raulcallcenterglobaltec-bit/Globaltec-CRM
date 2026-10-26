@@ -243,13 +243,23 @@
     if (running) return;
     running = true;
     try {
+      for (const button of document.querySelectorAll('.crm-tasks-manage-button')) {
+        const heading = button.closest('.dashboard-heading');
+        if (!heading || heading.querySelector('h1')?.textContent?.trim() !== 'Tareas') button.remove();
+      }
+      for (const heading of document.querySelectorAll('.dashboard-heading.crm-tasks-heading')) {
+        if (heading.querySelector('h1')?.textContent?.trim() !== 'Tareas') heading.classList.remove('crm-tasks-heading');
+      }
       for (const heading of document.querySelectorAll('.dashboard-heading')) {
         if (heading.querySelector('h1')?.textContent?.trim() !== 'Tareas') continue;
         heading.classList.add('crm-tasks-heading');
         if (heading.querySelector('.crm-tasks-manage-button')) return;
         const button = element('button', 'Gestionar tareas', 'crm-tasks-manage-button');
         button.type = 'button';
-        button.onclick = () => showManager(heading);
+        button.onclick = () => {
+          if (heading.querySelector('h1')?.textContent?.trim() !== 'Tareas') { button.remove(); return; }
+          showManager(heading);
+        };
         heading.append(button);
       }
     } finally { running = false; }
@@ -276,6 +286,6 @@
   .crm-tasks-danger{border:1px solid #dc8a82;border-radius:8px;color:#b42318;background:#fff;padding:8px 13px;cursor:pointer}
   .crm-tasks-danger:disabled{opacity:.5}.crm-tasks-delete-footer{display:flex;justify-content:flex-end;gap:10px;padding-top:16px}.crm-tasks-export{padding:10px 14px;background:#fff;color:#087f74;border:1px solid #087f74;border-radius:8px;cursor:pointer}.crm-tasks-done{padding:10px 14px;background:#087f74;color:white;border:0;border-radius:8px;cursor:pointer}@media(max-width:700px){.crm-task-editor{grid-template-columns:1fr}.crm-tasks-summary{grid-template-columns:repeat(2,1fr)}}`;
   document.head.append(css);
-  new MutationObserver(install).observe(document.body, {childList:true,subtree:true});
+  new MutationObserver(install).observe(document.body, {childList:true,characterData:true,subtree:true});
   install();
 })();
