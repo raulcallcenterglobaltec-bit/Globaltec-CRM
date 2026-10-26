@@ -189,6 +189,7 @@
     try {
       for (const heading of document.querySelectorAll('.dashboard-heading')) {
         if (heading.querySelector('h1')?.textContent?.trim() !== 'Tareas') continue;
+        heading.classList.add('crm-tasks-heading');
         if (heading.querySelector('.crm-tasks-manage-button')) return;
         const button = element('button', 'Gestionar tareas', 'crm-tasks-manage-button');
         button.type = 'button';
@@ -198,7 +199,9 @@
     } finally { running = false; }
   }
   const css = document.createElement('style');
-  css.textContent = `.crm-tasks-manage-button{padding:11px 16px;border:1px solid #d0d7e2;border-radius:10px;background:#fff;color:#b42318;font-weight:700;cursor:pointer}
+  css.textContent = `.dashboard-heading.crm-tasks-heading{justify-content:flex-start;gap:10px;flex-wrap:wrap}
+  .dashboard-heading.crm-tasks-heading>div:first-child{margin-right:auto}
+  .crm-tasks-manage-button{padding:11px 16px;border:1px solid #d0d7e2;border-radius:10px;background:#fff;color:#142c48;font-weight:700;cursor:pointer}
   .crm-tasks-delete-overlay{position:fixed;inset:0;z-index:99999;background:rgba(14,28,48,.65);display:grid;place-items:center;padding:16px}
   .crm-tasks-delete-dialog{box-sizing:border-box;background:white;color:#192c3f;width:min(900px,100%);max-height:88vh;overflow:auto;border-radius:16px;padding:24px;box-shadow:0 20px 60px #142c483b}
   .crm-tasks-delete-header{display:flex;align-items:center;justify-content:space-between;gap:12px}.crm-tasks-delete-header h2{margin:0}
