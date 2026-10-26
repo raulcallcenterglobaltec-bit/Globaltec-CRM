@@ -117,17 +117,17 @@
   }
   function install(){
     scheduled=false;
-    const candidates=[...root.querySelectorAll('.dashboard-heading')].filter(h=>!h.querySelector('.dashboard-heading')&&h.getClientRects().length>0&&h.querySelector('h1')?.textContent.trim()==='Agenda');
+    const candidates=[...root.querySelectorAll('.agenda-hero')].filter(h=>h.getClientRects().length>0&&h.querySelector('h1')?.textContent.trim()==='Agenda');
     const heading=candidates[0];
     for(const button of root.querySelectorAll('.crm-agenda-manage-button'))if(!heading?.contains(button))button.remove();
     if(!heading||heading.querySelector('.crm-agenda-manage-button'))return;
     const button=make('button','Gestionar citas','crm-agenda-manage-button');button.type='button';button.onclick=()=>openManager(heading);
-    const actions=[...heading.querySelectorAll('button')].find(b=>/nueva cita|nuevo evento|añadir cita/i.test(b.textContent));
-    if(actions?.parentElement&&actions.parentElement!==heading)actions.parentElement.insertBefore(button,actions);
+    const actionGroup=heading.querySelector('.lead-heading-actions');
+    if(actionGroup){const newAppointment=[...actionGroup.querySelectorAll('button')].find(b=>/nueva cita/i.test(b.textContent));if(newAppointment)actionGroup.insertBefore(button,newAppointment);else actionGroup.prepend(button);}
     else heading.append(button);
   }
   const style=document.createElement('style');style.textContent=`
-    .crm-agenda-manage-button{padding:10px 14px;border:1px solid #0b8075;border-radius:9px;background:#fff;color:#08776e;font:inherit;font-size:13px;font-weight:750;cursor:pointer;margin-right:8px}
+    .agenda-hero .crm-agenda-manage-button{padding:10px 14px;border:1px solid #8ec3bb;border-radius:9px;background:#fff;color:#08776e;font:inherit;font-size:13px;font-weight:750;cursor:pointer;margin-right:8px;white-space:nowrap}
     .crm-agenda-overlay{position:fixed;inset:0;z-index:100003;display:grid;place-items:center;padding:16px;background:#081a30aa}
     .crm-agenda-dialog{box-sizing:border-box;width:min(960px,100%);max-height:91vh;overflow:auto;background:white;color:#16314b;padding:24px;border-radius:16px;box-shadow:0 18px 50px #142c4860}
     .crm-agenda-dialog header,.crm-agenda-dialog footer{display:flex;align-items:center;justify-content:space-between;gap:12px}.crm-agenda-dialog h2{margin:0}
