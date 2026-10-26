@@ -102,7 +102,10 @@
         if(!organizations.length)throw Error('No hay empresas disponibles.');
         for(const item of organizations){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;org.append(option);}
         const kicker=heading.querySelector('.dashboard-kicker')?.textContent||'';
-        const selected=organizations.find(item=>kicker.includes(item.name));if(selected)org.value=selected.id;
+        const activeOrg=document.getElementById('active-organization')?.value;
+        const selected=organizations.find(item=>item.id===activeOrg)||organizations.find(item=>kicker.includes(item.name));
+        if(selected)org.value=selected.id;
+        if(organizations.some(item=>item.id===activeOrg))org.closest('label').style.display='none';
         message('Elige la empresa y pulsa «Descargar CSV».');
       }catch(error){message(error.message,true);start.disabled=true;}
     })();

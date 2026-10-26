@@ -177,8 +177,10 @@
         if (!organizations.length) throw Error('No hay empresas activas.');
         const headingText = heading.querySelector('.dashboard-kicker')?.textContent || '';
         for (const item of organizations) { const option = element('option', item.name); option.value = item.id; org.append(option); }
-        const selected = organizations.find(item => headingText.includes(item.name));
+        const activeOrg = document.getElementById('active-organization')?.value;
+        const selected = organizations.find(item => item.id === activeOrg) || organizations.find(item => headingText.includes(item.name));
         if (selected) org.value = selected.id;
+        if (organizations.some(item => item.id === activeOrg)) org.closest('label').style.display = 'none';
         await load();
       } catch (error) { setNotice(error.message, true); }
     })();

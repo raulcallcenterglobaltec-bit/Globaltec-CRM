@@ -114,7 +114,10 @@
         if(!organizations.length)throw Error('No hay empresas disponibles.');
         for(const item of organizations){const option=el('option',item.name);option.value=item.id;org.append(option);}
         const current=document.getElementById('active-organization')?.value;
-        if(organizations.some(x=>x.id===current))org.value=current;
+        if(organizations.some(x=>x.id===current)){
+          org.value=current;
+          org.closest('label').style.display='none';
+        }
         await loadCompanies();
       }catch(error){message(error.message,true);}
     })();
@@ -131,7 +134,9 @@
     }
   }
   const style=document.createElement('style');style.textContent=`
-    .company-detail-header .crm-client-history-button{background:#087f74;color:#fff;border:1px solid #087f74;border-radius:9px;padding:10px 14px;font-weight:750;cursor:pointer;margin-right:8px}
+    .company-detail-header:has(.crm-client-history-button){justify-content:flex-start;gap:8px;flex-wrap:wrap}
+    .company-detail-header:has(.crm-client-history-button)>div:first-child{margin-right:auto}
+    .company-detail-header .crm-client-history-button{background:#087f74;color:#fff;border:1px solid #087f74;border-radius:9px;padding:10px 14px;font-weight:750;cursor:pointer;margin:0}
     .crm-client-history-overlay{position:fixed;inset:0;z-index:100004;display:grid;place-items:center;padding:16px;background:#091b31ad}
     .crm-client-history-dialog{box-sizing:border-box;width:min(960px,100%);max-height:92vh;overflow:auto;background:#fff;color:#16314b;padding:24px;border-radius:16px;box-shadow:0 18px 50px #142c4860}
     .crm-client-history-dialog header,.crm-client-history-dialog footer{display:flex;align-items:center;justify-content:space-between;gap:12px}

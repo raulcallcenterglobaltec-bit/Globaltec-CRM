@@ -53,9 +53,14 @@ async function initialize() {
     state.organizations.forEach(org => option(select, org.id, org.name));
     const savedOrg = sessionStorage.getItem('crm-marketing-org');
     const preferred = new URLSearchParams(location.search).get('org');
+    const globalOrg = sessionStorage.getItem('crm-active-organization');
     state.org = state.organizations.find(o => o.id === preferred)?.id ||
+      state.organizations.find(o => o.id === globalOrg)?.id ||
       state.organizations.find(o => o.id === savedOrg)?.id || state.organizations[0].id;
     select.value = state.org;
+    if(state.org === globalOrg){
+      select.closest('label').style.display = 'none';
+    }
     select.addEventListener('change', async () => {
       state.org = select.value;
       sessionStorage.setItem('crm-marketing-org', state.org);

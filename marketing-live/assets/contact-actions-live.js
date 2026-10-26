@@ -92,8 +92,11 @@
       const organizations = await api('organizations?select=id,name&active=eq.true&order=name');
       for(const item of organizations){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;org.append(option);}
       if(!organizations.length)throw Error('No hay empresas disponibles.');
+      const globalOrg=document.getElementById('active-organization')?.value;
       const current = document.querySelector('.dashboard-heading .dashboard-kicker')?.textContent || '';
-      const chosen = organizations.find(item => current.includes(item.name));if(chosen)org.value=chosen.id;
+      const chosen = organizations.find(item => item.id===globalOrg)||organizations.find(item => current.includes(item.name));
+      if(chosen)org.value=chosen.id;
+      if(organizations.some(item => item.id===globalOrg))org.closest('label').style.display='none';
       await loadCompanies();
     }catch(error){message(error.message,true);}
   }

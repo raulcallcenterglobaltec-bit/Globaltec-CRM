@@ -110,7 +110,10 @@
         if(!organizations.length)throw Error('No hay empresas disponibles.');
         for(const item of organizations){const option=make('option',item.name);option.value=item.id;org.append(option);}
         const hint=heading.querySelector('.dashboard-kicker')?.textContent||'';
-        const current=organizations.find(item=>hint.includes(item.name));if(current)org.value=current.id;
+        const activeOrg=document.getElementById('active-organization')?.value;
+        const current=organizations.find(item=>item.id===activeOrg)||organizations.find(item=>hint.includes(item.name));
+        if(current)org.value=current.id;
+        if(organizations.some(item=>item.id===activeOrg))org.closest('label').style.display='none';
         await load();
       }catch(error){message(error.message,true);}
     })();

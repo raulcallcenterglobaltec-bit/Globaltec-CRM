@@ -171,7 +171,9 @@ async function initialize() {
     const select=$('organization');
     organizations.forEach(org=>addOption(select,org.id,org.name));
     const preferred=new URLSearchParams(location.search).get('org');
-    state.org=organizations.find(o=>o.id===preferred)?.id||organizations[0].id;select.value=state.org;
+    const globalOrg=sessionStorage.getItem('crm-active-organization');
+    state.org=organizations.find(o=>o.id===preferred)?.id||organizations.find(o=>o.id===globalOrg)?.id||organizations[0].id;select.value=state.org;
+    if(state.org===globalOrg)select.closest('label').style.display='none';
     select.onchange=()=>{state.org=select.value;loadReport();};
     $('filters').onsubmit=event=>{event.preventDefault();loadReport();};
     $('export').onclick=exportCsv;
