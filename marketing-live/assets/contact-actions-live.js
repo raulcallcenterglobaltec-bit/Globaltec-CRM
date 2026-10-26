@@ -52,6 +52,8 @@
     tomorrow.setMinutes(0,0,0);
     const pad = n => String(n).padStart(2,'0');
     form.elements.due.value = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth()+1)}-${pad(tomorrow.getDate())}T${pad(tomorrow.getHours())}:00`;
+    if(context.title)form.elements.title.value=String(context.title).slice(0,180);
+    if(context.notes)form.elements.notes.value=String(context.notes).slice(0,3000);
     const message = (value,bad=false) => {status.textContent=value;status.style.color=bad?'#b42318':'#17665d';};
     let companies = [], contacts=[];
     function renderContacts(){
@@ -72,7 +74,8 @@
         const empty = document.createElement('option');empty.value='';empty.textContent='Sin cliente';company.append(empty);
         for(const item of companies){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;company.append(option);}
         const matches=companies.filter(item => item.name?.trim().toLocaleLowerCase('es') === context.companyName?.trim().toLocaleLowerCase('es'));
-        if(matches.length===1)company.value=matches[0].id;
+        if(context.companyId&&companies.some(x=>x.id===context.companyId))company.value=context.companyId;
+        else if(matches.length===1)company.value=matches[0].id;
         else if(matches.length>1)message('Hay varios clientes con ese nombre. Elige el correcto antes de guardar.',true);
         contacts=[];
         try{
@@ -82,6 +85,7 @@
           if(!company.value&&matched.length===1&&companies.some(x=>x.id===matched[0].company_id))company.value=matched[0].company_id;
         }catch(error){console.warn('Contactos no disponibles para vinculación:',error.message);}
         renderContacts();
+        if(context.contactId&&[...contact.options].some(x=>x.value===context.contactId))contact.value=context.contactId;
         if(matches.length<=1)message('Completa los datos y guarda la tarea.');
       } catch(error) {companies=[];contacts=[];renderContacts();message(error.message,true);}
     }
@@ -96,11 +100,17 @@
         if(!companies.length && company.value)throw Error('Vuelve a seleccionar la empresa.');
         if(company.value&&!companies.some(item=>item.id===company.value))throw Error('El cliente elegido no corresponde a esta empresa.');
         if(contact.value&&!contacts.some(item=>item.id===contact.value&&(!company.value||item.company_id===company.value)))throw Error('El contacto seleccionado no corresponde al cliente elegido.');
+        if(context.opportunityId){
+          const opps=await api(`opportunities?select=id,company_id,contact_id&organization_id=eq.${encodeURIComponent(org.value)}&id=eq.${encodeURIComponent(context.opportunityId)}&limit=1`);
+          if(opps.length!==1)throw Error('La oportunidad ya no está disponible en esta empresa.');
+          if(opps[0].company_id&&company.value!==opps[0].company_id)throw Error('Esta oportunidad ya pertenece a otro cliente. Selecciona el cliente vinculado.');
+          if(opps[0].contact_id&&contact.value!==opps[0].contact_id)throw Error('Selecciona el contacto vinculado a esta oportunidad.');
+        }
         const allowed = await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org.value,p_module:'tasks',p_action:'edit'}});
         if(allowed!==true)throw Error('No tienes permisos para crear tareas.');
         const due = new Date(form.elements.due.value);
         if(Number.isNaN(due.getTime()))throw Error('Introduce una fecha válida.');
-        const payload = {organization_id:org.value,title:form.elements.title.value.trim(),description:form.elements.notes.value.trim() || null,due_date:due.toISOString(),priority:form.elements.priority.value,status:'pending',task_type:'general',created_by:session().user.id,assigned_to:session().user.id,company_id:company.value || null,contact_id:contact.value||null};
+        const payload = {organization_id:org.value,title:form.elements.title.value.trim(),description:form.elements.notes.value.trim() || null,due_date:due.toISOString(),priority:form.elements.priority.value,status:'pending',task_type:'general',created_by:session().user.id,assigned_to:session().user.id,company_id:company.value || null,contact_id:contact.value||null,opportunity_id:context.opportunityId||null};
         if(!payload.title)throw Error('El título es obligatorio.');
         const created = await api('tasks?select=id,title',{method:'POST',body:payload});
         if(!Array.isArray(created)||created.length!==1)throw Error('No se ha confirmado el guardado.');
@@ -145,6 +155,11 @@
     clearTimeout(toast.timeout);
     toast.timeout = setTimeout(() => status.remove(), 2900);
   }
+  document.addEventListener('crm:open-followup-task',event=>{
+    const context=event.detail;
+    if(!context||!context.opportunityId||context.organizationId!==document.getElementById('active-organization')?.value)return;
+    newTask(context).catch(error=>toast(error.message||'No se pudo abrir la tarea.',true));
+  });
   async function copy(value, label) {
     try {
       if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(value);

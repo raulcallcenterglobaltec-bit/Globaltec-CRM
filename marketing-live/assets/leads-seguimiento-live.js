@@ -7,7 +7,7 @@
   function session(){let s;try{s=JSON.parse(localStorage.getItem(TOKEN)||'null');}catch{s=null;}
     if(!s?.access_token||s.expires_at*1000<=Date.now())throw Error('Tu sesión ha caducado. Inicia sesión de nuevo.');return s;}
   async function api(path,opts={}){
-    const res=await fetch(API+path,{method:opts.method||'GET',headers:{apikey:KEY,Authorization:'Bearer '+session().access_token,'Content-Type':'application/json'},...(opts.body?{body:JSON.stringify(opts.body)}:{})});
+    const res=await fetch(API+path,{method:opts.method||'GET',headers:{apikey:KEY,Authorization:'Bearer '+session().access_token,'Content-Type':'application/json',Prefer:'return=representation'},...(opts.body?{body:JSON.stringify(opts.body)}:{})});
     const raw=await res.text();let data;try{data=raw?JSON.parse(raw):null;}catch{data=null;}
     if(!res.ok)throw Error(data?.message||`Error ${res.status} al consultar los leads.`);return data;
   }
@@ -34,10 +34,35 @@
     const view=overlay.querySelector('#crm-lead-summary-view'),search=overlay.querySelector('#crm-lead-summary-search'),sort=overlay.querySelector('#crm-lead-summary-sort');
     const message=(value,bad=false)=>{notice.textContent=value;notice.style.color=bad?'#b42318':'#087f74';};
     const close=()=>overlay.remove();overlay.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);overlay.onclick=e=>{if(e.target===overlay)close();};
-    let org='',entries=[];
+    let org='',entries=[],canEdit=false,busy=false;
     const active=x=>!['converted','discarded','spam'].includes(x.status);
     const day=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     const dueDay=x=>x.next_action_at?day(new Date(x.next_action_at)):'';
+    const localInputDate=value=>{const d=new Date(value||Date.now()+86400000),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;};
+    function plan(item,row){
+      if(row.querySelector('.crm-lead-plan'))return;
+      const form=el('form','','crm-lead-plan');
+      form.innerHTML='<label>Próxima actuación<input name="action" required maxlength="400" placeholder="Llamar, enviar presupuesto, confirmar visita…"></label><label>Fecha y hora<input name="when" required type="datetime-local"></label><div><button type="submit">Guardar</button><button type="button" data-cancel>Cancelar</button></div>';
+      form.elements.action.value=item.next_action||'';form.elements.when.value=localInputDate(item.next_action_at);
+      form.querySelector('[data-cancel]').onclick=()=>form.remove();
+      form.onsubmit=async event=>{
+        event.preventDefault();if(busy)return;
+        busy=true;const button=form.querySelector('[type="submit"]');button.disabled=true;
+        try{
+          if(document.getElementById('active-organization')?.value!==org)throw Error('Ha cambiado la empresa activa. Abre el panel de nuevo.');
+          if(!active(item))throw Error('El lead ya no permite planificar actuaciones.');
+          const action=form.elements.action.value.trim(),when=new Date(form.elements.when.value);
+          if(!action||Number.isNaN(when.getTime()))throw Error('Completa la actuación y una fecha válida.');
+          const allowed=await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org,p_module:'leads',p_action:'edit'}});
+          if(allowed!==true)throw Error('No tienes permiso para modificar leads.');
+          const updated=await api(`leads?id=eq.${encodeURIComponent(item.id)}&organization_id=eq.${encodeURIComponent(org)}&status=not.in.(converted,discarded,spam)&select=id,next_action,next_action_at`,{method:'PATCH',body:{next_action:action,next_action_at:when.toISOString()}});
+          if(!Array.isArray(updated)||updated.length!==1||updated[0].id!==item.id)throw Error('No se confirmó el cambio. Comprueba el estado del lead.');
+          item.next_action=updated[0].next_action;item.next_action_at=updated[0].next_action_at;
+          render();message('Próxima actuación guardada correctamente.');
+        }catch(error){message(error.message,true);button.disabled=false;}finally{busy=false;}
+      };
+      row.append(form);
+    }
     function filtered(){
       const now=new Date(),today=day(now),end=new Date(now.getFullYear(),now.getMonth(),now.getDate()+7),last=day(end);
       const q=search.value.toLocaleLowerCase('es').trim();
@@ -73,6 +98,10 @@
         const action=el('div','','crm-lead-summary-next');action.append(el('strong',row.next_action||'Sin próxima actuación'));
         action.append(el('small',row.next_action_at?new Date(row.next_action_at).toLocaleString('es-ES',{dateStyle:'short',timeStyle:'short'}):'Sin fecha'));
         if(active(row)&&(!row.next_action||!row.next_action_at||!row.assigned_to))action.append(el('small',[!row.next_action||!row.next_action_at?'Falta planificar':'',!row.assigned_to?'Sin responsable':''].filter(Boolean).join(' · '),'crm-lead-summary-warning'));
+        if(canEdit&&active(row)){
+          const planButton=el('button',row.next_action_at?'Reprogramar':'Planificar','crm-lead-plan-button');planButton.type='button';
+          planButton.onclick=()=>plan(row,item);action.append(planButton);
+        }
         item.append(info,action);list.append(item);
       }
       message(`${rows.length} leads encontrados.${rows.length>300?' El CSV incluirá también los no mostrados.':''}`);
@@ -83,6 +112,7 @@
         if(document.getElementById('active-organization')?.value!==org)throw Error('Ha cambiado la empresa activa. Vuelve a abrir el panel.');
         const allowed=await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org,p_module:'leads',p_action:'view'}});
         if(allowed!==true)throw Error('No tienes permiso para consultar leads.');
+        canEdit=(await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org,p_module:'leads',p_action:'edit'}}).catch(()=>false))===true;
         for(let offset=0;offset<10000;offset+=500){
           const batch=await api(`leads?select=id,contact_name,company_name,email,phone,status,assigned_to,next_action,next_action_at,created_at&organization_id=eq.${encodeURIComponent(org)}&order=created_at.desc&limit=500&offset=${offset}`);
           entries.push(...batch);if(batch.length<500)break;
@@ -117,8 +147,9 @@
     .crm-lead-summary-dialog input,.crm-lead-summary-dialog select{display:block;box-sizing:border-box;width:100%;padding:10px;border:1px solid #bed0dc;border-radius:9px;margin-top:6px;font:inherit}
     .crm-lead-summary-notice{min-height:20px;font-size:13px}.crm-lead-summary-list{display:grid;gap:8px;max-height:400px;overflow:auto}.crm-lead-summary-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid #e1e8ed;border-radius:9px}
     .crm-lead-summary-info{flex:1;min-width:0}.crm-lead-summary-info strong,.crm-lead-summary-info small,.crm-lead-summary-next strong,.crm-lead-summary-next small{display:block}.crm-lead-summary-info small,.crm-lead-summary-next small{color:#687d8c;margin-top:5px}.crm-lead-summary-next{text-align:right;max-width:270px}.crm-lead-summary-next .crm-lead-summary-warning{color:#ae5100;font-weight:750}
+    .crm-lead-plan-button{margin-top:9px;border:1px solid #087f74;background:#fff;color:#087f74;border-radius:8px;padding:7px 10px;cursor:pointer;font-size:12px;font-weight:750}.crm-lead-plan{flex:0 0 100%;display:grid;grid-template-columns:1fr 200px auto;align-items:end;gap:9px;padding:12px;background:#f5faf8;border:1px solid #dcebe7;border-radius:9px}.crm-lead-plan label{text-align:left}.crm-lead-plan div{display:flex;gap:5px}.crm-lead-plan button{border:1px solid #087f74;color:#087f74;background:#fff;border-radius:8px;padding:10px;cursor:pointer}.crm-lead-plan button[type=submit]{background:#087f74;color:#fff}
     .crm-lead-summary-dialog footer button{padding:10px 14px;border:1px solid #087f74;border-radius:9px;background:#fff;color:#08776e;cursor:pointer;font-weight:700}
-    @media(max-width:800px){.crm-lead-summary-metrics{grid-template-columns:repeat(2,1fr)}.crm-lead-summary-controls{grid-template-columns:1fr}.crm-lead-summary-dialog{padding:15px}.crm-lead-summary-row{flex-wrap:wrap}}`;
+    @media(max-width:800px){.crm-lead-summary-metrics{grid-template-columns:repeat(2,1fr)}.crm-lead-summary-controls{grid-template-columns:1fr}.crm-lead-summary-dialog{padding:15px}.crm-lead-summary-row{flex-wrap:wrap}.crm-lead-plan{grid-template-columns:1fr}}`;
   document.head.append(css);
   new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(install);}).observe(root,{childList:true,subtree:true});install();
 })();

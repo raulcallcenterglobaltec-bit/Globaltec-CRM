@@ -81,6 +81,16 @@
         info.append(el('small',`${r.companies?.name||'Sin cliente'} · ${r.pipeline_stages?.name||'Sin etapa'} · ${r.expected_close_date||'Sin fecha de cierre'}`));
         if(taskVisible){const t=taskSummary.get(r.id)||{pending:0,overdue:0,next:''};info.append(el('small',`${t.pending} tareas pendientes${t.overdue?' · '+t.overdue+' vencidas':''}${t.next?' · Próxima: '+t.next:' · Sin próxima tarea'}`,'crm-opp-tasks'));}
         const val=el('div','','crm-opp-value');val.append(el('strong',money(r.estimated_value)),el('small',`${Number(r.probability||0)}% de probabilidad`));
+        if(stage(r)==='open'){
+          const followup=el('button','Crear tarea','crm-opp-followup');followup.type='button';
+          followup.title='Preparar una tarea vinculada a esta oportunidad';
+          followup.onclick=()=>{
+            if(document.getElementById('active-organization')?.value!==org){message('Ha cambiado la empresa activa. Vuelve a abrir el panel.',true);return;}
+            close();
+            document.dispatchEvent(new CustomEvent('crm:open-followup-task',{detail:{organizationId:org,opportunityId:r.id,companyId:r.company_id||null,contactId:r.contact_id||null,companyName:r.companies?.name||'',title:'Seguimiento: '+(r.title||'oportunidad')}}));
+          };
+          val.append(followup);
+        }
         row.append(info,val);list.append(row);
       }
       message(`${rows.length} oportunidades con el filtro actual.${!taskVisible?' No se pudo consultar el seguimiento de tareas.':''}${rows.length>300?' Se muestran las primeras 300; el CSV incluye todas.':''}`);
@@ -93,7 +103,7 @@
         const allowed=await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org,p_module:'opportunities',p_action:'view'}});
         if(allowed!==true)throw Error('No tienes permiso para consultar oportunidades.');
         for(let offset=0;offset<10000;offset+=500){
-          const page=await api(`opportunities?select=id,title,estimated_value,monthly_value,probability,expected_close_date,owner_id,companies(name),contacts(first_name,last_name),pipeline_stages(name,is_won,is_lost)&organization_id=eq.${encodeURIComponent(org)}&order=created_at.desc&limit=500&offset=${offset}`);
+          const page=await api(`opportunities?select=id,title,company_id,contact_id,estimated_value,monthly_value,probability,expected_close_date,owner_id,companies(name),contacts(first_name,last_name),pipeline_stages(name,is_won,is_lost)&organization_id=eq.${encodeURIComponent(org)}&order=created_at.desc&limit=500&offset=${offset}`);
           records.push(...page);if(page.length<500)break;
         }
         try{
@@ -141,6 +151,7 @@
     .crm-opp-filters{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}.crm-opp-dialog label{font-size:13px;font-weight:650}.crm-opp-dialog input,.crm-opp-dialog select{display:block;box-sizing:border-box;width:100%;padding:10px;border:1px solid #bed0dc;border-radius:9px;margin-top:6px;font:inherit}
     .crm-opp-notice{min-height:20px;font-size:13px}.crm-opp-list{max-height:400px;overflow:auto;display:grid;gap:8px}.crm-opp-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid #e1e8ed;border-radius:9px}
     .crm-opp-info{flex:1;min-width:0}.crm-opp-info strong,.crm-opp-info small,.crm-opp-value strong,.crm-opp-value small{display:block}.crm-opp-info small,.crm-opp-value small{color:#687e90;margin-top:5px}.crm-opp-info .crm-opp-tasks{color:#087f74;font-weight:700}.crm-opp-value{text-align:right;white-space:nowrap}
+    .crm-opp-value .crm-opp-followup{display:block;margin:8px 0 0 auto;border:1px solid #087f74;background:#fff;color:#087f74;border-radius:8px;padding:7px 10px;font:inherit;font-size:12px;font-weight:750;cursor:pointer}
     .crm-opp-dialog footer button{padding:10px 14px;border:1px solid #087f74;border-radius:9px;color:#08776e;background:#fff;cursor:pointer;font-weight:700}
     @media(max-width:720px){.crm-opp-metrics{grid-template-columns:repeat(2,1fr)}.crm-opp-filters{grid-template-columns:1fr}.crm-opp-dialog{padding:15px}.crm-opp-item{flex-wrap:wrap}}`;
   document.head.append(css);
