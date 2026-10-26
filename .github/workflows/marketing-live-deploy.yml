@@ -34,6 +34,7 @@ jobs:
           test -s marketing-live/assets/contact-actions-live.js
           test -s marketing-live/assets/inicio-prioridades-live.js
           test -s marketing-live/assets/export-clientes-contactos-live.js
+          test -s marketing-live/assets/agenda-rapida-live.js
           node --check marketing-live/assets/marketing.js
           node --check marketing-live/assets/marketing-link.js
           node --check marketing-live/assets/informes-comerciales.js
@@ -41,6 +42,7 @@ jobs:
           node --check marketing-live/assets/contact-actions-live.js
           node --check marketing-live/assets/inicio-prioridades-live.js
           node --check marketing-live/assets/export-clientes-contactos-live.js
+          node --check marketing-live/assets/agenda-rapida-live.js
       - name: Preparar conexión
         run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass rsync
       - name: Respaldar archivos anteriores
@@ -63,7 +65,7 @@ jobs:
               BACK=.crm-backups/marketing-${GITHUB_RUN_ID}
               mkdir -p \"\$BACK/assets\"
               cp -p \"\$WEB/index.html\" \"\$BACK/index.html\"
-              for FILE in marketing.html informes-comerciales.html assets/marketing.js assets/marketing.css assets/marketing-link.js assets/tasks-delete-live.js assets/informes-comerciales.js assets/informes-comerciales.css assets/contact-actions-live.js assets/inicio-prioridades-live.js assets/export-clientes-contactos-live.js; do
+              for FILE in marketing.html informes-comerciales.html assets/marketing.js assets/marketing.css assets/marketing-link.js assets/tasks-delete-live.js assets/informes-comerciales.js assets/informes-comerciales.css assets/contact-actions-live.js assets/inicio-prioridades-live.js assets/export-clientes-contactos-live.js assets/agenda-rapida-live.js; do
                 if test -f \"\$WEB/\$FILE\"; then
                   cp -p \"\$WEB/\$FILE\" \"\$BACK/\$FILE\"
                 fi
@@ -79,7 +81,7 @@ jobs:
           SSH_HOST=grupoglobalteces@grupyj.ssh.tb-hosting.com
           SSH_OPTS='-o StrictHostKeyChecking=accept-new -o PreferredAuthentications=password -o PubkeyAuthentication=no -o ConnectTimeout=20'
           TARGET=subsites/crm.grupoglobaltec.es
-          sshpass -e rsync -az -e "ssh $SSH_OPTS" marketing-live/assets/marketing.js marketing-live/assets/marketing.css marketing-live/assets/marketing-link.js marketing-live/assets/tasks-delete-live.js marketing-live/assets/informes-comerciales.js marketing-live/assets/informes-comerciales.css marketing-live/assets/contact-actions-live.js marketing-live/assets/inicio-prioridades-live.js marketing-live/assets/export-clientes-contactos-live.js "$SSH_HOST:$TARGET/assets/"
+          sshpass -e rsync -az -e "ssh $SSH_OPTS" marketing-live/assets/marketing.js marketing-live/assets/marketing.css marketing-live/assets/marketing-link.js marketing-live/assets/tasks-delete-live.js marketing-live/assets/informes-comerciales.js marketing-live/assets/informes-comerciales.css marketing-live/assets/contact-actions-live.js marketing-live/assets/inicio-prioridades-live.js marketing-live/assets/export-clientes-contactos-live.js marketing-live/assets/agenda-rapida-live.js "$SSH_HOST:$TARGET/assets/"
           sshpass -e rsync -az -e "ssh $SSH_OPTS" marketing-live/marketing.html marketing-live/informes-comerciales.html "$SSH_HOST:$TARGET/"
           sshpass -e ssh -T $SSH_OPTS "$SSH_HOST" '
             set -eu
@@ -92,6 +94,7 @@ jobs:
             test -s assets/contact-actions-live.js
             test -s assets/inicio-prioridades-live.js
             test -s assets/export-clientes-contactos-live.js
+            test -s assets/agenda-rapida-live.js
             if ! grep -q "/assets/marketing-link.js" index.html; then
               grep -q "</body>" index.html
               sed "s@</body>@  <script defer src=\"/assets/marketing-link.js\"></script></body>@" index.html > index.html.marketing-next
@@ -118,6 +121,11 @@ jobs:
               grep -q "/assets/export-clientes-contactos-live.js" index.html.export-next
               mv index.html.export-next index.html
             fi
+            if ! grep -q "/assets/agenda-rapida-live.js" index.html; then
+              sed "s@</body>@  <script defer src=\"/assets/agenda-rapida-live.js\"></script></body>@" index.html > index.html.agenda-next
+              grep -q "/assets/agenda-rapida-live.js" index.html.agenda-next
+              mv index.html.agenda-next index.html
+            fi
             echo MARKETING_FILES_OK
           '
       - name: Comprobar publicación real por HTTPS
@@ -134,5 +142,7 @@ jobs:
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/ | grep -q '/assets/inicio-prioridades-live.js'
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/assets/export-clientes-contactos-live.js | grep -q 'crm-export-button'
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/ | grep -q '/assets/export-clientes-contactos-live.js'
+          curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/assets/agenda-rapida-live.js | grep -q 'crm-agenda-manage-button'
+          curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/ | grep -q '/assets/agenda-rapida-live.js'
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/ | grep -q '/assets/tasks-delete-live.js'
           echo MARKETING_LIVE_OK
