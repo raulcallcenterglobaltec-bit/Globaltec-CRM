@@ -1,0 +1,103 @@
+name: Preparar y publicar CRM en Nominalia
+
+on:
+  push:
+    paths:
+      - '.github/workflows/nominalia-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Primero verificar; publicar solo tras validar la versión'
+        required: true
+        type: choice
+        default: verify
+        options:
+          - verify
+          - deploy
+      confirmation:
+        description: 'Para publicar escribe PUBLICAR_CRM'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nominalia-crm-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Instalar dependencias
+        run: npm install
+      - name: Comprobar variables de Supabase
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          test -n "$VITE_SUPABASE_URL" || { echo 'Falta VITE_SUPABASE_URL'; exit 1; }
+          test -n "$VITE_SUPABASE_PUBLISHABLE_KEY" || { echo 'Falta VITE_SUPABASE_PUBLISHABLE_KEY'; exit 1; }
+      - name: Compilar para la raíz del dominio de Nominalia
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: npm run build -- --base=/
+      - name: Validar salida
+        run: |
+          test -s dist/index.html
+          test -d dist/assets
+          grep -q '/assets/' dist/index.html
+          echo 'BUILD_OK: compilación lista. El CRM de Nominalia sigue intacto.'
+      - name: Guardar compilación para revisión
+        uses: actions/upload-artifact@v4
+        with:
+          name: crm-nominalia-preview
+          path: dist/
+          retention-days: 7
+      - name: Bloquear publicación no autorizada
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'deploy' && inputs.confirmation != 'PUBLICAR_CRM' }}
+        run: |
+          echo 'La publicación requiere la confirmación PUBLICAR_CRM.'
+          exit 1
+      - name: Instalar herramientas de despliegue
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'deploy' && inputs.confirmation == 'PUBLICAR_CRM' }}
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass rsync
+      - name: Copia de seguridad y publicación protegida
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'deploy' && inputs.confirmation == 'PUBLICAR_CRM' }}
+        env:
+          SSHPASS: ${{ secrets.NOMINALIA_SSH_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$SSHPASS" || { echo 'Falta el secreto SSH'; exit 1; }
+          SSH_HOST='grupoglobalteces@grupyj.ssh.tb-hosting.com'
+          SSH_OPTS='-o StrictHostKeyChecking=accept-new -o PreferredAuthentications=password -o PubkeyAuthentication=no -o ConnectTimeout=20'
+          REMOTE='subsites/crm.grupoglobaltec.es'
+          sshpass -e ssh $SSH_OPTS "$SSH_HOST" "
+            set -eu
+            test -f '$REMOTE/index.html'
+            test -d '$REMOTE/assets'
+            mkdir -p .crm-backups
+            tar -czf '.crm-backups/crm-predeploy-${GITHUB_RUN_ID}.tgz' -C '$REMOTE' .
+            test -s '.crm-backups/crm-predeploy-${GITHUB_RUN_ID}.tgz'
+            echo BACKUP_OK
+          "
+          # Los activos se añaden sin borrar versiones anteriores.
+          sshpass -e rsync -az -e "ssh $SSH_OPTS" dist/assets/ "$SSH_HOST:$REMOTE/assets/"
+          # El HTML se reemplaza al final, mediante cambio de nombre.
+          sshpass -e rsync -az -e "ssh $SSH_OPTS" dist/index.html "$SSH_HOST:$REMOTE/index.html.next"
+          sshpass -e ssh $SSH_OPTS "$SSH_HOST" "
+            set -eu
+            test -s '$REMOTE/index.html.next'
+            mv '$REMOTE/index.html.next' '$REMOTE/index.html'
+            test -s '$REMOTE/index.html'
+            echo DEPLOY_OK
+          "
