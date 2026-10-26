@@ -35,12 +35,12 @@
     overlay.id = 'crm-tasks-delete-dialog';
     overlay.innerHTML = `<section class="crm-tasks-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="crm-tasks-delete-title">
       <div class="crm-tasks-delete-header"><h2 id="crm-tasks-delete-title">Gestión rápida de tareas</h2><button type="button" class="crm-tasks-close" aria-label="Cerrar">×</button></div>
-      <p>Consulta pendientes, vencidas y completadas. Puedes completar tareas sin abrir el formulario y eliminar registros con confirmación.</p>
+      <p>Organiza el trabajo del día, localiza seguimientos de oportunidades y consulta las tareas sin responsable. Puedes completar tareas sin abrir el formulario y eliminar registros con confirmación.</p>
       <label>Empresa <select id="crm-tasks-org"></select></label>
       <div id="crm-tasks-summary" class="crm-tasks-summary"></div>
       <div class="crm-tasks-filters">
-        <label>Vista <select id="crm-tasks-view"><option value="pending">Pendientes</option><option value="overdue">Vencidas</option><option value="completed">Completadas</option><option value="all">Todas</option></select></label>
-        <label>Buscar <input id="crm-tasks-search" type="search" placeholder="Título o cliente…"></label>
+        <label>Vista <select id="crm-tasks-view"><option value="pending">Pendientes</option><option value="today">Para hoy</option><option value="overdue">Vencidas</option><option value="unassigned">Sin responsable</option><option value="opportunity">De oportunidades</option><option value="completed">Completadas</option><option value="all">Todas</option></select></label>
+        <label>Buscar <input id="crm-tasks-search" type="search" placeholder="Título, cliente u oportunidad…"></label>
         <label>Cliente <select id="crm-tasks-client"><option value="all">Todos</option></select></label>
         <label>Prioridad <select id="crm-tasks-priority"><option value="all">Todas</option><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option><option value="low">Baja</option></select></label>
         <label>Responsable <select id="crm-tasks-owner"><option value="all">Todos</option><option value="mine">Mis tareas</option></select></label>
@@ -49,7 +49,7 @@
       </div>
       <div id="crm-tasks-delete-notice" role="status" aria-live="polite"></div>
       <div id="crm-tasks-delete-list"></div>
-      <div class="crm-tasks-delete-footer"><button type="button" class="crm-tasks-done">Cerrar y actualizar CRM</button></div>
+      <div class="crm-tasks-delete-footer"><button type="button" class="crm-tasks-export">Exportar CSV</button><button type="button" class="crm-tasks-done">Cerrar y actualizar CRM</button></div>
     </section>`;
     document.body.append(overlay);
     const get = id => overlay.querySelector('#' + id);
@@ -72,11 +72,22 @@
     };
     const isPending = task => task.status === 'pending' || task.status === 'in_progress';
     const overdue = task => isPending(task) && task.due_date && dayKey(task.due_date) < dayKey(new Date());
+    const today = task => isPending(task) && task.due_date && dayKey(task.due_date) === dayKey(new Date());
+    function csvCell(value) { let s=String(value??''); if (/^[\s\u0000-\u001f]*[=+@\-]/.test(s)) s="'"+s; return '"'+s.replace(/"/g,'""')+'"'; }
+    function exportCsv() {
+      const rows=[['Tarea','Estado','Prioridad','Vencimiento','Cliente','Oportunidad vinculada','Responsable'],...filters().map(t=>[t.title,t.status,t.priority,t.due_date||'',t.companies?.name||'',t.opportunity_id?'Sí':'No',t.assigned_to?'Asignado':'Sin asignar'])];
+      const content='\ufeff'+rows.map(row=>row.map(csvCell).join(';')).join('\r\n');
+      const url=URL.createObjectURL(new Blob([content],{type:'text/csv;charset=utf-8'}));const link=element('a');link.href=url;link.download='globaltec-tareas-'+new Date().toISOString().slice(0,10)+'.csv';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);
+    }
+    overlay.querySelector('.crm-tasks-export').onclick=exportCsv;
     function filters() {
       const term = search.value.toLocaleLowerCase('es').trim();
       return records.filter(task => {
         if (view.value === 'pending' && !isPending(task)) return false;
         if (view.value === 'overdue' && !overdue(task)) return false;
+        if (view.value === 'today' && !today(task)) return false;
+        if (view.value === 'unassigned' && (!isPending(task) || task.assigned_to)) return false;
+        if (view.value === 'opportunity' && (!isPending(task) || !task.opportunity_id)) return false;
         if (view.value === 'completed' && task.status !== 'completed') return false;
         if (client.value !== 'all' && (task.company_id || '') !== client.value) return false;
         if (priority.value !== 'all' && task.priority !== priority.value) return false;
@@ -84,7 +95,7 @@
         const due = task.due_date ? dayKey(task.due_date) : '';
         if (from.value && (!due || due < from.value)) return false;
         if (to.value && (!due || due > to.value)) return false;
-        return ((task.title || '') + ' ' + (task.companies?.name || '')).toLocaleLowerCase('es').includes(term);
+        return ((task.title || '') + ' ' + (task.companies?.name || '') + ' ' + (task.description || '')).toLocaleLowerCase('es').includes(term);
       });
     }
     function render() {
@@ -93,7 +104,10 @@
       get('crm-tasks-summary').replaceChildren();
       const counts = [
         ['Pendientes', records.filter(isPending).length, 'pending'],
+        ['Para hoy', records.filter(today).length, 'today'],
         ['Vencidas', records.filter(overdue).length, 'overdue'],
+        ['Sin responsable', records.filter(task=>isPending(task)&&!task.assigned_to).length, 'unassigned'],
+        ['De oportunidades', records.filter(task=>isPending(task)&&!!task.opportunity_id).length, 'opportunity'],
         ['Completadas', records.filter(task => task.status === 'completed').length, 'completed'],
         ['Total', records.length, 'all']
       ];
@@ -112,12 +126,15 @@
         const due = task.due_date ? new Date(task.due_date).toLocaleString('es-ES', {dateStyle:'short',timeStyle:'short'}) : 'Sin vencimiento';
         const priorityLabel = ({urgent:'Urgente',high:'Alta',normal:'Normal',low:'Baja'})[task.priority] || task.priority || 'Normal';
         info.append(element('small', `${task.companies?.name || 'Sin cliente'} · ${state} · ${priorityLabel} · ${due}${overdue(task) ? ' · VENCIDA' : ''}`));
+        if (task.opportunity_id) info.append(element('small','Vinculada a una oportunidad','crm-task-linked'));
+        if (isPending(task) && !task.assigned_to) info.append(element('small','Sin responsable asignado','crm-task-alert'));
         const buttons = element('div', '', 'crm-tasks-actions');
         if (canEdit && task.status !== 'cancelled') {
           const complete = element('button', task.status === 'completed' ? 'Reabrir' : 'Completar', 'crm-tasks-primary');
           complete.type = 'button'; complete.disabled = busy;
           complete.onclick = async () => {
             if (busy) return;
+            if (document.getElementById('active-organization')?.value && document.getElementById('active-organization').value !== org.value) { setNotice('Ha cambiado la empresa activa. Cierra y abre el gestor de tareas.',true); return; }
             busy = true; complete.disabled = true; setNotice('Guardando estado…');
             const done = task.status !== 'completed';
             try {
@@ -134,7 +151,9 @@
           const button = element('button', 'Eliminar', 'crm-tasks-danger');
           button.type = 'button'; button.disabled = busy;
           button.onclick = async () => {
-            if (busy || !confirm(`¿Eliminar definitivamente la tarea «${task.title}»? Esta acción no se puede deshacer.`)) return;
+            if (busy) return;
+            if (document.getElementById('active-organization')?.value && document.getElementById('active-organization').value !== org.value) { setNotice('Ha cambiado la empresa activa. Cierra y abre el gestor de tareas.',true); return; }
+            if (!confirm(`¿Eliminar definitivamente la tarea «${task.title}»? Esta acción no se puede deshacer.`)) return;
             busy = true; button.disabled = true; setNotice('Eliminando tarea…');
             try {
               const deleted = await request(`tasks?id=eq.${encodeURIComponent(task.id)}&organization_id=eq.${encodeURIComponent(org.value)}&select=id`, {method:'DELETE'});
@@ -158,7 +177,7 @@
           request('rpc/crm_has_module_permission', {method:'POST',body:{p_org:org.value,p_module:'tasks',p_action:'edit'}}),
           request('rpc/crm_can_delete_record', {method:'POST',body:{p_org:org.value,p_module:'tasks'}})
         ]);
-        records = await request(`tasks?select=id,title,status,priority,due_date,company_id,assigned_to,organization_id,companies(name)&organization_id=eq.${encodeURIComponent(org.value)}&order=created_at.desc&limit=1000`);
+        records = await request(`tasks?select=id,title,description,status,priority,due_date,company_id,opportunity_id,assigned_to,organization_id,companies(name)&organization_id=eq.${encodeURIComponent(org.value)}&order=created_at.desc&limit=1000`);
         client.replaceChildren(); const all = element('option', 'Todos'); all.value = 'all'; client.append(all);
         const clients = new Map(records.filter(task => task.company_id).map(task => [task.company_id,task.companies?.name || 'Cliente']));
         for (const [id,name] of [...clients].sort((a,b)=>a[1].localeCompare(b[1],'es'))) {
@@ -215,11 +234,11 @@
   .crm-task-count.selected{background:#e5f5f1;border-color:#087f74}.crm-task-count strong,.crm-task-count span{display:block}
   .crm-task-count strong{font-size:24px;color:#142c48}.crm-task-count span{font-size:12px;color:#64748b}
   #crm-tasks-delete-notice{margin:14px 0;font-size:14px}.crm-tasks-delete-row{display:flex;align-items:center;justify-content:space-between;border-top:1px solid #e3e8ed;padding:12px 0;gap:12px}
-  .crm-tasks-delete-row strong,.crm-tasks-delete-row small{display:block}.crm-tasks-delete-row small{margin-top:5px;color:#64748b}
+  .crm-tasks-delete-row strong,.crm-tasks-delete-row small{display:block}.crm-tasks-delete-row small{margin-top:5px;color:#64748b}.crm-tasks-delete-row .crm-task-linked{color:#087f74;font-weight:700}.crm-tasks-delete-row .crm-task-alert{color:#aa5100;font-weight:700}
   .crm-tasks-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
   .crm-tasks-primary{border:1px solid #087f74;border-radius:8px;color:#087f74;background:#fff;padding:8px 13px;cursor:pointer}
   .crm-tasks-danger{border:1px solid #dc8a82;border-radius:8px;color:#b42318;background:#fff;padding:8px 13px;cursor:pointer}
-  .crm-tasks-danger:disabled{opacity:.5}.crm-tasks-delete-footer{text-align:right;padding-top:16px}.crm-tasks-done{padding:10px 14px;background:#087f74;color:white;border:0;border-radius:8px;cursor:pointer}`;
+  .crm-tasks-danger:disabled{opacity:.5}.crm-tasks-delete-footer{display:flex;justify-content:flex-end;gap:10px;padding-top:16px}.crm-tasks-export{padding:10px 14px;background:#fff;color:#087f74;border:1px solid #087f74;border-radius:8px;cursor:pointer}.crm-tasks-done{padding:10px 14px;background:#087f74;color:white;border:0;border-radius:8px;cursor:pointer}`;
   document.head.append(css);
   new MutationObserver(install).observe(document.body, {childList:true,subtree:true});
   install();
