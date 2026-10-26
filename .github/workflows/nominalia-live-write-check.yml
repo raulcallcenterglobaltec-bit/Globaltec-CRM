@@ -1,0 +1,36 @@
+name: Verificar publicación real en Nominalia
+
+on:
+  push:
+    paths:
+      - '.github/workflows/nominalia-live-write-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Preparar conexión segura
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+      - name: Publicar archivo de verificación sin tocar el CRM
+        env:
+          SSHPASS: ${{ secrets.NOMINALIA_SSH_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$SSHPASS"
+          sshpass -e ssh -T \
+            -o StrictHostKeyChecking=accept-new \
+            -o PreferredAuthentications=password \
+            -o PubkeyAuthentication=no \
+            -o ConnectTimeout=15 \
+            grupoglobalteces@grupyj.ssh.tb-hosting.com \
+            'set -eu; cd subsites/crm.grupoglobaltec.es; test -f index.html; test -d assets; umask 022; printf "Globaltec CRM: publicación remota verificada el 26-10-2026.\nEl CRM y sus datos no se han modificado.\n" > chatgpt-despliegue-verificado.txt; test -s chatgpt-despliegue-verificado.txt; echo LIVE_FILE_OK'
+      - name: Comprobar el archivo por HTTPS
+        run: |
+          curl --fail --silent --show-error --location --retry 5 --retry-delay 2 \
+            'https://crm.grupoglobaltec.es/chatgpt-despliegue-verificado.txt' \
+            | grep -F 'Globaltec CRM: publicación remota verificada'
