@@ -25,7 +25,7 @@
       <header><div><small>CONTROL COMERCIAL</small><h2 id="crm-lead-summary-title">Seguimiento de leads</h2></div><button type="button" data-close aria-label="Cerrar">×</button></header>
       <p>Consulta los contactos que requieren seguimiento, las próximas actuaciones y los leads convertidos. No se cambian estados desde esta ventana.</p>
       <div class="crm-lead-summary-metrics"></div>
-      <div class="crm-lead-summary-controls"><label>Ver<select id="crm-lead-summary-view"><option value="attention">Necesitan atención</option><option value="overdue">Seguimiento vencido</option><option value="today">Actuación para hoy</option><option value="upcoming">Próximos siete días</option><option value="new">Nuevos</option><option value="converted">Convertidos</option><option value="all">Todos</option></select></label><label>Buscar<input id="crm-lead-summary-search" type="search" placeholder="Persona, empresa o teléfono"></label></div>
+      <div class="crm-lead-summary-controls"><label>Ver<select id="crm-lead-summary-view"><option value="attention">Necesitan atención</option><option value="overdue">Seguimiento vencido</option><option value="today">Actuación para hoy</option><option value="upcoming">Próximos siete días</option><option value="noaction">Sin próxima actuación</option><option value="unassigned">Sin responsable</option><option value="new">Nuevos</option><option value="converted">Convertidos</option><option value="all">Todos</option></select></label><label>Buscar<input id="crm-lead-summary-search" type="search" placeholder="Persona, empresa o teléfono"></label></div>
       <p class="crm-lead-summary-notice" role="status"></p><div class="crm-lead-summary-list"></div>
       <footer><button type="button" id="crm-lead-summary-export">Exportar CSV</button><button type="button" id="crm-lead-summary-refresh">Actualizar</button><button type="button" data-close>Cerrar</button></footer>
     </section>`;
@@ -47,6 +47,8 @@
         if(view.value==='overdue'&&(!active(x)||!due||due>=today))return false;
         if(view.value==='today'&&(!active(x)||due!==today))return false;
         if(view.value==='upcoming'&&(!active(x)||!due||due<today||due>last))return false;
+        if(view.value==='noaction'&&(!active(x)||!!x.next_action_at&&!!x.next_action))return false;
+        if(view.value==='unassigned'&&(!active(x)||!!x.assigned_to))return false;
         if(view.value==='new'&&x.status!=='new')return false;
         if(view.value==='converted'&&x.status!=='converted')return false;
         return [x.contact_name,x.company_name,x.phone,x.email,x.next_action].join(' ').toLocaleLowerCase('es').includes(q);
@@ -54,7 +56,7 @@
     }
     function render(){
       const today=day(new Date());const activeLeads=entries.filter(active);
-      const metrics=[['Nuevos',entries.filter(x=>x.status==='new').length],['Pendientes',activeLeads.length],['Vencidos',activeLeads.filter(x=>dueDay(x)&&dueDay(x)<today).length],['Convertidos',entries.filter(x=>x.status==='converted').length],['Sin responsable',activeLeads.filter(x=>!x.assigned_to).length]];
+      const metrics=[['Nuevos',entries.filter(x=>x.status==='new').length],['Pendientes',activeLeads.length],['Vencidos',activeLeads.filter(x=>dueDay(x)&&dueDay(x)<today).length],['Sin próxima acción',activeLeads.filter(x=>!x.next_action||!x.next_action_at).length],['Sin responsable',activeLeads.filter(x=>!x.assigned_to).length],['Convertidos',entries.filter(x=>x.status==='converted').length]];
       stats.replaceChildren();for(const [name,value] of metrics){const box=el('div','','crm-lead-summary-stat');box.append(el('strong',String(value)),el('span',name));stats.append(box);}
       list.replaceChildren();const rows=filtered();
       if(!rows.length){list.append(el('p','No hay leads con estos filtros.','crm-lead-summary-empty'));return;}
@@ -64,6 +66,7 @@
         info.append(el('small',`${row.company_name||'Sin empresa'} · ${row.status||'Sin estado'} · ${row.phone||row.email||'Sin teléfono ni correo'}`));
         const action=el('div','','crm-lead-summary-next');action.append(el('strong',row.next_action||'Sin próxima actuación'));
         action.append(el('small',row.next_action_at?new Date(row.next_action_at).toLocaleString('es-ES',{dateStyle:'short',timeStyle:'short'}):'Sin fecha'));
+        if(active(row)&&(!row.next_action||!row.next_action_at||!row.assigned_to))action.append(el('small',[!row.next_action||!row.next_action_at?'Falta planificar':'',!row.assigned_to?'Sin responsable':''].filter(Boolean).join(' · '),'crm-lead-summary-warning'));
         item.append(info,action);list.append(item);
       }
       message(`${rows.length} leads encontrados.${rows.length>300?' El CSV incluirá también los no mostrados.':''}`);
@@ -102,12 +105,12 @@
     .crm-lead-summary-dialog{box-sizing:border-box;width:min(990px,100%);max-height:92vh;overflow:auto;background:#fff;color:#16314b;padding:24px;border-radius:16px;box-shadow:0 18px 50px #142c4860}
     .crm-lead-summary-dialog header,.crm-lead-summary-dialog footer{display:flex;align-items:center;justify-content:space-between;gap:12px}.crm-lead-summary-dialog h2{margin:4px 0}
     .crm-lead-summary-dialog header small{color:#087f74;font-weight:750}.crm-lead-summary-dialog header button{border:0;background:none;font-size:28px;cursor:pointer}
-    .crm-lead-summary-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}.crm-lead-summary-stat{border:1px solid #d2e4e0;border-radius:10px;background:#f3f9f7;padding:12px}
+    .crm-lead-summary-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.crm-lead-summary-stat{border:1px solid #d2e4e0;border-radius:10px;background:#f3f9f7;padding:12px}
     .crm-lead-summary-stat strong,.crm-lead-summary-stat span{display:block}.crm-lead-summary-stat strong{font-size:25px;color:#087f74}.crm-lead-summary-stat span{font-size:12px;color:#587083}
     .crm-lead-summary-controls{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:15px 0}.crm-lead-summary-dialog label{font-size:13px;font-weight:650}
     .crm-lead-summary-dialog input,.crm-lead-summary-dialog select{display:block;box-sizing:border-box;width:100%;padding:10px;border:1px solid #bed0dc;border-radius:9px;margin-top:6px;font:inherit}
     .crm-lead-summary-notice{min-height:20px;font-size:13px}.crm-lead-summary-list{display:grid;gap:8px;max-height:400px;overflow:auto}.crm-lead-summary-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid #e1e8ed;border-radius:9px}
-    .crm-lead-summary-info{flex:1;min-width:0}.crm-lead-summary-info strong,.crm-lead-summary-info small,.crm-lead-summary-next strong,.crm-lead-summary-next small{display:block}.crm-lead-summary-info small,.crm-lead-summary-next small{color:#687d8c;margin-top:5px}.crm-lead-summary-next{text-align:right;max-width:270px}
+    .crm-lead-summary-info{flex:1;min-width:0}.crm-lead-summary-info strong,.crm-lead-summary-info small,.crm-lead-summary-next strong,.crm-lead-summary-next small{display:block}.crm-lead-summary-info small,.crm-lead-summary-next small{color:#687d8c;margin-top:5px}.crm-lead-summary-next{text-align:right;max-width:270px}.crm-lead-summary-next .crm-lead-summary-warning{color:#ae5100;font-weight:750}
     .crm-lead-summary-dialog footer button{padding:10px 14px;border:1px solid #087f74;border-radius:9px;background:#fff;color:#08776e;cursor:pointer;font-weight:700}
     @media(max-width:800px){.crm-lead-summary-metrics{grid-template-columns:repeat(2,1fr)}.crm-lead-summary-controls{grid-template-columns:1fr}.crm-lead-summary-dialog{padding:15px}.crm-lead-summary-row{flex-wrap:wrap}}`;
   document.head.append(css);
