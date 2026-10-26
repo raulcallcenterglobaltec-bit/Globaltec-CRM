@@ -16,7 +16,7 @@
     sessionStorage.setItem(STORAGE,changed);previous=changed;
     if(current&&current!==changed){
       // Discard modal state from the previous organization: no cross-company writes.
-      for(const id of ['crm-tasks-delete-dialog','crm-contact-task-overlay','crm-export-dialog','crm-agenda-manager','crm-client-history','crm-conversion-dialog','crm-data-quality','crm-opportunity-dashboard']){
+      for(const id of ['crm-tasks-delete-dialog','crm-contact-task-overlay','crm-export-dialog','crm-agenda-manager','crm-client-history','crm-conversion-dialog','crm-data-quality','crm-opportunity-dashboard','crm-lead-summary']){
         document.getElementById(id)?.remove();
       }
     }
