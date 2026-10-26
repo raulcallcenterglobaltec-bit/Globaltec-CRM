@@ -68,6 +68,15 @@ jobs:
         run: |
           echo 'La publicación requiere la confirmación PUBLICAR_CRM.'
           exit 1
+      - name: Proteger producción hasta validar las personalizaciones
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'deploy' && inputs.confirmation == 'PUBLICAR_CRM' }}
+        env:
+          RELEASE_READY: ${{ vars.NOMINALIA_RELEASE_READY }}
+        run: |
+          if [ "$RELEASE_READY" != 'true' ]; then
+            echo 'Publicación bloqueada: falta validar equivalencia con la versión activa de Nominalia.'
+            exit 1
+          fi
       - name: Instalar herramientas de despliegue
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'deploy' && inputs.confirmation == 'PUBLICAR_CRM' }}
         run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass rsync
