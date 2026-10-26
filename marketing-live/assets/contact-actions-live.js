@@ -3,6 +3,100 @@
   const root = document.getElementById('root');
   if (!root) return;
   let scheduled = false;
+  const API = 'https://kkyizztxlvjqbplcnhtx.supabase.co/rest/v1/';
+  const KEY = 'sb_publishable_g1yhzmMPYG9OC5kaE42FjQ_lGTgBNFQ';
+  const SESSION = 'sb-kkyizztxlvjqbplcnhtx-auth-token';
+  function session() {
+    let value;
+    try { value = JSON.parse(localStorage.getItem(SESSION) || 'null'); } catch { value = null; }
+    if (!value?.access_token || value.expires_at * 1000 <= Date.now()) throw Error('Tu sesión ha caducado. Vuelve a entrar al CRM.');
+    return value;
+  }
+  async function api(path, options = {}) {
+    const response = await fetch(API + path, {
+      method: options.method || 'GET',
+      headers: {apikey:KEY, Authorization:'Bearer ' + session().access_token, 'Content-Type':'application/json', Prefer:'return=representation'},
+      ...(options.body ? {body:JSON.stringify(options.body)} : {})
+    });
+    const raw = await response.text();
+    let data;
+    try {data = raw ? JSON.parse(raw) : null;} catch {data = null;}
+    if (!response.ok) throw Error(data?.message || `Error ${response.status} al guardar.`);
+    return data;
+  }
+  async function newTask(context = {}) {
+    if (document.getElementById('crm-contact-task-overlay')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'crm-contact-task-overlay';
+    overlay.innerHTML = `<form class="crm-contact-task-modal" role="dialog" aria-modal="true" aria-labelledby="crm-contact-task-title">
+      <header><h2 id="crm-contact-task-title">Nueva tarea de seguimiento</h2><button type="button" data-close aria-label="Cerrar">×</button></header>
+      <label>Empresa del CRM<select name="org" required></select></label>
+      <label>Cliente asociado<select name="company"><option value="">Sin cliente</option></select></label>
+      <label>Título de la tarea<input name="title" required maxlength="180" value="Llamar y hacer seguimiento"></label>
+      <label>Fecha y hora<input name="due" type="datetime-local" required></label>
+      <label>Prioridad<select name="priority"><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option><option value="low">Baja</option></select></label>
+      <label>Notas<textarea name="notes" rows="3" maxlength="3000" placeholder="Próxima acción, detalles…"></textarea></label>
+      <p role="status" class="crm-contact-task-status"></p>
+      <footer><button type="button" data-close>Cancelar</button><button type="submit" class="crm-contact-task-save">Guardar tarea</button></footer>
+    </form>`;
+    document.body.append(overlay);
+    const form = overlay.querySelector('form');
+    const org = form.elements.org, company = form.elements.company;
+    const status = overlay.querySelector('.crm-contact-task-status');
+    const save = overlay.querySelector('.crm-contact-task-save');
+    const close = () => overlay.remove();
+    overlay.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click',close));
+    overlay.addEventListener('click',event => {if(event.target === overlay)close();});
+    const tomorrow = new Date(Date.now() + 24*60*60*1000);
+    tomorrow.setMinutes(0,0,0);
+    const pad = n => String(n).padStart(2,'0');
+    form.elements.due.value = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth()+1)}-${pad(tomorrow.getDate())}T${pad(tomorrow.getHours())}:00`;
+    const message = (value,bad=false) => {status.textContent=value;status.style.color=bad?'#b42318':'#17665d';};
+    let companies = [];
+    async function loadCompanies() {
+      message('Cargando clientes…');
+      try {
+        const permitted = await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org.value,p_module:'tasks',p_action:'edit'}});
+        if (permitted !== true) throw Error('No tienes permisos para crear tareas en esta empresa.');
+        companies = await api(`companies?select=id,name&organization_id=eq.${encodeURIComponent(org.value)}&order=name&limit=2000`);
+        company.replaceChildren();
+        const empty = document.createElement('option');empty.value='';empty.textContent='Sin cliente';company.append(empty);
+        for(const item of companies){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;company.append(option);}
+        const match = companies.find(item => item.name?.trim().toLocaleLowerCase('es') === context.companyName?.trim().toLocaleLowerCase('es'));
+        if(match)company.value=match.id;
+        if (!match && context.email) {
+          const contacts = await api(`contacts?select=id,company_id&organization_id=eq.${encodeURIComponent(org.value)}&email=eq.${encodeURIComponent(context.email)}&limit=3`);
+          if(contacts.length===1 && companies.some(item => item.id===contacts[0].company_id))company.value=contacts[0].company_id;
+        }
+        message('Completa los datos y guarda la tarea.');
+      } catch(error) {companies=[];message(error.message,true);}
+    }
+    org.addEventListener('change',loadCompanies);
+    form.addEventListener('submit',async event => {
+      event.preventDefault();if(save.disabled)return;
+      save.disabled=true;message('Guardando tarea…');
+      try {
+        if(!companies.length && company.value)throw Error('Vuelve a seleccionar la empresa.');
+        const allowed = await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org.value,p_module:'tasks',p_action:'edit'}});
+        if(allowed!==true)throw Error('No tienes permisos para crear tareas.');
+        const due = new Date(form.elements.due.value);
+        if(Number.isNaN(due.getTime()))throw Error('Introduce una fecha válida.');
+        const payload = {organization_id:org.value,title:form.elements.title.value.trim(),description:form.elements.notes.value.trim() || null,due_date:due.toISOString(),priority:form.elements.priority.value,status:'pending',task_type:'general',created_by:session().user.id,assigned_to:session().user.id,company_id:company.value || null};
+        if(!payload.title)throw Error('El título es obligatorio.');
+        const created = await api('tasks?select=id,title',{method:'POST',body:payload});
+        if(!Array.isArray(created)||created.length!==1)throw Error('No se ha confirmado el guardado.');
+        toast('Tarea creada correctamente.');close();
+      } catch(error){message(error.message,true);}finally{save.disabled=false;}
+    });
+    try {
+      const organizations = await api('organizations?select=id,name&active=eq.true&order=name');
+      for(const item of organizations){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;org.append(option);}
+      if(!organizations.length)throw Error('No hay empresas disponibles.');
+      const current = document.querySelector('.dashboard-heading .dashboard-kicker')?.textContent || '';
+      const chosen = organizations.find(item => current.includes(item.name));if(chosen)org.value=chosen.id;
+      await loadCompanies();
+    }catch(error){message(error.message,true);}
+  }
 
   function cleanPhone(value) {
     if (!value || /sin tel[eé]fono|^—$/i.test(value.trim())) return null;
@@ -51,14 +145,13 @@
     const b = document.createElement('button');b.type = 'button';b.className = 'crm-contact-quick';
     b.textContent = label;b.title = title;b.addEventListener('click', action);return b;
   }
-  function putActions(parent, phoneValue, emailValue, detail = false) {
+  function putActions(parent, phoneValue, emailValue, detail = false, context = {}) {
     if (!parent) return;
     const phone = cleanPhone(phoneValue), email = cleanEmail(emailValue);
-    const signature = JSON.stringify([phone?.phone || '',email || '',detail]);
+    const signature = JSON.stringify([phone?.phone || '',email || '',detail,context.companyName || '']);
     if (parent.dataset.crmContactActionSignature === signature && parent.querySelector('[data-crm-quick-actions]')) return;
     parent.querySelector('[data-crm-quick-actions]')?.remove();
     parent.dataset.crmContactActionSignature = signature;
-    if (!phone && !email) return;
     const group = document.createElement('span');group.dataset.crmQuickActions = 'true';
     group.className = 'crm-contact-quick-group';
     if (phone && !detail) group.append(link('Llamar','tel:' + phone.phone,'Abrir el marcador telefónico'));
@@ -66,6 +159,7 @@
     if (phone) group.append(button('Copiar teléfono',()=>copy(phone.phone,'Teléfono'),'Copiar número'));
     if (email && !detail) group.append(link('Correo','mailto:' + email,'Redactar correo'));
     if (email) group.append(button('Copiar correo',()=>copy(email,'Correo'),'Copiar dirección de correo'));
+    group.append(button('Nueva tarea',()=>newTask({...context,email}),'Crear una tarea de seguimiento en este CRM'));
     if (group.childNodes.length) parent.append(group);
   }
   function scanRows(page) {
@@ -77,7 +171,8 @@
       const actions = row.querySelector('.client-actions');
       const phone = row.querySelector('.client-contact span')?.textContent || '';
       const email = page === 'Contactos' ? row.querySelector('.client-main small')?.textContent || '' : row.querySelector('.client-contact small')?.textContent || '';
-      putActions(actions,phone,email);
+      const companyName = page === 'Clientes' ? row.querySelector('.client-main strong')?.textContent?.trim() : '';
+      putActions(actions,phone,email,false,{companyName});
     }
   }
   function scanContactDetail() {
@@ -96,7 +191,7 @@
       if (!grid) continue;
       const fields = [...grid.children].filter(node => node.querySelector('span') && node.querySelector('strong'));
       const value = label => fields.find(field => field.querySelector('span')?.textContent.trim().toLocaleLowerCase('es') === label)?.querySelector('strong')?.textContent || '';
-      putActions(grid, value('teléfono'), value('email'));
+      putActions(grid, value('teléfono'), value('email'),false,{companyName:detail.querySelector('.company-detail-header h1, .company-detail-header h2')?.textContent?.trim() || ''});
     }
   }
   function scan() {
@@ -115,6 +210,13 @@
   .crm-contact-quick-group .crm-contact-quick:hover{background:#edf7f8;border-color:#84bbb6}
   .company-detail-grid>.crm-contact-quick-group{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;padding-top:16px;margin-top:8px;border-top:1px solid #e0e8ed}
   #crm-contact-action-status{position:fixed;right:20px;bottom:20px;z-index:100000;color:white;padding:13px 18px;border-radius:9px;box-shadow:0 8px 28px #142c4833;font-size:14px;max-width:340px}
+  #crm-contact-task-overlay{position:fixed;inset:0;z-index:100001;background:rgba(10,25,43,.65);display:grid;place-items:center;padding:16px}
+  .crm-contact-task-modal{box-sizing:border-box;width:min(530px,100%);max-height:92vh;overflow:auto;background:white;padding:23px;border-radius:16px;color:#16314b;box-shadow:0 18px 50px #142c4860}
+  .crm-contact-task-modal header,.crm-contact-task-modal footer{display:flex;align-items:center;justify-content:space-between;gap:12px}.crm-contact-task-modal h2{margin:0 0 10px;font-size:22px}
+  .crm-contact-task-modal header button{font-size:28px;background:none;border:0;cursor:pointer}.crm-contact-task-modal label{display:block;font-weight:650;margin:12px 0;font-size:13px}
+  .crm-contact-task-modal input,.crm-contact-task-modal select,.crm-contact-task-modal textarea{display:block;box-sizing:border-box;width:100%;padding:10px;margin-top:5px;border:1px solid #becfdc;border-radius:9px;font:inherit;font-weight:400}
+  .crm-contact-task-modal footer button{padding:10px 15px;border:1px solid #b5cbd4;border-radius:9px;background:#fff;cursor:pointer;font-weight:700}.crm-contact-task-modal footer .crm-contact-task-save{background:#087f74;color:#fff;border-color:#087f74}.crm-contact-task-modal button:disabled{opacity:.6;cursor:wait}
+  .crm-contact-task-status{min-height:19px;font-size:13px}
   @media(max-width:800px){.crm-contact-quick-group{flex-wrap:wrap}.crm-contact-quick-group .crm-contact-quick{white-space:normal}}
   `;
   document.head.append(css);
