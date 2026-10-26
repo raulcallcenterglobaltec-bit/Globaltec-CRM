@@ -109,8 +109,16 @@
   }
   function mount() {
     const select=document.getElementById('active-organization');
-    const heading=[...root.querySelectorAll('.dashboard-heading h1')].find(h=>h.textContent.includes('Tu negocio'));
-    if(!select||!heading)return;
+    const headings=[...root.querySelectorAll('.dashboard-heading h1')].filter(h=>h.getClientRects().length>0);
+    const visiblePage=headings.find(h=>/^(Clientes|Contactos|Tareas|Agenda|Leads|Oportunidades|Archivos|Informes|Marketing)$/i.test(h.textContent.trim()));
+    const heading=!visiblePage&&headings.find(h=>h.textContent.includes('Tu negocio'));
+    if(!select||!heading){
+      // The React shell can retain the previous Inicio dashboard across navigation.
+      // A priorities panel must never remain visible on Clientes or Contactos.
+      for(const stale of root.querySelectorAll('#crm-priorities-panel'))stale.remove();
+      currentOrg='';requestId++;
+      return;
+    }
     const dashboard=heading.closest('.dashboard');if(!dashboard)return;
     const summary=dashboard.querySelector('.stats-grid');if(!summary)return;
     let panel=dashboard.querySelector('#crm-priorities-panel');

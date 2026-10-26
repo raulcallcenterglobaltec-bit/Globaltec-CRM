@@ -109,18 +109,33 @@
   }
   function install() {
     scheduled=false;
-    for(const heading of root.querySelectorAll('.dashboard-heading')){
-      const page=heading.querySelector('h1')?.textContent?.trim();
-      if(page!=='Clientes'&&page!=='Contactos')continue;
-      if(heading.querySelector('.crm-export-button'))continue;
-      const button=document.createElement('button');button.type='button';button.className='crm-export-button';button.textContent='Exportar Excel / CSV';
-      button.onclick=()=>openDialog(page,heading);
-      heading.append(button);
+    const headings=[...root.querySelectorAll('.dashboard-heading')].filter(heading=>{
+      // The CRM can nest headings; only use the innermost heading for the active page.
+      const title=heading.querySelector('h1')?.textContent?.trim();
+      return (title==='Clientes'||title==='Contactos') && !heading.querySelector('.dashboard-heading') && heading.getClientRects().length>0;
+    });
+    const selected=headings.find(heading=>[...heading.querySelectorAll('button')].some(button=>/^\+?\s*Nuevo (cliente|contacto)$/i.test(button.textContent.trim()))) || headings[0];
+    // Remove buttons previously mounted into the wrong/nested heading.
+    for(const existing of root.querySelectorAll('.crm-export-button')){
+      if(existing.dataset.crmExportMounted==='true' && selected?.contains(existing))continue;
+      existing.remove();
     }
+    if(!selected)return;
+    const page=selected.querySelector('h1')?.textContent?.trim();
+    const action=[...selected.querySelectorAll('button')].find(button=>/^\+?\s*Nuevo (cliente|contacto)$/i.test(button.textContent.trim()));
+    const target=action?.parentElement && action.parentElement!==selected ? action.parentElement : selected;
+    let button=selected.querySelector('.crm-export-button[data-crm-export-mounted="true"]');
+    if(!button){
+      button=document.createElement('button');button.type='button';button.className='crm-export-button';button.dataset.crmExportMounted='true';button.textContent='Exportar Excel / CSV';
+      button.onclick=()=>openDialog(page,selected);
+    }
+    if(button.parentElement!==target)target.append(button);
+    // Keep export adjacent to the other primary actions.
+    if(action && button.nextElementSibling!==action)target.insertBefore(button,action);
   }
   const css=document.createElement('style');css.textContent=`
-    .dashboard-heading>.crm-export-button{padding:10px 14px;border:1px solid #0b8075;border-radius:9px;background:#fff;color:#08776e;font:inherit;font-size:13px;font-weight:750;cursor:pointer;margin-left:8px}
-    .dashboard-heading>.crm-export-button:hover{background:#eefaf7}
+    .dashboard-heading .crm-export-button{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border:1px solid #0b8075;border-radius:9px;background:#fff;color:#08776e;font:inherit;font-size:13px;font-weight:750;cursor:pointer;margin:0 8px 0 0;white-space:nowrap}
+    .dashboard-heading .crm-export-button:hover{background:#eefaf7}
     #crm-export-dialog{position:fixed;inset:0;z-index:100002;display:grid;place-items:center;padding:16px;background:rgba(10,25,43,.65)}
     .crm-export-sheet{box-sizing:border-box;width:min(510px,100%);background:#fff;padding:24px;border-radius:16px;color:#16314b;box-shadow:0 18px 50px #142c4860}
     .crm-export-sheet header,.crm-export-sheet footer{display:flex;align-items:center;justify-content:space-between;gap:12px}
