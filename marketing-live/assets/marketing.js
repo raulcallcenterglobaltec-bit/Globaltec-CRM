@@ -148,6 +148,15 @@ function renderPosts() {
       button.style.marginLeft = '10px';
       button.addEventListener('click', () => openPost(post));
       actions.append(button);
+      if (post.status === 'draft' || state.canReview) {
+        const remove = textEl('button', 'Eliminar', 'secondary');
+        remove.type = 'button';
+        remove.style.marginLeft = '10px';
+        remove.style.color = '#b42318';
+        remove.style.borderColor = '#f1b3ac';
+        remove.addEventListener('click', () => deletePost(post, remove));
+        actions.append(remove);
+      }
     }
     row.append(details, actions);
     container.append(row);
@@ -226,6 +235,22 @@ async function reviewPost(post, status) {
     await reload();
     notice(status === 'approved' ? 'Contenido aprobado. Aún no se publica automáticamente.' : 'Correcciones solicitadas.','success');
   } catch(error) { notice(error.message,'error'); }
+}
+async function deletePost(post, button) {
+  if (!state.canEdit || (post.status !== 'draft' && !state.canReview)) return;
+  if (!confirm(`¿Eliminar definitivamente la publicación «${post.title}»? Esta acción no se puede deshacer.`)) return;
+  button.disabled = true;
+  try {
+    const deleted = await api('crm_marketing_posts?id=eq.' + encodeURIComponent(post.id) + '&organization_id=eq.' + encodeURIComponent(state.org) + '&select=id', { method: 'DELETE' });
+    if (!Array.isArray(deleted) || deleted.length !== 1 || deleted[0].id !== post.id) {
+      throw new Error('El borrado no se ha confirmado. Comprueba tus permisos.');
+    }
+    await reload();
+    notice('Publicación eliminada correctamente.', 'success');
+  } catch (error) {
+    notice(error.message, 'error');
+    button.disabled = false;
+  }
 }
 function bindEvents() {
   document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',()=>activateTab(button.dataset.tab)));
