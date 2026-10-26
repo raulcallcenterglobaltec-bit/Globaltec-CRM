@@ -103,6 +103,7 @@ jobs:
             mkdir -p .crm-backups
             tar -czf '.crm-backups/crm-predeploy-${GITHUB_RUN_ID}.tgz' -C '$REMOTE' .
             test -s '.crm-backups/crm-predeploy-${GITHUB_RUN_ID}.tgz'
+            tar -tzf '.crm-backups/crm-predeploy-${GITHUB_RUN_ID}.tgz' >/dev/null
             echo BACKUP_OK
           "
           # Los activos se añaden sin borrar versiones anteriores.
