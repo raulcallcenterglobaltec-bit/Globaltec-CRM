@@ -31,4 +31,4 @@ jobs:
             -o ConnectTimeout=15 \
             -o NumberOfPasswordPrompts=1 \
             grupoglobalteces@grupyj.ssh.tb-hosting.com \
-            'printf "SSH_OK\n"; pwd; if test -d /subsites/crm.grupoglobaltec.es; then echo "CRM_PATH_OK"; else echo "CRM_PATH_NOT_FOUND_FROM_ROOT"; fi'
+            'printf "SSH_OK\n"; pwd; if test -d subsites/crm.grupoglobaltec.es; then echo "CRM_PATH_OK"; elif test -d www/subsites/crm.grupoglobaltec.es; then echo "CRM_PATH_IN_WWW"; else echo "CRM_PATH_NOT_FOUND"; fi'
