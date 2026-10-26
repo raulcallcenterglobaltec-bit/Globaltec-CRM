@@ -23,6 +23,15 @@
   gap: 8px;
   margin-left: auto;
 }
+/* La acción de alta siempre abre la fila, incluso si se insertaron complementos. */
+.dashboard-heading > .primary-action,
+.dashboard-heading > .lead-heading-actions > .primary-action,
+.dashboard-heading > .header-actions > .primary-action,
+.dashboard-heading > .dashboard-actions > .primary-action { order: -100; }
+.dashboard-heading > :is(.crm-quality-button,.crm-client-history-button,.crm-export-button),
+.dashboard-heading > .lead-heading-actions > :is(.crm-opp-dashboard-button,.crm-lead-summary-button,.crm-convert-client-button) { order: 0; }
+.dashboard-heading > .lead-heading-actions > .crm-export-button,
+.dashboard-heading > .crm-export-button { order: 40; }
 .dashboard-heading > button,
 .dashboard-heading > .lead-heading-actions button,
 .dashboard-heading > .header-actions button,
@@ -75,6 +84,24 @@
   min-height: 42px;
   border-radius: 9px;
 }
+/* Los accesos secundarios son enlaces HTML, pero deben parecerse al menú nativo. */
+.sidebar nav a,
+.sidebar nav a:link,
+.sidebar nav a:visited,
+aside nav a.nav-item,
+aside nav a.nav-item:visited {
+  text-decoration: none !important;
+  color: var(--crm-sidebar-ink, #d1dfeb) !important;
+  background: transparent;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+.sidebar nav a:hover,
+aside nav a.nav-item:hover { color: #fff !important; background: #ffffff12; }
+.sidebar nav a:focus-visible,
+aside nav a.nav-item:focus-visible { outline: 2px solid #6bcfbd; outline-offset: 2px; }
 @media (max-width: 900px) {
   .dashboard-heading { align-items: flex-start; }
   .dashboard-heading > div:first-child:not(.lead-heading-actions) { flex-basis: 100%; }
