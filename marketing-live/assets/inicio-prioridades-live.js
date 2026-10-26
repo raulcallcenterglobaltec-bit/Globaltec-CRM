@@ -66,12 +66,22 @@
     const dueToday=tasks===null?null:open.filter(t=>t.due_date&&dateKey(new Date(t.due_date))===today);
     const meetings=data.meetings;
     const leads=data.leads;
+    const leadFollowups=data.leadFollowups;
+    const urgentLeads=leadFollowups===null?null:leadFollowups.filter(l=>{
+      if(['converted','discarded','spam'].includes(l.status))return false;
+      return (l.next_action_at&&dateKey(new Date(l.next_action_at))<=today)||(l.status==='new'&&!l.next_action_at);
+    }).sort((a,b)=>(a.next_action_at||'0000-00-00').localeCompare(b.next_action_at||'0000-00-00'));
+    const opportunities=data.opportunities;
+    const activeOpps=opportunities===null?null:opportunities.filter(o=>!o.pipeline_stages?.is_won&&!o.pipeline_stages?.is_lost);
+    const next7=new Date(now.getFullYear(),now.getMonth(),now.getDate()+7);const weekEnd=dateKey(next7);
+    const closingSoon=activeOpps===null?null:activeOpps.filter(o=>o.expected_close_date&&o.expected_close_date>=today&&o.expected_close_date<=weekEnd);
+    const lateOpps=activeOpps===null?null:activeOpps.filter(o=>o.expected_close_date&&o.expected_close_date<today);
     const stats=el('div','','crm-priorities-stats');
-    const metrics=[['Vencidas',overdue?.length??'—','tasks'],['Para hoy',dueToday?.length??'—','tasks'],['Citas de hoy',meetings?.length??'—','agenda'],['Leads de 7 días',leads?.length??'—','leads']];
+    const metrics=[['Tareas vencidas',overdue?.length??'—','tasks'],['Tareas hoy',dueToday?.length??'—','tasks'],['Citas de hoy',meetings?.length??'—','agenda'],['Leads recientes',leads?.length??'—','leads'],['Leads por atender',urgentLeads?.length??'—','leads'],['Cierres atrasados',lateOpps?.length??'—','opportunities'],['Cierres en 7 días',closingSoon?.length??'—','opportunities']];
     for(const [label,value,module] of metrics){
       const box=el('button','','crm-priorities-stat');box.type='button';
       box.append(el('strong',String(value)),el('span',label));
-      box.addEventListener('click',()=>selectModule(({tasks:'Tareas',agenda:'Agenda',leads:'Leads'})[module]));
+      box.addEventListener('click',()=>selectModule(({tasks:'Tareas',agenda:'Agenda',leads:'Leads',opportunities:'Oportunidades'})[module]));
       stats.append(box);
     }
     body.append(stats);
@@ -80,6 +90,9 @@
     addList(lists,'Tareas prioritarias',taskRows,'Tareas',t=>({title:t.title||'Tarea',detail:new Date(t.due_date).toLocaleString('es-ES',{dateStyle:'medium',timeStyle:'short'})+(dateKey(new Date(t.due_date))<today?' · Vencida':' · Hoy')}),'No tienes tareas vencidas ni previstas para hoy.');
     addList(lists,'Citas de hoy',meetings,'Agenda',m=>({title:m.subject||'Cita',detail:new Date(m.activity_date).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}),'No hay citas para hoy.');
     addList(lists,'Leads recientes',leads,'Leads',l=>({title:l.contact_name||l.company_name||'Lead',detail:(l.company_name||'Sin empresa')+' · '+(l.status||'Sin estado')}),'No han entrado leads en los últimos siete días.');
+    addList(lists,'Leads por atender',urgentLeads,'Leads',l=>({title:l.contact_name||l.company_name||'Lead',detail:(l.company_name||'Sin empresa')+' · '+(l.next_action||'Planificar seguimiento')+(l.next_action_at?' · '+new Date(l.next_action_at).toLocaleDateString('es-ES'):' · Sin fecha')}),'No hay leads con seguimientos pendientes para hoy.');
+    const urgentOpps=lateOpps===null?null:[...lateOpps,...(closingSoon||[])].sort((a,b)=>(a.expected_close_date||'').localeCompare(b.expected_close_date||''));
+    addList(lists,'Cierres comerciales próximos',urgentOpps,'Oportunidades',o=>({title:o.title||'Oportunidad',detail:(o.expected_close_date||'Sin fecha')+(o.expected_close_date<today?' · ATRASADA':' · Próximo cierre')+' · '+Number(o.estimated_value||0).toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0})}),'No hay cierres vencidos ni previstos para los próximos siete días.');
     body.append(lists);
     panel.querySelector('.crm-priorities-updated').textContent='Actualizado '+now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
   }
@@ -92,18 +105,20 @@
     panel.querySelector('.crm-priorities-body').replaceChildren(el('p','Cargando prioridades…','crm-priorities-empty'));
     try{
       session();
-      const [tasksOk,agendaOk,leadsOk]=await Promise.all([granted(org,'tasks'),granted(org,'agenda'),granted(org,'leads')]);
+      const [tasksOk,agendaOk,leadsOk,oppsOk]=await Promise.all([granted(org,'tasks'),granted(org,'agenda'),granted(org,'leads'),granted(org,'opportunities')]);
       if(ticket!==requestId)return;
       const now=new Date(),today=startOf(now),tomorrow=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1);
       const week=new Date(today.getFullYear(),today.getMonth(),today.getDate()-6);
       const scope='organization_id=eq.'+encodeURIComponent(org);
-      const [t,m,l]=await Promise.all([
+      const [t,m,l,followups,opps]=await Promise.all([
         tasksOk?all('tasks',scope+'&status=in.(pending,in_progress)&due_date=not.is.null','id,title,status,due_date','due_date.asc,id.asc'):Promise.resolve(null),
         agendaOk?all('activities',scope+'&activity_type=eq.meeting&activity_date=gte.'+encodeURIComponent(today.toISOString())+'&activity_date=lt.'+encodeURIComponent(tomorrow.toISOString()),'id,subject,activity_date','activity_date.asc,id.asc'):Promise.resolve(null),
-        leadsOk?all('leads',scope+'&created_at=gte.'+encodeURIComponent(week.toISOString()),'id,contact_name,company_name,status,created_at','created_at.desc,id.desc'):Promise.resolve(null)
+        leadsOk?all('leads',scope+'&created_at=gte.'+encodeURIComponent(week.toISOString()),'id,contact_name,company_name,status,created_at','created_at.desc,id.desc'):Promise.resolve(null),
+        leadsOk?all('leads',scope+'&status=in.(new,reviewing,qualified,proposal)','id,contact_name,company_name,status,next_action,next_action_at','created_at.desc,id.desc').catch(()=>null):Promise.resolve(null),
+        oppsOk?all('opportunities',scope+'&expected_close_date=not.is.null','id,title,expected_close_date,estimated_value,pipeline_stages(is_won,is_lost)','expected_close_date.asc,id.asc').catch(()=>null):Promise.resolve(null)
       ]);
       if(ticket!==requestId)return;
-      cache={org,data:{tasks:t,meetings:m,leads:l}};
+      cache={org,data:{tasks:t,meetings:m,leads:l,leadFollowups:followups,opportunities:opps}};
       render(panel,cache.data);
     }catch(error){if(ticket===requestId)render(panel,{error:error.message||'No se pudo cargar el resumen.'});}
   }
@@ -125,7 +140,7 @@
     if(!panel){
       panel=el('section','','crm-priorities-panel');panel.id='crm-priorities-panel';
       const header=el('div','','crm-priorities-header');
-      const title=el('div');title.append(el('h2','Prioridades de hoy'),el('p','Vencimientos, citas y nuevos contactos de tu empresa.'));
+      const title=el('div');title.append(el('h2','Prioridades comerciales'),el('p','Tareas, citas, leads por atender y cierres próximos de la empresa activa.'));
       const right=el('div','','crm-priorities-tools');right.append(el('small','','crm-priorities-updated'));
       const refresh=el('button','Actualizar','crm-priorities-refresh');refresh.type='button';refresh.onclick=()=>load(select.value,true);
       right.append(refresh);header.append(title,right);
