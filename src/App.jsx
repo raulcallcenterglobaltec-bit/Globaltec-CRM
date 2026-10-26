@@ -2521,7 +2521,7 @@ service_ids: [],
         </div>
 
         <div className="form-field">
-          <label>Cliente *</label>
+          <label>Cliente</label>
           <select
             value={opportunityForm.company_id}
             onChange={(e) =>
@@ -2531,9 +2531,8 @@ service_ids: [],
                 contact_id: ''
               })
             }
-            required
           >
-            <option value="">Seleccionar cliente</option>
+            <option value="">Sin cliente asignado</option>
             {companies.map((company) => (
               <option key={company.id} value={company.id}>
                 {company.name}
