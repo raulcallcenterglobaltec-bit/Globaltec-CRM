@@ -3,8 +3,8 @@ const KEY = 'sb_publishable_g1yhzmMPYG9OC5kaE42FjQ_lGTgBNFQ';
 const SESSION_KEY = 'sb-kkyizztxlvjqbplcnhtx-auth-token';
 const $ = id => document.getElementById(id);
 const platformLabels = { instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok', youtube: 'YouTube' };
-const statusLabels = { draft: 'Borrador', pending_approval: 'Pendiente de aprobación' };
-const state = { session: null, org: '', organizations: [], accounts: [], posts: [], canEdit: false, month: new Date(), editingPostId: null, tab: 'calendar' };
+const statusLabels = { draft: 'Borrador', pending_approval: 'Pendiente de aprobación', approved: 'Aprobado', changes_requested: 'Cambios solicitados' };
+const state = { session: null, org: '', organizations: [], accounts: [], posts: [], canEdit: false, canReview: false, month: new Date(), editingPostId: null, tab: 'calendar' };
 
 function notice(message = '', kind = '') {
   $('notice').textContent = message;
@@ -72,6 +72,7 @@ async function reload() {
     const allowed = await permission('view');
     if (allowed !== true) throw new Error('No tienes permisos para consultar Marketing en esta empresa.');
     state.canEdit = (await permission('edit')) === true;
+    state.canReview = (await permission('admin')) === true && state.canEdit;
     const query = '?organization_id=eq.' + encodeURIComponent(state.org) + '&order=created_at.desc';
     const [accounts, posts] = await Promise.all([
       api('crm_marketing_accounts' + query),
@@ -132,6 +133,16 @@ function renderPosts() {
     details.append(textEl('p', post.client_name + ' · ' + date));
     const actions = document.createElement('div');
     actions.append(textEl('span', statusLabels[post.status] || post.status, 'pill' + (post.status === 'pending_approval' ? ' pending' : '')));
+    if (post.review_note) details.append(textEl('p', 'Revisión: ' + post.review_note));
+    if (state.canReview && post.status === 'pending_approval') {
+      const approve = textEl('button', 'Aprobar', 'secondary');
+      approve.type = 'button'; approve.style.marginLeft = '10px';
+      approve.addEventListener('click', () => reviewPost(post, 'approved'));
+      const requestChanges = textEl('button', 'Pedir cambios', 'secondary');
+      requestChanges.type = 'button'; requestChanges.style.marginLeft = '10px';
+      requestChanges.addEventListener('click', () => reviewPost(post, 'changes_requested'));
+      actions.append(approve, requestChanges);
+    }
     if (state.canEdit) {
       const button = textEl('button', 'Editar', 'secondary');
       button.style.marginLeft = '10px';
@@ -190,13 +201,31 @@ function openPost(post=null) {
   const form=$('post-form'); form.reset(); state.editingPostId=post?.id||null;
   $('post-form-title').textContent=post?'Editar contenido':'Nuevo contenido';
   if(post) {
-    for(const field of ['client_name','platform','title','content','media_url','status'])form.elements.namedItem(field).value=post[field]||'';
+    for(const field of ['client_name','platform','title','content','media_url'])form.elements.namedItem(field).value=post[field]||'';
+    form.elements.namedItem('status').value=['draft','pending_approval'].includes(post.status) ? post.status : 'draft';
+    if (post.status === 'approved' || post.status === 'changes_requested') notice('Al guardar esta edición, el contenido vuelve a borrador para revisarlo de nuevo.');
     if(post.scheduled_at){
       const d=new Date(post.scheduled_at), local=new Date(d.getTime()-d.getTimezoneOffset()*60000);
       form.elements.namedItem('scheduled_at').value=local.toISOString().slice(0,16);
     }
   }
   form.hidden=false; form.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+async function reviewPost(post, status) {
+  if (!state.canReview || post.status !== 'pending_approval') return;
+  let reviewNote = '';
+  if (status === 'approved') {
+    if (!confirm('¿Aprobar este contenido para su futura publicación? Todavía no se enviará a ninguna red.')) return;
+  } else {
+    reviewNote = prompt('Indica al equipo qué debe corregir:');
+    if (!reviewNote?.trim()) return;
+  }
+  try {
+    await api('crm_marketing_posts?id=eq.'+encodeURIComponent(post.id)+'&organization_id=eq.'+encodeURIComponent(state.org)+'&status=eq.pending_approval',
+      {method:'PATCH', body:{status,review_note:reviewNote.trim()}});
+    await reload();
+    notice(status === 'approved' ? 'Contenido aprobado. Aún no se publica automáticamente.' : 'Correcciones solicitadas.','success');
+  } catch(error) { notice(error.message,'error'); }
 }
 function bindEvents() {
   document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',()=>activateTab(button.dataset.tab)));
