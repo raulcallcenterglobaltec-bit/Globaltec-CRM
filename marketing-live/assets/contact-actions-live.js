@@ -130,6 +130,80 @@
     }catch(error){message(error.message,true);}
   }
 
+  async function contactHistory(context={}) {
+    if(document.getElementById('crm-contact-history'))return;
+    const org=document.getElementById('active-organization')?.value;
+    if(!org){toast('Selecciona primero una empresa en el CRM.',true);return;}
+    const overlay=document.createElement('div');overlay.id='crm-contact-history';
+    overlay.innerHTML=`<section class="crm-contact-history-dialog" role="dialog" aria-modal="true" aria-labelledby="crm-contact-history-title">
+      <header><div><small>HISTORIAL DEL CONTACTO</small><h2 id="crm-contact-history-title">Seguimiento comercial</h2></div><button type="button" data-close aria-label="Cerrar">×</button></header>
+      <p>Consulta las actividades, tareas, leads y oportunidades vinculados directamente al contacto. No modifica registros.</p>
+      <div class="crm-contact-history-controls"><label>Contacto<select id="crm-contact-history-person"><option value="">Selecciona el contacto correcto</option></select></label><label>Mostrar<select id="crm-contact-history-type"><option value="all">Todo</option><option value="activity">Actividades y citas</option><option value="task">Tareas</option><option value="opportunity">Oportunidades</option><option value="lead">Leads</option></select></label><label>Buscar<input id="crm-contact-history-search" type="search" placeholder="Buscar en el historial"></label></div>
+      <div class="crm-contact-history-stats"></div><p class="crm-contact-history-notice" role="status"></p><div class="crm-contact-history-list"></div>
+      <footer><button type="button" id="crm-contact-history-export">Exportar CSV</button><button type="button" id="crm-contact-history-refresh">Actualizar</button><button type="button" data-close>Cerrar</button></footer>
+    </section>`;
+    document.body.append(overlay);
+    const person=overlay.querySelector('#crm-contact-history-person'),kind=overlay.querySelector('#crm-contact-history-type'),search=overlay.querySelector('#crm-contact-history-search');
+    const list=overlay.querySelector('.crm-contact-history-list'),notice=overlay.querySelector('.crm-contact-history-notice'),stats=overlay.querySelector('.crm-contact-history-stats');
+    const say=(message,bad=false)=>{notice.textContent=message;notice.style.color=bad?'#b42318':'#087f74';};
+    const events=new AbortController(),close=()=>{events.abort();overlay.remove();};
+    overlay.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);overlay.onclick=e=>{if(e.target===overlay)close();};
+    document.addEventListener('change',event=>{if(event.target?.id==='active-organization')close();},{signal:events.signal});
+    let contacts=[],entries=[];
+    const cell=value=>{let s=String(value??'');if(/^[\s\u0000-\u001f]*[=+@\-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};
+    function filtered(){const q=search.value.trim().toLocaleLowerCase('es');return entries.filter(x=>(kind.value==='all'||x.kind===kind.value)&&[x.title,x.detail,x.type].join(' ').toLocaleLowerCase('es').includes(q));}
+    function render(){
+      stats.replaceChildren();list.replaceChildren();
+      for(const [name,value] of [['Actividades',entries.filter(x=>x.kind==='activity').length],['Tareas pendientes',entries.filter(x=>x.kind==='task'&&x.pending).length],['Oportunidades',entries.filter(x=>x.kind==='opportunity').length],['Leads',entries.filter(x=>x.kind==='lead').length]]){
+        const box=document.createElement('div');box.append(Object.assign(document.createElement('strong'),{textContent:String(value)}),Object.assign(document.createElement('span'),{textContent:name}));stats.append(box);
+      }
+      const rows=filtered();if(!rows.length){const empty=document.createElement('p');empty.textContent='No hay registros vinculados al contacto con estos filtros.';list.append(empty);return;}
+      for(const item of rows){const row=document.createElement('article'),time=document.createElement('small'),title=document.createElement('strong'),detail=document.createElement('p');
+        time.textContent=item.date?new Date(item.date).toLocaleString('es-ES',{dateStyle:'short',timeStyle:'short'}):'Sin fecha';title.textContent=item.title;detail.textContent=item.detail;row.append(time,title,detail);list.append(row);
+      }
+    }
+    async function all(table,columns,scope,sort){const rows=[];for(let offset=0;offset<5000;offset+=500){const page=await api(`${table}?select=${columns}&${scope}&order=${sort}&limit=500&offset=${offset}`);rows.push(...page);if(page.length<500)break;}return rows;}
+    async function load(){
+      entries=[];stats.replaceChildren();list.replaceChildren();
+      if(!person.value){say('Selecciona el contacto correcto para consultar su historial.');return;}
+      if(document.getElementById('active-organization')?.value!==org){say('Ha cambiado la empresa activa. Abre el historial de nuevo.',true);return;}
+      say('Cargando seguimiento…');
+      try{
+        const allowed=await Promise.all(['agenda','tasks','opportunities','leads'].map(module=>api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org,p_module:module,p_action:'view'}}).catch(()=>false)));
+        const scope=`organization_id=eq.${encodeURIComponent(org)}&contact_id=eq.${encodeURIComponent(person.value)}`;
+        const [activities,tasks,opportunities,leads]=await Promise.all([
+          allowed[0]?all('activities','activity_type,subject,description,activity_date',scope,'activity_date.desc'):[],
+          allowed[1]?all('tasks','title,description,status,due_date,created_at',scope,'created_at.desc'):[],
+          allowed[2]?all('opportunities','title,estimated_value,created_at,pipeline_stages(name)',scope,'created_at.desc'):[],
+          allowed[3]?all('leads','contact_name,company_name,status,next_action,created_at',scope,'created_at.desc'):[]
+        ]);
+        entries=[
+          ...activities.map(x=>({kind:'activity',date:x.activity_date,title:(x.activity_type||'Actividad')+': '+(x.subject||'Sin asunto'),detail:x.description||'',type:'Actividad'})),
+          ...tasks.map(x=>({kind:'task',date:x.due_date||x.created_at,title:'Tarea: '+(x.title||'Sin título'),detail:(x.status||'')+(x.description?' · '+x.description:''),type:'Tarea',pending:['pending','in_progress'].includes(x.status)})),
+          ...opportunities.map(x=>({kind:'opportunity',date:x.created_at,title:'Oportunidad: '+(x.title||'Sin título'),detail:(x.pipeline_stages?.name||'Sin etapa')+' · '+Number(x.estimated_value||0).toLocaleString('es-ES',{style:'currency',currency:'EUR'}),type:'Oportunidad'})),
+          ...leads.map(x=>({kind:'lead',date:x.created_at,title:'Lead: '+(x.contact_name||x.company_name||'Sin nombre'),detail:(x.status||'Sin estado')+(x.next_action?' · '+x.next_action:''),type:'Lead'}))
+        ].sort((a,b)=>new Date(b.date)-new Date(a.date));
+        render();say(`${entries.length} registros vinculados al contacto.${allowed.some(x=>!x)?' Algunos módulos no están disponibles para tu perfil.':''}`);
+      }catch(error){say(error.message,true);}
+    }
+    person.onchange=load;kind.onchange=render;search.oninput=render;overlay.querySelector('#crm-contact-history-refresh').onclick=load;
+    overlay.querySelector('#crm-contact-history-export').onclick=()=>{
+      const rows=[['Fecha','Tipo','Título','Detalle'],...filtered().map(x=>[x.date||'',x.type,x.title,x.detail])];
+      const csv='\ufeff'+rows.map(x=>x.map(cell).join(';')).join('\r\n'),url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='globaltec-historial-contacto-'+new Date().toISOString().slice(0,10)+'.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);
+    };
+    try{
+      const permitted=await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org,p_module:'contacts',p_action:'view'}});
+      if(permitted!==true)throw Error('No tienes permiso para consultar contactos.');
+      contacts=await all('contacts','id,first_name,last_name,email,phone,company_id',`organization_id=eq.${encodeURIComponent(org)}`,'first_name.asc');
+      for(const c of contacts){const opt=document.createElement('option');opt.value=c.id;opt.textContent=[c.first_name,c.last_name].filter(Boolean).join(' ')+' · '+(c.email||c.phone||'ID '+c.id.slice(0,8));person.append(opt);}
+      const email=String(context.email||'').trim().toLocaleLowerCase('es');const name=String(context.contactName||'').trim().toLocaleLowerCase('es');
+      let matches=contacts.filter(x=>email&&String(x.email||'').trim().toLocaleLowerCase('es')===email);
+      if(!matches.length&&name)matches=contacts.filter(x=>[x.first_name,x.last_name].filter(Boolean).join(' ').trim().toLocaleLowerCase('es')===name);
+      if(matches.length===1){person.value=matches[0].id;await load();}
+      else say(matches.length>1?'Hay varios contactos coincidentes. Selecciona el correcto antes de abrir el historial.':'Selecciona el contacto correcto en la lista.');
+    }catch(error){say(error.message,true);}
+  }
+
   function cleanPhone(value) {
     if (!value || /sin tel[eé]fono|^—$/i.test(value.trim())) return null;
     let phone = value.trim().replace(/[^+0-9]/g, '');
@@ -185,7 +259,7 @@
   function putActions(parent, phoneValue, emailValue, detail = false, context = {}) {
     if (!parent) return;
     const phone = cleanPhone(phoneValue), email = cleanEmail(emailValue);
-    const signature = JSON.stringify([phone?.phone || '',email || '',detail,context.companyName || '']);
+    const signature = JSON.stringify([phone?.phone || '',email || '',detail,context.companyName || '',context.isContact||false,context.contactName||'']);
     if (parent.dataset.crmContactActionSignature === signature && parent.querySelector('[data-crm-quick-actions]')) return;
     parent.querySelector('[data-crm-quick-actions]')?.remove();
     parent.dataset.crmContactActionSignature = signature;
@@ -197,6 +271,7 @@
     if (email && !detail) group.append(link('Correo','mailto:' + email,'Redactar correo'));
     if (email) group.append(button('Copiar correo',()=>copy(email,'Correo'),'Copiar dirección de correo'));
     group.append(button('Nueva tarea',()=>newTask({...context,email}),'Crear una tarea de seguimiento en este CRM'));
+    if(context.isContact)group.append(button('Historial',()=>contactHistory({...context,email}).catch(e=>toast(e.message,true)),'Consultar actividad comercial de este contacto'));
     if (group.childNodes.length) parent.append(group);
   }
   function scanRows(page) {
@@ -209,7 +284,8 @@
       const phone = row.querySelector('.client-contact span')?.textContent || '';
       const email = page === 'Contactos' ? row.querySelector('.client-main small')?.textContent || '' : row.querySelector('.client-contact small')?.textContent || '';
       const companyName = page === 'Clientes' ? row.querySelector('.client-main strong')?.textContent?.trim() : '';
-      putActions(actions,phone,email,false,{companyName});
+      const contactName=page==='Contactos'?row.querySelector('.client-main strong')?.textContent?.trim()||'':'';
+      putActions(actions,phone,email,false,{companyName,isContact:page==='Contactos',contactName});
     }
   }
   function scanContactDetail() {
@@ -218,7 +294,7 @@
       const mail = detail.querySelector('a[href^="mailto:"]');
       const actions = call?.parentElement || mail?.parentElement;
       if (!actions) continue;
-      putActions(actions,call?.getAttribute('href')?.slice(4) || '',mail?.getAttribute('href')?.slice(7) ? decodeURIComponent(mail.getAttribute('href').slice(7)) : '',true);
+      putActions(actions,call?.getAttribute('href')?.slice(4) || '',mail?.getAttribute('href')?.slice(7) ? decodeURIComponent(mail.getAttribute('href').slice(7)) : '',true,{isContact:true});
     }
   }
   function scanClientDetail() {
@@ -254,6 +330,13 @@
   .crm-contact-task-modal input,.crm-contact-task-modal select,.crm-contact-task-modal textarea{display:block;box-sizing:border-box;width:100%;padding:10px;margin-top:5px;border:1px solid #becfdc;border-radius:9px;font:inherit;font-weight:400}
   .crm-contact-task-modal footer button{padding:10px 15px;border:1px solid #b5cbd4;border-radius:9px;background:#fff;cursor:pointer;font-weight:700}.crm-contact-task-modal footer .crm-contact-task-save{background:#087f74;color:#fff;border-color:#087f74}.crm-contact-task-modal button:disabled{opacity:.6;cursor:wait}
   .crm-contact-task-status{min-height:19px;font-size:13px}
+  #crm-contact-history{position:fixed;inset:0;z-index:100002;display:grid;place-items:center;padding:16px;background:#081a30aa}
+  .crm-contact-history-dialog{box-sizing:border-box;width:min(990px,100%);max-height:92vh;overflow:auto;padding:23px;border-radius:15px;background:#fff;color:#16314b;box-shadow:0 18px 50px #142c4860}
+  .crm-contact-history-dialog header,.crm-contact-history-dialog footer{display:flex;align-items:center;justify-content:space-between;gap:12px}.crm-contact-history-dialog header small{color:#087f74;font-weight:750}.crm-contact-history-dialog h2{margin:3px 0}.crm-contact-history-dialog header button{border:0;background:none;font-size:28px;cursor:pointer}
+  .crm-contact-history-controls{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin:14px 0}.crm-contact-history-controls label{font-size:13px;font-weight:650}.crm-contact-history-controls input,.crm-contact-history-controls select{display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:10px;border:1px solid #becfdc;border-radius:8px;font:inherit}
+  .crm-contact-history-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.crm-contact-history-stats>div{border:1px solid #d5e7e2;background:#f3faf8;border-radius:9px;padding:11px}.crm-contact-history-stats strong,.crm-contact-history-stats span{display:block}.crm-contact-history-stats strong{font-size:24px;color:#087f74}.crm-contact-history-stats span{font-size:12px;color:#5a7182}
+  .crm-contact-history-notice{font-size:13px;min-height:18px}.crm-contact-history-list{max-height:380px;overflow:auto;display:grid;gap:8px}.crm-contact-history-list article{border:1px solid #e0e8ed;border-radius:9px;padding:12px}.crm-contact-history-list small,.crm-contact-history-list strong{display:block}.crm-contact-history-list small{color:#6a8191}.crm-contact-history-list p{margin:5px 0 0;white-space:pre-wrap;font-size:13px;color:#42596e}.crm-contact-history-dialog footer{margin-top:15px}.crm-contact-history-dialog footer button{border:1px solid #087f74;background:#fff;color:#087f74;padding:10px 14px;border-radius:8px;font-weight:700;cursor:pointer}
+  @media(max-width:800px){.crm-contact-history-controls{grid-template-columns:1fr}.crm-contact-history-stats{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:800px){.crm-contact-quick-group{flex-wrap:wrap}.crm-contact-quick-group .crm-contact-quick{white-space:normal}}
   `;
   document.head.append(css);
