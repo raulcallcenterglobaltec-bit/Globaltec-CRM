@@ -1,0 +1,48 @@
+name: Respaldo y auditoría del CRM real
+
+on:
+  push:
+    paths:
+      - '.github/workflows/nominalia-backup-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Preparar cliente SSH
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+      - name: Respaldar y validar archivos sin cambiar el CRM
+        env:
+          SSHPASS: ${{ secrets.NOMINALIA_SSH_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$SSHPASS"
+          sshpass -e ssh -T \
+            -o StrictHostKeyChecking=accept-new \
+            -o PreferredAuthentications=password \
+            -o PubkeyAuthentication=no \
+            -o ConnectTimeout=20 \
+            grupoglobalteces@grupyj.ssh.tb-hosting.com \
+            "set -eu
+              cd /data/sites/web/grupoglobalteces
+              WEB=subsites/crm.grupoglobaltec.es
+              test -f \"\$WEB/index.html\"
+              test -f \"\$WEB/.htaccess\"
+              test -d \"\$WEB/assets\"
+              echo INDEX_HASH
+              sha256sum \"\$WEB/index.html\"
+              echo HTACCESS_HASH
+              sha256sum \"\$WEB/.htaccess\"
+              mkdir -p .crm-backups
+              BACKUP=.crm-backups/crm-pre-sync-${GITHUB_RUN_ID}.tgz
+              tar -czf \"\$BACKUP\" -C \"\$WEB\" .
+              tar -tzf \"\$BACKUP\" >/dev/null
+              test \"\$(tar -xOzf \"\$BACKUP\" ./index.html | sha256sum | cut -d' ' -f1)\" = \"\$(sha256sum \"\$WEB/index.html\" | cut -d' ' -f1)\"
+              echo BACKUP_OK
+              ls -lh \"\$BACKUP\"
+            "
