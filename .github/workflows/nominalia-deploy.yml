@@ -56,7 +56,13 @@ jobs:
           test -s dist/index.html
           test -d dist/assets
           grep -q '/assets/' dist/index.html
-          echo 'BUILD_OK: compilación lista. El CRM de Nominalia sigue intacto.'
+          test -s dist/notificaciones.html
+          test -s dist/assets/notifications-editor.js
+          test -s dist/assets/globaltec-conexion-20261015.js
+          test -s dist/assets/globaltec-arrastre-bordes-20261015.js
+          grep -q 'globaltec-diseno-20261015.css' dist/index.html
+          grep -q 'Sin cliente asignado' dist/assets/index-*.js
+          echo 'BUILD_OK: compilación y complementos esenciales preparados. Nominalia sigue intacto.'
       - name: Guardar compilación para revisión
         uses: actions/upload-artifact@v4
         with:
