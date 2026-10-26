@@ -55,7 +55,7 @@
     if (!parent) return;
     const phone = cleanPhone(phoneValue), email = cleanEmail(emailValue);
     const signature = JSON.stringify([phone?.phone || '',email || '',detail]);
-    if (parent.dataset.crmContactActionSignature === signature) return;
+    if (parent.dataset.crmContactActionSignature === signature && parent.querySelector('[data-crm-quick-actions]')) return;
     parent.querySelector('[data-crm-quick-actions]')?.remove();
     parent.dataset.crmContactActionSignature = signature;
     if (!phone && !email) return;
@@ -89,9 +89,19 @@
       putActions(actions,call?.getAttribute('href')?.slice(4) || '',mail?.getAttribute('href')?.slice(7) ? decodeURIComponent(mail.getAttribute('href').slice(7)) : '',true);
     }
   }
+  function scanClientDetail() {
+    for (const detail of root.querySelectorAll('.company-detail')) {
+      if (!detail.querySelector('.company-detail-header .dashboard-kicker')?.textContent.includes('FICHA DE CLIENTE')) continue;
+      const grid = detail.querySelector('.company-detail-grid');
+      if (!grid) continue;
+      const fields = [...grid.children].filter(node => node.querySelector('span') && node.querySelector('strong'));
+      const value = label => fields.find(field => field.querySelector('span')?.textContent.trim().toLocaleLowerCase('es') === label)?.querySelector('strong')?.textContent || '';
+      putActions(grid, value('teléfono'), value('email'));
+    }
+  }
   function scan() {
     scheduled = false;
-    scanRows('Contactos');scanRows('Clientes');scanContactDetail();
+    scanRows('Contactos');scanRows('Clientes');scanContactDetail();scanClientDetail();
   }
   new MutationObserver(() => {
     if (scheduled) return;
@@ -103,6 +113,7 @@
   .crm-contact-quick-group{display:inline-flex;gap:5px;flex-wrap:wrap;align-items:center}
   .crm-contact-quick-group .crm-contact-quick{display:inline-flex;align-items:center;justify-content:center;border:1px solid #cbd8e3;border-radius:7px;background:#fff;color:#1a5978;padding:7px 9px;font-family:inherit;font-size:12px;font-weight:700;line-height:1.3;text-decoration:none;cursor:pointer;white-space:nowrap}
   .crm-contact-quick-group .crm-contact-quick:hover{background:#edf7f8;border-color:#84bbb6}
+  .company-detail-grid>.crm-contact-quick-group{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;padding-top:16px;margin-top:8px;border-top:1px solid #e0e8ed}
   #crm-contact-action-status{position:fixed;right:20px;bottom:20px;z-index:100000;color:white;padding:13px 18px;border-radius:9px;box-shadow:0 8px 28px #142c4833;font-size:14px;max-width:340px}
   @media(max-width:800px){.crm-contact-quick-group{flex-wrap:wrap}.crm-contact-quick-group .crm-contact-quick{white-space:normal}}
   `;
