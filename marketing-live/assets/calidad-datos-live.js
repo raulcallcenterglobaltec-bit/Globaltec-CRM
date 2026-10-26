@@ -160,6 +160,13 @@
   }
   function install(){
     scheduled=false;
+    // React reutiliza el mismo encabezado al navegar; retirar botones heredados
+    // evita que «Revisar datos» termine en Tareas u otra pantalla.
+    for(const button of root.querySelectorAll('.crm-quality-button')){
+      const heading=button.closest('.dashboard-heading');
+      const current=heading?.querySelector('h1')?.textContent.trim();
+      if(!heading||!heading.getClientRects().length||!['Clientes','Contactos'].includes(current))button.remove();
+    }
     const headings=[...root.querySelectorAll('.dashboard-heading')].filter(h=>!h.querySelector('.dashboard-heading')&&h.getClientRects().length>0);
     for(const heading of headings){
       const page=heading.querySelector('h1')?.textContent.trim();if(page!=='Clientes'&&page!=='Contactos')continue;
@@ -167,7 +174,10 @@
       const buttons=heading.querySelectorAll('button');
       const action=[...buttons].find(b=>/^\+?\s*Nuevo (cliente|contacto)$/i.test(b.textContent.trim()));
       const target=action?.parentElement&&action.parentElement!==heading?action.parentElement:heading;
-      const button=make('button','Revisar datos','crm-quality-button');button.type='button';button.onclick=()=>open(page);
+      const button=make('button','Revisar datos','crm-quality-button');button.type='button';button.onclick=()=>{
+        if(button.closest('.dashboard-heading')?.querySelector('h1')?.textContent.trim()!==page){button.remove();return;}
+        open(page);
+      };
       if(action)target.insertBefore(button,action);else target.append(button);
     }
   }
@@ -185,5 +195,5 @@
     .crm-quality-navigation-notice{position:fixed;bottom:20px;right:20px;z-index:100100;color:#fff;padding:13px 17px;border-radius:10px;box-shadow:0 8px 28px #142c4860;max-width:360px;font-size:13px}
     @media(max-width:720px){.crm-quality-controls{grid-template-columns:1fr}.crm-quality-dialog{padding:15px}.crm-quality-row{flex-wrap:wrap}}`;
   document.head.append(css);
-  new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(install);}).observe(root,{childList:true,subtree:true});install();
+  new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(install);}).observe(root,{childList:true,characterData:true,subtree:true});install();
 })();
