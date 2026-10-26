@@ -79,11 +79,37 @@
       }
     }
     function filtered(){const q=norm(search.value);return issues.filter(row=>(view.value==='all'||row.kind===view.value)&&norm([row.name,row.phone,row.email,row.reason].join(' ')).includes(q));}
-    function findInPage(value){
-      const target=document.getElementById(page==='Clientes'?'client-search':'contact-search');
-      if(!target)return false;
-      const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')?.set;
-      if(!setter)return false;setter.call(target,value);target.dispatchEvent(new Event('input',{bubbles:true}));target.focus();return true;
+    function noticeOutside(value,bad=false){
+      let banner=document.getElementById('crm-quality-navigation-notice');
+      if(!banner){banner=make('div','','crm-quality-navigation-notice');banner.id='crm-quality-navigation-notice';banner.setAttribute('role','status');document.body.append(banner);}
+      banner.textContent=value;banner.style.background=bad?'#a52b22':'#087f74';clearTimeout(noticeOutside.timeout);
+      noticeOutside.timeout=setTimeout(()=>banner.remove(),4800);
+    }
+    async function findInPage(row){
+      if(document.getElementById('active-organization')?.value!==org){message('Ha cambiado la empresa activa. Vuelve a abrir la revisión.',true);return;}
+      const fieldId=page==='Clientes'?'client-search':'contact-search';
+      // El listado de React puede estar desmontado mientras se muestra otra ficha.
+      // Cerrar primero y reabrir el módulo permite que reaparezca su buscador.
+      close();
+      let navigated=false;
+      for(let attempt=0;attempt<35;attempt++){
+        const target=document.getElementById(fieldId);
+        if(target&&target.isConnected&&target.getClientRects().length){
+          const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')?.set;
+          if(!setter){noticeOutside('No se puede utilizar el buscador. Abre '+page+' manualmente.',true);return;}
+          const term=row.name||row.phone||row.email;
+          setter.call(target,term);target.dispatchEvent(new Event('input',{bubbles:true}));target.dispatchEvent(new Event('change',{bubbles:true}));target.focus();
+          target.scrollIntoView({behavior:'smooth',block:'center'});
+          noticeOutside('Buscando «'+row.name+'» en '+page+'. Selecciona su ficha para editarla.');return;
+        }
+        if(!navigated){
+          const nav=root.querySelector('aside nav');
+          const link=[...(nav?.querySelectorAll('button')||[])].find(x=>x.textContent.trim()===page);
+          if(link){link.click();navigated=true;}
+        }
+        await new Promise(resolve=>setTimeout(resolve,100));
+      }
+      noticeOutside('No se encontró el buscador de '+page+'. Entra en ese módulo y busca «'+row.name+'».',true);
     }
     function render(){
       results.replaceChildren();const rows=filtered();
@@ -92,10 +118,7 @@
         const item=make('article','','crm-quality-row');
         const info=make('div','','crm-quality-row-info');
         info.append(make('strong',row.name||'Sin nombre'),make('small',row.type+' · '+row.reason),make('small',[row.phone,row.email].filter(Boolean).join(' · ')||'Sin datos de contacto'));
-        const action=make('button','Buscar ficha');action.type='button';action.onclick=()=>{
-          const term=row.name||row.phone||row.email;
-          if(findInPage(term))close();else message('Abre el buscador de '+page+' para localizar esta ficha.',true);
-        };
+        const action=make('button','Buscar ficha');action.type='button';action.onclick=()=>findInPage(row);
         item.append(info,action);results.append(item);
       }
       message(`${rows.length} incidencias encontradas.${rows.length>500?' Se muestran las primeras 500; descarga el CSV para verlas todas.':''}`);
@@ -144,6 +167,7 @@
     .crm-quality-notice{min-height:19px;font-size:13px}.crm-quality-results{display:grid;gap:8px;max-height:380px;overflow:auto}.crm-quality-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border:1px solid #e0e8ed;border-radius:9px}
     .crm-quality-row-info{flex:1;min-width:0}.crm-quality-row-info strong,.crm-quality-row-info small{display:block}.crm-quality-row-info small{color:#667d8b;margin-top:3px}
     .crm-quality-row button,.crm-quality-dialog footer button{padding:9px 13px;border:1px solid #087f74;border-radius:8px;background:#fff;color:#08776e;cursor:pointer;font-weight:700;white-space:nowrap}
+    .crm-quality-navigation-notice{position:fixed;bottom:20px;right:20px;z-index:100100;color:#fff;padding:13px 17px;border-radius:10px;box-shadow:0 8px 28px #142c4860;max-width:360px;font-size:13px}
     @media(max-width:720px){.crm-quality-controls{grid-template-columns:1fr}.crm-quality-dialog{padding:15px}.crm-quality-row{flex-wrap:wrap}}`;
   document.head.append(css);
   new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(install);}).observe(root,{childList:true,subtree:true});install();
