@@ -17,13 +17,13 @@
     const overlay=node('div','','crm-conversion-overlay');overlay.id='crm-conversion-dialog';
     overlay.innerHTML=`<section class="crm-conversion-sheet" role="dialog" aria-modal="true" aria-labelledby="crm-conversion-title">
       <header><div><small>CONVERSIÓN COMERCIAL</small><h2 id="crm-conversion-title">Convertir en cliente</h2></div><button type="button" data-close aria-label="Cerrar">×</button></header>
-      <p>Selecciona el lead o la oportunidad que ya ha salido adelante. La conversión mantiene su historial y evita duplicados.</p>
+      <p>Selecciona el lead o la oportunidad que ya ha salido adelante. Crear un cliente nuevo y vincular uno existente son operaciones distintas: el CRM nunca los unirá automáticamente.</p>
       <form id="crm-conversion-form">
         <label>Registro de origen<select id="crm-conversion-source" required><option value="">Selecciona un registro</option></select></label>
         <div class="crm-conversion-preview" role="status">Elige un registro para ver sus datos.</div>
         <label>Nombre del cliente<input id="crm-conversion-name" maxlength="160" required placeholder="Empresa o persona que contrata"></label>
         <fieldset class="crm-conversion-mode"><legend>¿Qué quieres hacer?</legend>
-          <label><input type="radio" name="conversion-mode" value="new" checked> Crear ficha de cliente nueva</label>
+          <label><input type="radio" name="conversion-mode" value="new" checked> Crear ficha independiente de cliente</label>
           <label><input type="radio" name="conversion-mode" value="existing"> Vincular a un cliente que ya existe</label>
         </fieldset>
         <div id="crm-conversion-existing" hidden>
@@ -31,7 +31,7 @@
           <div class="crm-conversion-warning"><strong>Atención:</strong> esto reunirá los contactos, leads y oportunidades bajo el mismo cliente. Hazlo solo si realmente pertenecen a la misma empresa o persona.</div>
           <label>Para evitar errores, escribe el nombre exacto del cliente elegido<input id="crm-conversion-verify" autocomplete="off" placeholder="Confirma el nombre del cliente"></label>
         </div>
-        <p class="crm-conversion-help">Si el CRM detecta una ficha con el mismo nombre o correo, te pedirá comprobarla antes de continuar. Nunca elijas otra persona solo para completar el formulario.</p>
+        <p class="crm-conversion-help">Seguridad: si hay coincidencias de nombre o correo, el CRM detendrá el alta para que las revises. Solo se reutilizará un cliente si eliges expresamente «Vincular a un cliente que ya existe».</p>
         <label class="crm-conversion-confirm"><input type="checkbox" id="crm-conversion-accepted" required> Confirmo que ha aceptado la oferta o ha pasado a ser cliente.</label>
         <p class="crm-conversion-notice" role="status"></p>
         <footer><button type="button" data-close>Cancelar</button><button type="submit" id="crm-conversion-submit">Convertir en cliente</button></footer>
@@ -75,7 +75,7 @@
       ] : [['Oportunidad',item.title||''],['Etapa',item.pipeline_stages?.name||'Sin etapa'],['Contacto',[person?.first_name,person?.last_name].filter(Boolean).join(' ')||'Sin contacto']];
       for(const [key,value] of lines){const line=node('div');line.append(node('strong',key+': '),node('span',value));preview.append(line);}
       if(item.converted_company_id){message('Este lead ya fue convertido. No debes convertirlo otra vez.',true);submit.disabled=true;}
-      else {submit.disabled=false;message(matches.length&&!linked?'Existe un posible cliente coincidente. Comprueba si se trata de la misma persona antes de crear otra ficha.':'Comprueba los datos y confirma la conversión.');}
+      else {submit.disabled=false;message(linked?'Este registro ya tiene un cliente asociado. Confirma expresamente el vínculo con esa ficha.':matches.length?'Existe un posible cliente coincidente. Revisa si es la misma persona antes de crear una ficha independiente.':'Comprueba los datos y confirma la conversión.');}
     }
     choice.onchange=selectItem;
     form.onsubmit=async e=>{
@@ -86,9 +86,14 @@
       try{
         const existing=mode()==='existing';
         const selected=companies.find(x=>x.id===company.value);
+        const person=contacts.find(x=>x.id===item.contact_id);
+        const linked=item.converted_company_id||item.company_id||person?.company_id||null;
         if(existing){
           if(!selected)throw Error('Selecciona un cliente existente.');
+          if(linked&&selected.id!==linked)throw Error('Este registro ya está vinculado a otro cliente. Selecciona la ficha vinculada o revisa el caso antes de convertir.');
           if(verify.value.trim().toLocaleLowerCase('es')!==selected.name.trim().toLocaleLowerCase('es'))throw Error('El nombre de confirmación no coincide. No se han unido las fichas.');
+        }else if(linked){
+          throw Error('Este registro ya está relacionado con un cliente. Debes elegir explícitamente «Vincular a un cliente que ya existe».');
         }else if(matchingCompanies(item,name.value).length){
           throw Error('Ya hay una ficha con este nombre o correo. Comprueba si es la misma persona y, solo si lo es, elige «Vincular a un cliente existente».');
         }
@@ -117,7 +122,7 @@
         ]);
         entries=rows;companies=clientRows;contacts=people;
         for(const item of entries){const opt=node('option',source==='lead'?(item.contact_name||item.company_name||item.email||'Lead')+' · '+(item.converted_company_id?'Ya convertido':item.status||''):(item.title||'Oportunidad')+' · '+(item.pipeline_stages?.name||''));opt.value=item.id;if(item.converted_company_id)opt.disabled=true;choice.append(opt);}
-        for(const item of companies){const opt=node('option',item.name);opt.value=item.id;company.append(opt);}
+        for(const item of companies){const opt=node('option',item.name+(item.email?' · '+item.email:' · ID '+item.id.slice(0,8)));opt.value=item.id;company.append(opt);}
         message(`${entries.length} registros disponibles de la empresa activa.`);
       }catch(error){message(error.message,true);submit.disabled=true;}
     })();
