@@ -161,6 +161,87 @@ aside nav a.nav-item:focus-visible { outline: 2px solid #6bcfbd; outline-offset:
   .agenda-hero > .primary-btn,
   .agenda-hero > .crm-agenda-manage-button { min-height: 44px; }
 }
+
+/* Listados: cabeceras legibles, filas compactas y acciones en un mismo bloque. */
+.clients-list {
+  border: 1px solid #dae7eb;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 4px 16px #17324a08;
+}
+.clients-table-header {
+  background: #edf5f7;
+  border-bottom: 1px solid #cfdee4;
+  color: #435d70;
+  letter-spacing: .35px;
+}
+.clients-list .client-row {
+  padding-top: 15px;
+  padding-bottom: 15px;
+  border-bottom-color: #e5edf0;
+}
+.clients-list .client-row:nth-of-type(even) { background: #fafcfd; }
+.clients-list .client-row:hover { background: #eff8f5; }
+.client-main strong { color: #17324a; font-weight: 750; }
+.client-main small,
+.client-contact small { color: #586f81; }
+.clients-list .client-actions { gap: 7px; justify-content: flex-end; }
+.clients-list .client-actions button {
+  border-color: #ccdde3;
+  color: #173b52;
+  min-height: 36px;
+  white-space: normal;
+}
+.clients-list .client-actions button:hover { border-color: #087f74; color: #087f74; }
+.client-results-count {
+  color: #496477;
+  font-weight: 700;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.client-filter-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  padding: 16px;
+  border: 1px solid #dae7eb;
+  background: #fff;
+  box-shadow: 0 3px 12px #17324a06;
+}
+.client-filter-toolbar > .client-search-field { flex: 2 1 270px; min-width: 190px; }
+.client-filter-toolbar > label:not(.client-search-field) { flex: 1 1 125px; min-width: 120px; }
+.client-filter-toolbar .client-results-count { margin-left: auto; align-self: center; }
+.client-filter-toolbar input,
+.client-filter-toolbar select { border: 1px solid #c7d7de; background: #fff; }
+
+/* Formularios y estados vacíos con el mismo lenguaje visual. */
+.company-form-card { border: 1px solid #dce8ed; border-radius: 16px; }
+.form-grid { gap: 16px; }
+.form-field label { color: #38556b; }
+.form-field :is(input,select,textarea) { min-height: 43px; border: 1px solid #cbdbe2; border-radius: 9px; }
+.form-field :is(input,select,textarea):focus-visible {
+  border-color: #087f74;
+  outline: 2px solid #b5e7dd;
+  outline-offset: 1px;
+}
+.form-actions { align-items: center; flex-wrap: wrap; gap: 9px; border-top-color: #dce8ed; }
+.form-actions button { min-height: 42px; }
+.empty-state { border-radius: 12px; padding: 28px 18px; color: #667c8c; }
+.empty-state strong { color: #17324a; }
+
+@media (max-width: 900px) {
+  .clients-list .client-actions { justify-content: flex-start; }
+  .client-filter-toolbar .client-results-count { margin-left: 0; }
+}
+@media (max-width: 600px) {
+  .client-filter-toolbar { padding: 12px; gap: 10px; }
+  .client-filter-toolbar > .client-search-field,
+  .client-filter-toolbar > label:not(.client-search-field) { flex-basis: 100%; min-width: 0; }
+  .clients-list .client-row { padding: 14px; gap: 10px; }
+  .form-grid { gap: 13px; }
+  .form-actions { flex-direction: column-reverse; align-items: stretch; }
+  .form-actions button { width: 100%; }
+}
 @media (max-width: 900px) {
   .dashboard-heading { align-items: flex-start; }
   .dashboard-heading > div:first-child:not(.lead-heading-actions) { flex-basis: 100%; }
