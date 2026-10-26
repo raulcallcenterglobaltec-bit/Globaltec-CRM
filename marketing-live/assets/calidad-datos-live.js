@@ -30,7 +30,7 @@
       <header><div><small>CONTROL DE CALIDAD</small><h2 id="crm-quality-title">Revisar datos</h2></div><button type="button" data-close aria-label="Cerrar">×</button></header>
       <p>Detecta posibles fichas duplicadas o incompletas en la empresa que tienes seleccionada. No se borra, fusiona ni modifica nada automáticamente.</p>
       <div class="crm-quality-metrics"></div>
-      <div class="crm-quality-controls"><label>Mostrar<select id="crm-quality-view"><option value="duplicates">Posibles duplicados</option><option value="incomplete">Fichas incompletas</option><option value="all">Todas las incidencias</option></select></label><label>Buscar<input type="search" id="crm-quality-search" placeholder="Nombre, teléfono o correo"></label></div>
+      <div class="crm-quality-controls"><label>Mostrar<select id="crm-quality-view"><option value="duplicates">Posibles duplicados</option><option value="incomplete">Fichas incompletas</option><option value="all">Todas las incidencias</option></select></label><label>Problema<select id="crm-quality-problem"><option value="all">Todos los problemas</option><option value="email">Sin correo</option><option value="phone">Sin teléfono</option><option value="name">Sin nombre</option><option value="tax">Sin CIF/NIF</option></select></label><label>Buscar<input type="search" id="crm-quality-search" placeholder="Nombre, teléfono o correo"></label><label>Ordenar<select id="crm-quality-sort"><option value="name">Nombre (A-Z)</option><option value="type">Tipo de incidencia</option></select></label></div>
       <p class="crm-quality-notice" role="status"></p><div class="crm-quality-results"></div>
       <footer><button type="button" id="crm-quality-export">Descargar revisión CSV</button><button type="button" data-close>Cerrar</button></footer>
     </section>`;
@@ -38,6 +38,7 @@
     overlay.querySelector('#crm-quality-title').textContent='Revisar '+page.toLowerCase();
     const notice=overlay.querySelector('.crm-quality-notice'),stats=overlay.querySelector('.crm-quality-metrics'),results=overlay.querySelector('.crm-quality-results');
     const view=overlay.querySelector('#crm-quality-view'),search=overlay.querySelector('#crm-quality-search');
+    const problem=overlay.querySelector('#crm-quality-problem'),sort=overlay.querySelector('#crm-quality-sort');
     const message=(value,bad=false)=>{notice.textContent=value;notice.style.color=bad?'#b42318':'#087f74';};
     const close=()=>overlay.remove();overlay.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);overlay.onclick=e=>{if(e.target===overlay)close();};
     let entries=[],issues=[],org='';
@@ -45,7 +46,7 @@
     function itemPhone(item){return item.mobile||item.phone||'';}
     function build(){
       issues=[];
-      const buckets=new Map(),seen=new Set();
+      const buckets=new Map();
       const record=new Map(entries.map(item=>[item.id,item]));
       function put(type,key,item){
         if(!key)return;const id=type+':'+key;
@@ -57,12 +58,25 @@
         if(page==='Contactos')put('Móvil',phone(item.mobile),item);
         else {put('CIF/NIF',norm(item.tax_id),item);put('Nombre exacto',norm(item.name),item);}
       }
+      // Agrupar por ficha, aunque coincida en más de un campo o en grupos solapados.
+      const parent=new Map(entries.map(item=>[item.id,item.id]));
+      function find(id){let p=parent.get(id);while(p!==parent.get(p)){parent.set(p,parent.get(parent.get(p)));p=parent.get(p);}parent.set(id,p);return p;}
+      function union(a,b){const x=find(a),y=find(b);if(x!==y)parent.set(y,x);}
       for(const bucket of buckets.values()){
         if(bucket.ids.size<2)continue;
-        const ids=[...bucket.ids].sort();const fingerprint=ids.join(':');
-        // Several matching fields on the same pair still count as one duplicate group.
-        if(seen.has(fingerprint))continue;seen.add(fingerprint);
-        for(const id of ids){const item=record.get(id);issues.push({kind:'duplicates',type:'Posible duplicado',reason:`Coincidencia en ${bucket.type} (${bucket.ids.size} fichas)`,id:item.id,name:label(item),phone:itemPhone(item),email:item.email||''});}
+        const ids=[...bucket.ids];for(const id of ids.slice(1))union(ids[0],id);
+      }
+      const groups=new Map();
+      for(const item of entries){const key=find(item.id);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}
+      const reasons=new Map();
+      for(const bucket of buckets.values()){
+        if(bucket.ids.size<2)continue;
+        const key=find([...bucket.ids][0]);if(!reasons.has(key))reasons.set(key,new Set());reasons.get(key).add(bucket.type);
+      }
+      for(const [key,items] of groups){
+        if(items.length<2)continue;
+        const reason=`Coinciden en ${[...(reasons.get(key)||[])].join(', ')} (${items.length} fichas relacionadas)`;
+        for(const item of items)issues.push({kind:'duplicates',type:'Posible duplicado',reason,id:item.id,name:label(item),phone:itemPhone(item),email:item.email||'',problem:''});
       }
       for(const item of entries){
         const lacksPhone=!phone(itemPhone(item))&&!phone(item.phone),lacksEmail=!trim(item.email);
@@ -70,7 +84,7 @@
         const reasons=[];
         if(lacksPhone)reasons.push('sin teléfono');if(lacksEmail)reasons.push('sin correo');if(lacksName)reasons.push('sin nombre');
         if(page==='Clientes'&&!trim(item.tax_id))reasons.push('sin CIF/NIF');
-        if(reasons.length)issues.push({kind:'incomplete',type:'Ficha incompleta',reason:reasons.join(', '),id:item.id,name:label(item),phone:itemPhone(item),email:item.email||''});
+        if(reasons.length)issues.push({kind:'incomplete',type:'Ficha incompleta',reason:reasons.join(', '),id:item.id,name:label(item),phone:itemPhone(item),email:item.email||'',problem:[lacksEmail?'email':'',lacksPhone?'phone':'',lacksName?'name':'',page==='Clientes'&&!trim(item.tax_id)?'tax':''].filter(Boolean)});
       }
       stats.replaceChildren();
       const affected=new Set(issues.filter(x=>x.kind==='duplicates').map(x=>x.id));
@@ -78,7 +92,7 @@
         const box=make('div','','crm-quality-stat');box.append(make('strong',String(value)),make('span',title));stats.append(box);
       }
     }
-    function filtered(){const q=norm(search.value);return issues.filter(row=>(view.value==='all'||row.kind===view.value)&&norm([row.name,row.phone,row.email,row.reason].join(' ')).includes(q));}
+    function filtered(){const q=norm(search.value);return issues.filter(row=>(view.value==='all'||row.kind===view.value)&&(problem.value==='all'||row.problem?.includes(problem.value))&&norm([row.name,row.phone,row.email,row.reason].join(' ')).includes(q)).sort((a,b)=>sort.value==='type'?(a.type.localeCompare(b.type,'es')||a.name.localeCompare(b.name,'es')):a.name.localeCompare(b.name,'es'));}
     function noticeOutside(value,bad=false){
       let banner=document.getElementById('crm-quality-navigation-notice');
       if(!banner){banner=make('div','','crm-quality-navigation-notice');banner.id='crm-quality-navigation-notice';banner.setAttribute('role','status');document.body.append(banner);}
@@ -123,7 +137,8 @@
       }
       message(`${rows.length} incidencias encontradas.${rows.length>500?' Se muestran las primeras 500; descarga el CSV para verlas todas.':''}`);
     }
-    view.onchange=render;search.oninput=render;
+    view.onchange=()=>{problem.disabled=view.value==='duplicates';if(problem.disabled)problem.value='all';render();};problem.disabled=true;
+    problem.onchange=render;sort.onchange=render;search.oninput=render;
     overlay.querySelector('#crm-quality-export').onclick=()=>exportRows(filtered(),page);
     (async()=>{
       try{
