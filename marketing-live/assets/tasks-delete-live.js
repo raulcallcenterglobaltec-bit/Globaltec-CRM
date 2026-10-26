@@ -35,11 +35,11 @@
     overlay.id = 'crm-tasks-delete-dialog';
     overlay.innerHTML = `<section class="crm-tasks-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="crm-tasks-delete-title">
       <div class="crm-tasks-delete-header"><h2 id="crm-tasks-delete-title">Gestión rápida de tareas</h2><button type="button" class="crm-tasks-close" aria-label="Cerrar">×</button></div>
-      <p>Organiza el trabajo del día, localiza seguimientos de oportunidades y consulta las tareas sin responsable. Puedes completar tareas sin abrir el formulario y eliminar registros con confirmación.</p>
+      <p>Organiza el trabajo del día, reprograma vencimientos, ajusta prioridades y localiza tareas sin responsable o sin fecha. Puedes completar o eliminar tareas desde esta misma ventana.</p>
       <label>Empresa <select id="crm-tasks-org"></select></label>
       <div id="crm-tasks-summary" class="crm-tasks-summary"></div>
       <div class="crm-tasks-filters">
-        <label>Vista <select id="crm-tasks-view"><option value="pending">Pendientes</option><option value="today">Para hoy</option><option value="overdue">Vencidas</option><option value="unassigned">Sin responsable</option><option value="opportunity">De oportunidades</option><option value="completed">Completadas</option><option value="all">Todas</option></select></label>
+        <label>Vista <select id="crm-tasks-view"><option value="pending">Pendientes</option><option value="today">Para hoy</option><option value="week">Próximos 7 días</option><option value="overdue">Vencidas</option><option value="nodate">Sin fecha de vencimiento</option><option value="unassigned">Sin responsable</option><option value="opportunity">De oportunidades</option><option value="completed">Completadas</option><option value="all">Todas</option></select></label>
         <label>Buscar <input id="crm-tasks-search" type="search" placeholder="Título, cliente u oportunidad…"></label>
         <label>Cliente <select id="crm-tasks-client"><option value="all">Todos</option></select></label>
         <label>Prioridad <select id="crm-tasks-priority"><option value="all">Todas</option><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option><option value="low">Baja</option></select></label>
@@ -73,6 +73,8 @@
     const isPending = task => task.status === 'pending' || task.status === 'in_progress';
     const overdue = task => isPending(task) && task.due_date && dayKey(task.due_date) < dayKey(new Date());
     const today = task => isPending(task) && task.due_date && dayKey(task.due_date) === dayKey(new Date());
+    const inWeek = task => {const now=new Date(),end=new Date(now.getFullYear(),now.getMonth(),now.getDate()+7);return isPending(task)&&!!task.due_date&&dayKey(task.due_date)>=dayKey(now)&&dayKey(task.due_date)<=dayKey(end);};
+    const localTime = date => {const d=new Date(date),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;};
     function csvCell(value) { let s=String(value??''); if (/^[\s\u0000-\u001f]*[=+@\-]/.test(s)) s="'"+s; return '"'+s.replace(/"/g,'""')+'"'; }
     function exportCsv() {
       const rows=[['Tarea','Estado','Prioridad','Vencimiento','Cliente','Oportunidad vinculada','Responsable'],...filters().map(t=>[t.title,t.status,t.priority,t.due_date||'',t.companies?.name||'',t.opportunity_id?'Sí':'No',t.assigned_to?'Asignado':'Sin asignar'])];
@@ -86,6 +88,8 @@
         if (view.value === 'pending' && !isPending(task)) return false;
         if (view.value === 'overdue' && !overdue(task)) return false;
         if (view.value === 'today' && !today(task)) return false;
+        if (view.value === 'week' && !inWeek(task)) return false;
+        if (view.value === 'nodate' && (!isPending(task) || task.due_date)) return false;
         if (view.value === 'unassigned' && (!isPending(task) || task.assigned_to)) return false;
         if (view.value === 'opportunity' && (!isPending(task) || !task.opportunity_id)) return false;
         if (view.value === 'completed' && task.status !== 'completed') return false;
@@ -105,7 +109,9 @@
       const counts = [
         ['Pendientes', records.filter(isPending).length, 'pending'],
         ['Para hoy', records.filter(today).length, 'today'],
+        ['En 7 días', records.filter(inWeek).length, 'week'],
         ['Vencidas', records.filter(overdue).length, 'overdue'],
+        ['Sin fecha', records.filter(task=>isPending(task)&&!task.due_date).length, 'nodate'],
         ['Sin responsable', records.filter(task=>isPending(task)&&!task.assigned_to).length, 'unassigned'],
         ['De oportunidades', records.filter(task=>isPending(task)&&!!task.opportunity_id).length, 'opportunity'],
         ['Completadas', records.filter(task => task.status === 'completed').length, 'completed'],
@@ -146,6 +152,35 @@
             finally { busy = false; render(); }
           };
           buttons.append(complete);
+        }
+        if (canEdit && isPending(task)) {
+          const edit=element('button','Reprogramar','crm-tasks-primary');edit.type='button';edit.disabled=busy;
+          edit.onclick=()=>{
+            if(row.querySelector('.crm-task-editor'))return;
+            const editor=element('form','','crm-task-editor');
+            editor.innerHTML='<label>Nuevo vencimiento<input name="due" type="datetime-local" required></label><label>Prioridad<select name="priority"><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option><option value="low">Baja</option></select></label><div><button type="submit">Guardar</button><button type="button" data-cancel>Cancelar</button></div>';
+            editor.elements.due.value=localTime(task.due_date||Date.now()+86400000);
+            editor.elements.priority.value=['normal','high','urgent','low'].includes(task.priority)?task.priority:'normal';
+            editor.querySelector('[data-cancel]').onclick=()=>editor.remove();
+            editor.onsubmit=async event=>{
+              event.preventDefault();if(busy)return;
+              busy=true;const submit=editor.querySelector('[type="submit"]');submit.disabled=true;
+              try{
+                const active=document.getElementById('active-organization')?.value;
+                if(active&&active!==org.value)throw Error('Ha cambiado la empresa activa. Cierra y vuelve a abrir el gestor.');
+                const date=new Date(editor.elements.due.value),level=editor.elements.priority.value;
+                if(Number.isNaN(date.getTime())||!['normal','high','urgent','low'].includes(level))throw Error('Selecciona una fecha y prioridad válidas.');
+                const allowed=await request('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org.value,p_module:'tasks',p_action:'edit'}});
+                if(allowed!==true)throw Error('No tienes permiso para editar tareas.');
+                const result=await request(`tasks?id=eq.${encodeURIComponent(task.id)}&organization_id=eq.${encodeURIComponent(org.value)}&status=in.(pending,in_progress)&select=id,due_date,priority`,{method:'PATCH',body:{due_date:date.toISOString(),priority:level}});
+                if(!Array.isArray(result)||result.length!==1||result[0].id!==task.id)throw Error('El cambio no se ha confirmado. Comprueba que la tarea continúa pendiente.');
+                task.due_date=result[0].due_date;task.priority=result[0].priority;
+                render();setNotice('Vencimiento y prioridad actualizados.');
+              }catch(error){setNotice(error.message,true);submit.disabled=false;}finally{busy=false;}
+            };
+            row.append(editor);
+          };
+          buttons.append(edit);
         }
         if (canDelete) {
           const button = element('button', 'Eliminar', 'crm-tasks-danger');
@@ -233,12 +268,13 @@
   .crm-task-count{padding:12px 5px;border:1px solid #d9e3ea;border-radius:9px;background:#f8fafc;cursor:pointer}
   .crm-task-count.selected{background:#e5f5f1;border-color:#087f74}.crm-task-count strong,.crm-task-count span{display:block}
   .crm-task-count strong{font-size:24px;color:#142c48}.crm-task-count span{font-size:12px;color:#64748b}
-  #crm-tasks-delete-notice{margin:14px 0;font-size:14px}.crm-tasks-delete-row{display:flex;align-items:center;justify-content:space-between;border-top:1px solid #e3e8ed;padding:12px 0;gap:12px}
+  #crm-tasks-delete-notice{margin:14px 0;font-size:14px}.crm-tasks-delete-row{display:flex;align-items:center;justify-content:space-between;border-top:1px solid #e3e8ed;padding:12px 0;gap:12px;flex-wrap:wrap}
   .crm-tasks-delete-row strong,.crm-tasks-delete-row small{display:block}.crm-tasks-delete-row small{margin-top:5px;color:#64748b}.crm-tasks-delete-row .crm-task-linked{color:#087f74;font-weight:700}.crm-tasks-delete-row .crm-task-alert{color:#aa5100;font-weight:700}
   .crm-tasks-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .crm-task-editor{flex:0 0 100%;display:grid;grid-template-columns:1fr 150px auto;align-items:end;gap:10px;padding:12px;background:#f5faf8;border:1px solid #d7e8e3;border-radius:9px}.crm-task-editor label{margin:0!important}.crm-task-editor div{display:flex;gap:6px}.crm-task-editor button{padding:10px;border:1px solid #087f74;border-radius:8px;background:#fff;color:#087f74;cursor:pointer}.crm-task-editor button[type=submit]{background:#087f74;color:#fff}
   .crm-tasks-primary{border:1px solid #087f74;border-radius:8px;color:#087f74;background:#fff;padding:8px 13px;cursor:pointer}
   .crm-tasks-danger{border:1px solid #dc8a82;border-radius:8px;color:#b42318;background:#fff;padding:8px 13px;cursor:pointer}
-  .crm-tasks-danger:disabled{opacity:.5}.crm-tasks-delete-footer{display:flex;justify-content:flex-end;gap:10px;padding-top:16px}.crm-tasks-export{padding:10px 14px;background:#fff;color:#087f74;border:1px solid #087f74;border-radius:8px;cursor:pointer}.crm-tasks-done{padding:10px 14px;background:#087f74;color:white;border:0;border-radius:8px;cursor:pointer}`;
+  .crm-tasks-danger:disabled{opacity:.5}.crm-tasks-delete-footer{display:flex;justify-content:flex-end;gap:10px;padding-top:16px}.crm-tasks-export{padding:10px 14px;background:#fff;color:#087f74;border:1px solid #087f74;border-radius:8px;cursor:pointer}.crm-tasks-done{padding:10px 14px;background:#087f74;color:white;border:0;border-radius:8px;cursor:pointer}@media(max-width:700px){.crm-task-editor{grid-template-columns:1fr}.crm-tasks-summary{grid-template-columns:repeat(2,1fr)}}`;
   document.head.append(css);
   new MutationObserver(install).observe(document.body, {childList:true,subtree:true});
   install();
