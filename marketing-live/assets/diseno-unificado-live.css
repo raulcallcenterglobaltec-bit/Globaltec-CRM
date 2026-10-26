@@ -1,0 +1,97 @@
+/* Globaltec CRM · capa de coherencia visual. Solo presentación, sin datos ni acciones. */
+.dashboard-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  column-gap: 10px;
+  row-gap: 12px;
+  margin-bottom: 22px;
+}
+.dashboard-heading > div:first-child:not(.lead-heading-actions) {
+  flex: 1 1 260px;
+  min-width: 180px;
+  margin-right: auto;
+}
+.dashboard-heading > .lead-heading-actions,
+.dashboard-heading > .header-actions,
+.dashboard-heading > .dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+.dashboard-heading > button,
+.dashboard-heading > .lead-heading-actions button,
+.dashboard-heading > .header-actions button,
+.dashboard-heading > .dashboard-actions button {
+  min-height: 42px;
+  box-sizing: border-box;
+  margin: 0;
+  border-radius: 10px;
+  line-height: 1.25;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.dashboard-heading button:focus-visible,
+.client-filter-toolbar button:focus-visible,
+.client-filter-toolbar input:focus-visible,
+.client-filter-toolbar select:focus-visible {
+  outline: 3px solid #7ecfc2;
+  outline-offset: 2px;
+}
+.dashboard-heading > .primary-action,
+.dashboard-heading > .lead-heading-actions .primary-action {
+  background: var(--crm-teal, #087f74);
+  color: #fff;
+  border: 1px solid transparent;
+}
+.dashboard-heading > button:not(.primary-action),
+.dashboard-heading > .lead-heading-actions button:not(.primary-action) {
+  border: 1px solid #cbd9e2;
+  background: #fff;
+  color: #173b52;
+  box-shadow: 0 2px 5px #12283f0a;
+}
+.dashboard-heading > button:not(.primary-action):hover,
+.dashboard-heading > .lead-heading-actions button:not(.primary-action):hover {
+  border-color: #0b8075;
+  background: #f1faf7;
+}
+.dashboard-heading > div:first-child > .crm-quality-button,
+.dashboard-heading > div:first-child > .crm-export-button {
+  margin-top: 10px;
+}
+.client-filter-toolbar {
+  gap: 12px;
+  border-radius: 14px;
+}
+.client-filter-toolbar input,
+.client-filter-toolbar select {
+  min-height: 42px;
+  border-radius: 9px;
+}
+@media (max-width: 900px) {
+  .dashboard-heading { align-items: flex-start; }
+  .dashboard-heading > div:first-child:not(.lead-heading-actions) { flex-basis: 100%; }
+  .dashboard-heading > .lead-heading-actions,
+  .dashboard-heading > .header-actions,
+  .dashboard-heading > .dashboard-actions { justify-content: flex-start; margin-left: 0; }
+}
+@media (max-width: 600px) {
+  .dashboard-heading { column-gap: 8px; row-gap: 9px; }
+  .dashboard-heading > button,
+  .dashboard-heading > .lead-heading-actions button,
+  .dashboard-heading > .header-actions button,
+  .dashboard-heading > .dashboard-actions button {
+    min-height: 42px;
+    white-space: normal;
+    text-align: center;
+  }
+  .dashboard-heading > .lead-heading-actions { width: 100%; }
+  .client-filter-toolbar { gap: 10px; }
+}

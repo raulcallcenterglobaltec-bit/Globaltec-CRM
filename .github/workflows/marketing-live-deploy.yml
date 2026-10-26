@@ -41,6 +41,7 @@ jobs:
           test -s marketing-live/assets/calidad-datos-live.js
           test -s marketing-live/assets/oportunidades-panel-live.js
           test -s marketing-live/assets/leads-seguimiento-live.js
+          test -s marketing-live/assets/diseno-unificado-live.css
           node --check marketing-live/assets/marketing.js
           node --check marketing-live/assets/marketing-link.js
           node --check marketing-live/assets/informes-comerciales.js
@@ -77,7 +78,7 @@ jobs:
               BACK=.crm-backups/marketing-${GITHUB_RUN_ID}
               mkdir -p \"\$BACK/assets\"
               cp -p \"\$WEB/index.html\" \"\$BACK/index.html\"
-              for FILE in marketing.html informes-comerciales.html assets/marketing.js assets/marketing.css assets/marketing-link.js assets/tasks-delete-live.js assets/informes-comerciales.js assets/informes-comerciales.css assets/contact-actions-live.js assets/inicio-prioridades-live.js assets/export-clientes-contactos-live.js assets/agenda-rapida-live.js assets/cliente-seguimiento-live.js assets/organizacion-global-live.js assets/conversion-cliente-live.js assets/calidad-datos-live.js assets/oportunidades-panel-live.js assets/leads-seguimiento-live.js; do
+              for FILE in marketing.html informes-comerciales.html assets/marketing.js assets/marketing.css assets/marketing-link.js assets/tasks-delete-live.js assets/informes-comerciales.js assets/informes-comerciales.css assets/contact-actions-live.js assets/inicio-prioridades-live.js assets/export-clientes-contactos-live.js assets/agenda-rapida-live.js assets/cliente-seguimiento-live.js assets/organizacion-global-live.js assets/conversion-cliente-live.js assets/calidad-datos-live.js assets/oportunidades-panel-live.js assets/leads-seguimiento-live.js assets/diseno-unificado-live.css; do
                 if test -f \"\$WEB/\$FILE\"; then
                   cp -p \"\$WEB/\$FILE\" \"\$BACK/\$FILE\"
                 fi
@@ -93,7 +94,7 @@ jobs:
           SSH_HOST=grupoglobalteces@grupyj.ssh.tb-hosting.com
           SSH_OPTS='-o StrictHostKeyChecking=accept-new -o PreferredAuthentications=password -o PubkeyAuthentication=no -o ConnectTimeout=20'
           TARGET=subsites/crm.grupoglobaltec.es
-          sshpass -e rsync -az -e "ssh $SSH_OPTS" marketing-live/assets/marketing.js marketing-live/assets/marketing.css marketing-live/assets/marketing-link.js marketing-live/assets/tasks-delete-live.js marketing-live/assets/informes-comerciales.js marketing-live/assets/informes-comerciales.css marketing-live/assets/contact-actions-live.js marketing-live/assets/inicio-prioridades-live.js marketing-live/assets/export-clientes-contactos-live.js marketing-live/assets/agenda-rapida-live.js marketing-live/assets/cliente-seguimiento-live.js marketing-live/assets/organizacion-global-live.js marketing-live/assets/conversion-cliente-live.js marketing-live/assets/calidad-datos-live.js marketing-live/assets/oportunidades-panel-live.js marketing-live/assets/leads-seguimiento-live.js "$SSH_HOST:$TARGET/assets/"
+          sshpass -e rsync -az -e "ssh $SSH_OPTS" marketing-live/assets/marketing.js marketing-live/assets/marketing.css marketing-live/assets/marketing-link.js marketing-live/assets/tasks-delete-live.js marketing-live/assets/informes-comerciales.js marketing-live/assets/informes-comerciales.css marketing-live/assets/contact-actions-live.js marketing-live/assets/inicio-prioridades-live.js marketing-live/assets/export-clientes-contactos-live.js marketing-live/assets/agenda-rapida-live.js marketing-live/assets/cliente-seguimiento-live.js marketing-live/assets/organizacion-global-live.js marketing-live/assets/conversion-cliente-live.js marketing-live/assets/calidad-datos-live.js marketing-live/assets/oportunidades-panel-live.js marketing-live/assets/leads-seguimiento-live.js marketing-live/assets/diseno-unificado-live.css "$SSH_HOST:$TARGET/assets/"
           sshpass -e rsync -az -e "ssh $SSH_OPTS" marketing-live/marketing.html marketing-live/informes-comerciales.html "$SSH_HOST:$TARGET/"
           sshpass -e ssh -T $SSH_OPTS "$SSH_HOST" '
             set -eu
@@ -113,6 +114,7 @@ jobs:
             test -s assets/calidad-datos-live.js
             test -s assets/oportunidades-panel-live.js
             test -s assets/leads-seguimiento-live.js
+            test -s assets/diseno-unificado-live.css
             if ! grep -q "/assets/marketing-link.js" index.html; then
               grep -q "</body>" index.html
               sed "s@</body>@  <script defer src=\"/assets/marketing-link.js\"></script></body>@" index.html > index.html.marketing-next
@@ -174,6 +176,12 @@ jobs:
               grep -q "/assets/leads-seguimiento-live.js" index.html.leads-panel-next
               mv index.html.leads-panel-next index.html
             fi
+            if ! grep -q "/assets/diseno-unificado-live.css" index.html; then
+              grep -q "</head>" index.html
+              sed "s@</head>@  <link rel=\"stylesheet\" href=\"/assets/diseno-unificado-live.css\"></head>@" index.html > index.html.design-next
+              grep -q "/assets/diseno-unificado-live.css" index.html.design-next
+              mv index.html.design-next index.html
+            fi
             echo MARKETING_FILES_OK
           '
       - name: Comprobar publicación real por HTTPS
@@ -205,4 +213,6 @@ jobs:
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/assets/leads-seguimiento-live.js | grep -q 'crm-lead-summary-button'
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/ | grep -q '/assets/leads-seguimiento-live.js'
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/ | grep -q '/assets/tasks-delete-live.js'
+          curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/assets/diseno-unificado-live.css | grep -q 'Globaltec CRM'
+          curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/ | grep -q '/assets/diseno-unificado-live.css'
           echo MARKETING_LIVE_OK
