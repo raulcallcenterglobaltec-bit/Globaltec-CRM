@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Informes comerciales · Globaltec CRM</title>
+  <link rel="stylesheet" href="/assets/marketing.css">
+  <link rel="stylesheet" href="/assets/informes-comerciales.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="back" href="/">← Volver al CRM</a>
+    <div class="brand"><span class="brand-mark">G</span><span>GLOBALTEC <small>CRM</small></span></div>
+    <span class="module-tag">INFORMES</span>
+  </header>
+  <main class="container">
+    <div class="intro">
+      <div><p class="eyebrow">Resultados comerciales</p><h1>Informes comerciales</h1><p class="subtitle">Leads, conversión, orígenes, responsables y oportunidades en un solo resumen.</p></div>
+      <label class="org-picker">Empresa <select id="organization" aria-label="Empresa activa"></select></label>
+    </div>
+    <form id="filters" class="report-filters">
+      <label>Desde <input id="date-from" type="date" required></label>
+      <label>Hasta <input id="date-to" type="date" required></label>
+      <button type="submit" class="primary">Actualizar informe</button>
+      <button type="button" id="export" class="secondary" disabled>Exportar CSV</button>
+    </form>
+    <p id="notice" class="notice" role="status" aria-live="polite">Comprobando sesión y permisos…</p>
+    <div id="results" hidden>
+      <section class="report-metrics" aria-label="Indicadores principales">
+        <article class="report-stat"><span>Leads recibidos</span><strong id="metric-leads">0</strong><small>Altas en el período</small></article>
+        <article class="report-stat"><span>Leads convertidos</span><strong id="metric-converted">0</strong><small>Con conversión registrada</small></article>
+        <article class="report-stat"><span>Conversión de leads</span><strong id="metric-rate">0 %</strong><small>Convertidos / recibidos</small></article>
+        <article class="report-stat"><span>Oportunidades</span><strong id="metric-opportunities">0</strong><small>Creadas en el período</small></article>
+        <article class="report-stat"><span>Valor de oportunidades</span><strong id="metric-value">0 €</strong><small>Importe estimado, sin duplicar leads</small></article>
+      </section>
+      <div class="report-grid">
+        <section class="report-card"><h2>Estados de los leads</h2><p>Distribución según su estado actual. Un lead cuenta una sola vez.</p><div id="status-bars" class="report-bars"></div></section>
+        <section class="report-card"><h2>Leads por origen</h2><p>Origen configurado, UTM o landing; se usa una categoría por lead.</p><div id="source-bars" class="report-bars"></div></section>
+        <section class="report-card"><h2>Rendimiento por responsable</h2><p>Leads recibidos y convertidos, agrupados por responsable actual.</p><div class="report-table-wrap"><table><thead><tr><th>Responsable</th><th>Leads</th><th>Convertidos</th><th>% conversión</th></tr></thead><tbody id="owner-rows"></tbody></table></div></section>
+        <section class="report-card"><h2>Oportunidades por etapa</h2><p>Resultados y valor estimado por etapa actual.</p><div class="report-table-wrap"><table><thead><tr><th>Etapa</th><th>Oportunidades</th><th>Valor estimado</th></tr></thead><tbody id="stage-rows"></tbody></table></div></section>
+      </div>
+      <p class="report-help">Las fechas filtran por fecha de creación de cada registro. El estado, la etapa y el responsable son los actuales; no representan necesariamente el estado histórico en esa fecha. No se suman los importes de leads y oportunidades.</p>
+    </div>
+  </main>
+  <script type="module" src="/assets/informes-comerciales.js"></script>
+</body>
+</html>

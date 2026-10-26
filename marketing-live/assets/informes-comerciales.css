@@ -1,0 +1,25 @@
+.report-filters{display:flex;flex-wrap:wrap;align-items:end;gap:12px;padding:18px 20px;background:#fff;border:1px solid #dbe5ee;border-radius:14px;margin:18px 0}
+.report-filters label{font-size:13px;font-weight:700;color:#334155;display:flex;flex-direction:column;gap:6px}
+.report-filters input{border:1px solid #cbd5e1;border-radius:9px;background:#fff;color:#142c48;padding:11px;font:inherit;min-width:150px}
+.report-filters button{min-height:41px}
+.report-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin:20px 0 25px}
+.report-stat{background:#fff;border:1px solid #d9e5ef;border-radius:14px;padding:20px 17px;min-width:0}
+.report-stat span{color:#52708b;font-size:13px;font-weight:600;display:block;min-height:34px}
+.report-stat strong{display:block;font-size:clamp(22px,2.4vw,30px);color:#0b2a45;margin:4px 0;overflow-wrap:anywhere}
+.report-stat small{color:#64748b;font-size:12px}
+.report-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.report-card{background:#fff;border:1px solid #d9e5ef;border-radius:15px;padding:23px;min-width:0}
+.report-card h2{font-size:19px;margin:0 0 7px;color:#102d46}.report-card p{font-size:13px;color:#6a7f93;margin:0 0 20px}
+.report-bars{display:flex;flex-direction:column;gap:13px}
+.report-bar-head{display:flex;justify-content:space-between;gap:10px;font-size:13px;font-weight:650;color:#263f56;margin-bottom:5px}
+.report-track{height:10px;background:#edf2f7;border-radius:20px;overflow:hidden}
+.report-fill{height:100%;background:#087f74;border-radius:20px;min-width:0}
+.report-table-wrap{overflow-x:auto}.report-card table{border-collapse:collapse;width:100%;font-size:13px}
+.report-card th{text-align:left;color:#64748b;padding:10px 8px;border-bottom:1px solid #d8e3ed;font-weight:700}
+.report-card td{padding:11px 8px;border-bottom:1px solid #edf2f6;color:#263e56}
+.report-card th:not(:first-child),.report-card td:not(:first-child){text-align:right;white-space:nowrap}
+.report-empty{padding:12px;color:#64748b;font-size:14px}
+.report-help{color:#64748b;font-size:12px;line-height:1.6;margin:22px 2px}
+@media(max-width:1100px){.report-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.report-grid{grid-template-columns:1fr}.report-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.report-filters label{flex:1 1 145px}.report-filters button{flex:1 1 140px}}
+@media(max-width:440px){.report-metrics{grid-template-columns:1fr 1fr}.report-stat{padding:14px 12px}.report-stat strong{font-size:23px}}
