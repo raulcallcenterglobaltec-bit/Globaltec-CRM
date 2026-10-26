@@ -32,6 +32,7 @@
       <header><h2 id="crm-contact-task-title">Nueva tarea de seguimiento</h2><button type="button" data-close aria-label="Cerrar">×</button></header>
       <label>Empresa del CRM<select name="org" required></select></label>
       <label>Cliente asociado<select name="company"><option value="">Sin cliente</option></select></label>
+      <label>Contacto asociado<select name="contact"><option value="">Sin contacto</option></select></label>
       <label>Título de la tarea<input name="title" required maxlength="180" value="Llamar y hacer seguimiento"></label>
       <label>Fecha y hora<input name="due" type="datetime-local" required></label>
       <label>Prioridad<select name="priority"><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option><option value="low">Baja</option></select></label>
@@ -41,7 +42,7 @@
     </form>`;
     document.body.append(overlay);
     const form = overlay.querySelector('form');
-    const org = form.elements.org, company = form.elements.company;
+    const org = form.elements.org, company = form.elements.company, contact=form.elements.contact;
     const status = overlay.querySelector('.crm-contact-task-status');
     const save = overlay.querySelector('.crm-contact-task-save');
     const close = () => overlay.remove();
@@ -52,7 +53,15 @@
     const pad = n => String(n).padStart(2,'0');
     form.elements.due.value = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth()+1)}-${pad(tomorrow.getDate())}T${pad(tomorrow.getHours())}:00`;
     const message = (value,bad=false) => {status.textContent=value;status.style.color=bad?'#b42318':'#17665d';};
-    let companies = [];
+    let companies = [], contacts=[];
+    function renderContacts(){
+      const previous=contact.value;contact.replaceChildren();const empty=document.createElement('option');empty.value='';empty.textContent='Sin contacto';contact.append(empty);
+      for(const person of contacts.filter(x=>!company.value||x.company_id===company.value)){
+        const option=document.createElement('option');option.value=person.id;option.textContent=[person.first_name,person.last_name].filter(Boolean).join(' ')||(person.email||'Contacto');contact.append(option);
+      }
+      if([...contact.options].some(x=>x.value===previous))contact.value=previous;
+      else{const email=String(context.email||'').trim().toLocaleLowerCase('es');const matches=contacts.filter(x=>String(x.email||'').trim().toLocaleLowerCase('es')===email&&(!company.value||x.company_id===company.value));if(email&&matches.length===1)contact.value=matches[0].id;}
+    }
     async function loadCompanies() {
       message('Cargando clientes…');
       try {
@@ -62,26 +71,36 @@
         company.replaceChildren();
         const empty = document.createElement('option');empty.value='';empty.textContent='Sin cliente';company.append(empty);
         for(const item of companies){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;company.append(option);}
-        const match = companies.find(item => item.name?.trim().toLocaleLowerCase('es') === context.companyName?.trim().toLocaleLowerCase('es'));
-        if(match)company.value=match.id;
-        if (!match && context.email) {
-          const contacts = await api(`contacts?select=id,company_id&organization_id=eq.${encodeURIComponent(org.value)}&email=eq.${encodeURIComponent(context.email)}&limit=3`);
-          if(contacts.length===1 && companies.some(item => item.id===contacts[0].company_id))company.value=contacts[0].company_id;
-        }
-        message('Completa los datos y guarda la tarea.');
-      } catch(error) {companies=[];message(error.message,true);}
+        const matches=companies.filter(item => item.name?.trim().toLocaleLowerCase('es') === context.companyName?.trim().toLocaleLowerCase('es'));
+        if(matches.length===1)company.value=matches[0].id;
+        else if(matches.length>1)message('Hay varios clientes con ese nombre. Elige el correcto antes de guardar.',true);
+        contacts=[];
+        try{
+          const allowedContacts=await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org.value,p_module:'contacts',p_action:'view'}});
+          if(allowedContacts===true){for(let offset=0;offset<5000;offset+=500){const page=await api(`contacts?select=id,first_name,last_name,email,company_id&organization_id=eq.${encodeURIComponent(org.value)}&order=first_name&limit=500&offset=${offset}`);contacts.push(...page);if(page.length<500)break;}}
+          const email=String(context.email||'').trim().toLocaleLowerCase('es');const matched=contacts.filter(x=>email&&String(x.email||'').trim().toLocaleLowerCase('es')===email);
+          if(!company.value&&matched.length===1&&companies.some(x=>x.id===matched[0].company_id))company.value=matched[0].company_id;
+        }catch(error){console.warn('Contactos no disponibles para vinculación:',error.message);}
+        renderContacts();
+        if(matches.length<=1)message('Completa los datos y guarda la tarea.');
+      } catch(error) {companies=[];contacts=[];renderContacts();message(error.message,true);}
     }
     org.addEventListener('change',loadCompanies);
+    company.addEventListener('change',renderContacts);
+    contact.addEventListener('change',()=>{const person=contacts.find(x=>x.id===contact.value);if(person?.company_id&&!company.value&&companies.some(x=>x.id===person.company_id))company.value=person.company_id;});
     form.addEventListener('submit',async event => {
       event.preventDefault();if(save.disabled)return;
       save.disabled=true;message('Guardando tarea…');
       try {
+        if(document.getElementById('active-organization')?.value&&document.getElementById('active-organization').value!==org.value)throw Error('Ha cambiado la empresa activa. Cierra y abre de nuevo la tarea.');
         if(!companies.length && company.value)throw Error('Vuelve a seleccionar la empresa.');
+        if(company.value&&!companies.some(item=>item.id===company.value))throw Error('El cliente elegido no corresponde a esta empresa.');
+        if(contact.value&&!contacts.some(item=>item.id===contact.value&&(!company.value||item.company_id===company.value)))throw Error('El contacto seleccionado no corresponde al cliente elegido.');
         const allowed = await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org.value,p_module:'tasks',p_action:'edit'}});
         if(allowed!==true)throw Error('No tienes permisos para crear tareas.');
         const due = new Date(form.elements.due.value);
         if(Number.isNaN(due.getTime()))throw Error('Introduce una fecha válida.');
-        const payload = {organization_id:org.value,title:form.elements.title.value.trim(),description:form.elements.notes.value.trim() || null,due_date:due.toISOString(),priority:form.elements.priority.value,status:'pending',task_type:'general',created_by:session().user.id,assigned_to:session().user.id,company_id:company.value || null};
+        const payload = {organization_id:org.value,title:form.elements.title.value.trim(),description:form.elements.notes.value.trim() || null,due_date:due.toISOString(),priority:form.elements.priority.value,status:'pending',task_type:'general',created_by:session().user.id,assigned_to:session().user.id,company_id:company.value || null,contact_id:contact.value||null};
         if(!payload.title)throw Error('El título es obligatorio.');
         const created = await api('tasks?select=id,title',{method:'POST',body:payload});
         if(!Array.isArray(created)||created.length!==1)throw Error('No se ha confirmado el guardado.');
