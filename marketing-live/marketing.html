@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Marketing · Globaltec CRM</title>
+  <link rel="stylesheet" href="/assets/marketing.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="back" href="/">← Volver al CRM</a>
+    <div class="brand"><span class="brand-mark">G</span><span>GLOBALTEC <small>CRM</small></span></div>
+    <span class="module-tag">MARKETING</span>
+  </header>
+  <main class="container">
+    <div class="intro">
+      <div><p class="eyebrow">Marketing y redes sociales</p><h1>Planifica tus contenidos</h1><p class="subtitle">Organiza clientes, canales y publicaciones desde un solo lugar.</p></div>
+      <label class="org-picker">Empresa <select id="organization" aria-label="Empresa activa"></select></label>
+    </div>
+    <div id="notice" class="notice" role="status" aria-live="polite">Comprobando sesión y permisos…</div>
+    <section id="workspace" hidden>
+      <div class="stats" aria-label="Resumen de contenidos">
+        <article class="stat"><span>Canales registrados</span><strong id="count-accounts">0</strong><small>Sin publicación automática</small></article>
+        <article class="stat"><span>Borradores</span><strong id="count-drafts">0</strong><small>En preparación</small></article>
+        <article class="stat"><span>Pendientes de aprobación</span><strong id="count-pending">0</strong><small>Para revisión</small></article>
+        <article class="stat"><span>Programados en calendario</span><strong id="count-dated">0</strong><small>No se envían aún a las redes</small></article>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Secciones de Marketing">
+        <button class="tab active" data-tab="calendar" role="tab" aria-selected="true">Calendario editorial</button>
+        <button class="tab" data-tab="content" role="tab" aria-selected="false">Contenidos</button>
+        <button class="tab" data-tab="accounts" role="tab" aria-selected="false">Cuentas y clientes</button>
+      </div>
+      <section class="panel" id="panel-calendar">
+        <div class="panel-head"><div><h2>Calendario editorial</h2><p>Fechas previstas de publicación y contenido en preparación.</p></div><div class="month-nav"><button id="previous-month" aria-label="Mes anterior">‹</button><strong id="month-title"></strong><button id="next-month" aria-label="Mes siguiente">›</button></div></div>
+        <div class="calendar" id="calendar"></div>
+      </section>
+      <section class="panel" id="panel-content" hidden>
+        <div class="panel-head"><div><h2>Biblioteca de contenidos</h2><p>Prepara borradores sin enviarlos a ninguna red social.</p></div><button class="primary" id="new-post">+ Nuevo contenido</button></div>
+        <div id="posts" class="records"></div>
+        <form id="post-form" class="editor" hidden>
+          <h3 id="post-form-title">Nuevo contenido</h3>
+          <div class="form-grid">
+            <label>Cliente <input name="client_name" maxlength="160" required placeholder="Nombre del cliente" /></label>
+            <label>Plataforma <select name="platform" required><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option></select></label>
+            <label class="wide">Título <input name="title" maxlength="200" required placeholder="Ej. Presentación de campaña" /></label>
+            <label class="wide">Texto <textarea name="content" rows="5" placeholder="Texto o guion de la publicación"></textarea></label>
+            <label class="wide">Enlace a imagen o vídeo (opcional) <input name="media_url" type="url" placeholder="https://…" /></label>
+            <label>Fecha prevista <input name="scheduled_at" type="datetime-local" /></label>
+            <label>Estado <select name="status"><option value="draft">Borrador</option><option value="pending_approval">Pendiente de aprobación</option></select></label>
+          </div>
+          <div class="form-actions"><button type="button" class="secondary" id="cancel-post">Cancelar</button><button type="submit" class="primary">Guardar contenido</button></div>
+        </form>
+      </section>
+      <section class="panel" id="panel-accounts" hidden>
+        <div class="panel-head"><div><h2>Cuentas por cliente</h2><p>Registra qué perfiles pertenecen a cada cliente. Las conexiones externas se activarán posteriormente.</p></div><button class="primary" id="new-account">+ Añadir cuenta</button></div>
+        <div id="accounts" class="records"></div>
+        <form id="account-form" class="editor" hidden>
+          <h3>Registrar perfil social</h3>
+          <div class="form-grid">
+            <label>Cliente <input name="client_name" maxlength="160" required placeholder="Nombre del cliente" /></label>
+            <label>Red social <select name="platform"><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option></select></label>
+            <label>Nombre visible <input name="account_label" maxlength="160" required placeholder="Nombre del perfil o canal" /></label>
+            <label>Usuario o identificador <input name="account_handle" maxlength="160" placeholder="@usuario" /></label>
+          </div>
+          <div class="form-actions"><button type="button" class="secondary" id="cancel-account">Cancelar</button><button class="primary" type="submit">Guardar cuenta</button></div>
+        </form>
+      </section>
+      <p class="footnote">Las fechas del calendario son planificación interna. Ningún contenido se publica automáticamente hasta conectar y autorizar cada plataforma.</p>
+    </section>
+  </main>
+  <script type="module" src="/assets/marketing.js"></script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+name: Publicar Marketing en CRM real
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "marketing-live/**"
+      - ".github/workflows/marketing-live-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: globaltec-marketing-live
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+      - name: Validar archivos del módulo
+        run: |
+          test -s marketing-live/marketing.html
+          test -s marketing-live/assets/marketing.js
+          test -s marketing-live/assets/marketing.css
+          test -s marketing-live/assets/marketing-link.js
+          node --check marketing-live/assets/marketing.js
+          node --check marketing-live/assets/marketing-link.js
+      - name: Preparar conexión
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass rsync
+      - name: Respaldar archivos anteriores
+        env:
+          SSHPASS: ${{ secrets.NOMINALIA_SSH_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$SSHPASS"
+          sshpass -e ssh -T \
+            -o StrictHostKeyChecking=accept-new \
+            -o PreferredAuthentications=password \
+            -o PubkeyAuthentication=no \
+            -o ConnectTimeout=20 \
+            grupoglobalteces@grupyj.ssh.tb-hosting.com \
+            "set -eu
+              cd /data/sites/web/grupoglobalteces
+              WEB=subsites/crm.grupoglobaltec.es
+              test -s \"\$WEB/index.html\"
+              test -f \"\$WEB/.htaccess\"
+              BACK=.crm-backups/marketing-${GITHUB_RUN_ID}
+              mkdir -p \"\$BACK/assets\"
+              cp -p \"\$WEB/index.html\" \"\$BACK/index.html\"
+              for FILE in marketing.html assets/marketing.js assets/marketing.css assets/marketing-link.js; do
+                if test -f \"\$WEB/\$FILE\"; then
+                  cp -p \"\$WEB/\$FILE\" \"\$BACK/\$FILE\"
+                fi
+              done
+              test -s \"\$BACK/index.html\"
+              echo BACKUP_OK
+            "
+      - name: Subir solamente el módulo Marketing
+        env:
+          SSHPASS: ${{ secrets.NOMINALIA_SSH_PASSWORD }}
+        run: |
+          set -euo pipefail
+          SSH_HOST=grupoglobalteces@grupyj.ssh.tb-hosting.com
+          SSH_OPTS='-o StrictHostKeyChecking=accept-new -o PreferredAuthentications=password -o PubkeyAuthentication=no -o ConnectTimeout=20'
+          TARGET=subsites/crm.grupoglobaltec.es
+          sshpass -e rsync -az -e "ssh $SSH_OPTS" marketing-live/assets/marketing.js marketing-live/assets/marketing.css marketing-live/assets/marketing-link.js "$SSH_HOST:$TARGET/assets/"
+          sshpass -e rsync -az -e "ssh $SSH_OPTS" marketing-live/marketing.html "$SSH_HOST:$TARGET/marketing.html"
+          sshpass -e ssh -T $SSH_OPTS "$SSH_HOST" '
+            set -eu
+            cd subsites/crm.grupoglobaltec.es
+            test -s marketing.html
+            test -s assets/marketing.js
+            test -s assets/marketing-link.js
+            if ! grep -q "/assets/marketing-link.js" index.html; then
+              grep -q "</body>" index.html
+              sed "s@</body>@  <script defer src=\"/assets/marketing-link.js\"></script></body>@" index.html > index.html.marketing-next
+              grep -q "/assets/marketing-link.js" index.html.marketing-next
+              mv index.html.marketing-next index.html
+            fi
+            echo MARKETING_FILES_OK
+          '
+      - name: Comprobar publicación real por HTTPS
+        run: |
+          curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/marketing.html | grep -q 'Calendario editorial'
+          curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/assets/marketing.js | grep -q 'crm_marketing_posts'
+          curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/ | grep -q '/assets/marketing-link.js'
+          echo MARKETING_LIVE_OK
