@@ -102,6 +102,65 @@ aside nav a.nav-item:visited {
 aside nav a.nav-item:hover { color: #fff !important; background: #ffffff12; }
 .sidebar nav a:focus-visible,
 aside nav a.nav-item:focus-visible { outline: 2px solid #6bcfbd; outline-offset: 2px; }
+
+/* Agenda usa su propio encabezado: la creación también va siempre primero. */
+.agenda-hero { column-gap: 10px; row-gap: 12px; }
+.agenda-hero > div:first-child { flex: 1 1 280px; min-width: 190px; }
+.agenda-hero > .primary-btn,
+.agenda-hero > .lead-heading-actions > .primary-btn { order: -100; }
+.agenda-hero > .crm-agenda-manage-button,
+.agenda-hero > .lead-heading-actions > .crm-agenda-manage-button { order: 0; margin: 0; min-height: 42px; }
+.agenda-hero > .lead-heading-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* Fichas de Cliente y Contacto: datos separados y fáciles de leer. */
+.company-detail {
+  border: 1px solid #dce8ed;
+  border-radius: 17px;
+  background: #fff;
+  box-shadow: 0 6px 20px #17324a08;
+}
+.company-detail-header {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #dbe8ed;
+}
+.company-detail-header > div:first-child { flex: 1 1 230px; min-width: 0; }
+.company-detail-header h2 { color: #17324a; letter-spacing: -0.5px; overflow-wrap: anywhere; }
+.company-detail-header .secondary-action { min-height: 40px; margin-left: auto; }
+.company-detail-grid {
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 10px;
+  padding: 18px 0;
+}
+.company-detail-grid > div {
+  min-width: 0;
+  gap: 6px;
+  border: 1px solid #e4ecf0;
+  border-radius: 11px;
+  padding: 13px 14px;
+  background: #f8fbfc;
+}
+.company-detail-grid > div span { color: #5b7284; font-size: 11px; letter-spacing: .45px; }
+.company-detail-grid > div strong { color: #17324a; line-height: 1.5; }
+.company-detail-sections { align-items: center; gap: 8px; padding-top: 15px; border-top: 1px solid #dbe8ed; }
+.company-detail-sections button { min-height: 40px; border-radius: 9px; }
+.client-row { transition: background-color .15s ease; }
+.client-row:hover { background: #f7fbfa; }
+.client-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.client-actions button { min-height: 36px; border-radius: 8px; }
+@media (max-width: 900px) {
+  .company-detail-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .agenda-hero > div:first-child { flex-basis: 100%; }
+}
+@media (max-width: 600px) {
+  .company-detail-grid { grid-template-columns: 1fr; }
+  .company-detail-grid > .detail-wide { grid-column: auto; }
+  .company-detail-header .secondary-action { margin-left: 0; }
+  .agenda-hero > .primary-btn,
+  .agenda-hero > .crm-agenda-manage-button { min-height: 44px; }
+}
 @media (max-width: 900px) {
   .dashboard-heading { align-items: flex-start; }
   .dashboard-heading > div:first-child:not(.lead-heading-actions) { flex-basis: 100%; }

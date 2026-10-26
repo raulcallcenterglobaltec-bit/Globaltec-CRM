@@ -139,9 +139,12 @@
     const heading=candidates[0];
     for(const button of root.querySelectorAll('.crm-agenda-manage-button'))if(!heading?.contains(button))button.remove();
     if(!heading||heading.querySelector('.crm-agenda-manage-button'))return;
-    const button=make('button','Gestionar citas','crm-agenda-manage-button');button.type='button';button.onclick=()=>openManager(heading);
+    const button=make('button','Gestionar citas','crm-agenda-manage-button');button.type='button';button.onclick=()=>{
+      if(heading.querySelector('h1')?.textContent.trim()!=='Agenda'){button.remove();return;}
+      openManager(heading);
+    };
     const actionGroup=heading.querySelector('.lead-heading-actions');
-    if(actionGroup){const newAppointment=[...actionGroup.querySelectorAll('button')].find(b=>/nueva cita/i.test(b.textContent));if(newAppointment)actionGroup.insertBefore(button,newAppointment);else actionGroup.prepend(button);}
+    if(actionGroup){const newAppointment=[...actionGroup.querySelectorAll('button')].find(b=>/nueva cita/i.test(b.textContent));if(newAppointment)newAppointment.after(button);else actionGroup.append(button);}
     else heading.append(button);
   }
   const style=document.createElement('style');style.textContent=`
