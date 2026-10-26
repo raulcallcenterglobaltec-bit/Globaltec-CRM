@@ -186,7 +186,7 @@ jobs:
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/assets/informes-comerciales.js | grep -q 'metric-converted'
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/assets/contact-actions-live.js | grep -q 'crm-contact-quick-group'
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/ | grep -q '/assets/contact-actions-live.js'
-          curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/assets/inicio-prioridades-live.js | grep -q 'Prioridades de hoy'
+          curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/assets/inicio-prioridades-live.js | grep -q 'crm-priorities-panel'
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/ | grep -q '/assets/inicio-prioridades-live.js'
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/assets/export-clientes-contactos-live.js | grep -q 'crm-export-button'
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/ | grep -q '/assets/export-clientes-contactos-live.js'
