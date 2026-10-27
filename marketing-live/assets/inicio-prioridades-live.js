@@ -50,6 +50,8 @@
     else for(const item of records.slice(0,5)){
       const btn=el('button','','crm-priorities-item');btn.type='button';
       const info=formatter(item);
+      if(info.urgent)btn.classList.add('crm-priorities-item-urgent');
+      else if(info.today)btn.classList.add('crm-priorities-item-today');
       btn.append(el('strong',info.title),el('small',info.detail));
       btn.addEventListener('click',()=>selectModule(module));block.append(btn);
     }
@@ -80,6 +82,10 @@
     const metrics=[['Tareas vencidas',overdue?.length??'—','tasks'],['Tareas hoy',dueToday?.length??'—','tasks'],['Citas de hoy',meetings?.length??'—','agenda'],['Leads recientes',leads?.length??'—','leads'],['Leads por atender',urgentLeads?.length??'—','leads'],['Cierres atrasados',lateOpps?.length??'—','opportunities'],['Cierres en 7 días',closingSoon?.length??'—','opportunities']];
     for(const [label,value,module] of metrics){
       const box=el('button','','crm-priorities-stat');box.type='button';
+      if(typeof value==='number'&&value>0){
+        if(['Tareas vencidas','Leads por atender','Cierres atrasados'].includes(label))box.classList.add('crm-priorities-stat-urgent');
+        else if(['Tareas hoy','Citas de hoy','Cierres en 7 días'].includes(label))box.classList.add('crm-priorities-stat-today');
+      }
       box.append(el('strong',String(value)),el('span',label));
       box.addEventListener('click',()=>selectModule(({tasks:'Tareas',agenda:'Agenda',leads:'Leads',opportunities:'Oportunidades'})[module]));
       stats.append(box);
@@ -87,12 +93,12 @@
     body.append(stats);
     const lists=el('div','','crm-priorities-lists');
     const taskRows=tasks===null?null:[...(overdue||[]),...(dueToday||[])].sort((a,b)=>new Date(a.due_date)-new Date(b.due_date));
-    addList(lists,'Tareas prioritarias',taskRows,'Tareas',t=>({title:t.title||'Tarea',detail:new Date(t.due_date).toLocaleString('es-ES',{dateStyle:'medium',timeStyle:'short'})+(dateKey(new Date(t.due_date))<today?' · Vencida':' · Hoy')}),'No tienes tareas vencidas ni previstas para hoy.');
+    addList(lists,'Tareas prioritarias',taskRows,'Tareas',t=>({title:t.title||'Tarea',detail:new Date(t.due_date).toLocaleString('es-ES',{dateStyle:'medium',timeStyle:'short'})+(dateKey(new Date(t.due_date))<today?' · Vencida':' · Hoy'),urgent:dateKey(new Date(t.due_date))<today,today:dateKey(new Date(t.due_date))===today}),'No tienes tareas vencidas ni previstas para hoy.');
     addList(lists,'Citas de hoy',meetings,'Agenda',m=>({title:m.subject||'Cita',detail:new Date(m.activity_date).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}),'No hay citas para hoy.');
     addList(lists,'Leads recientes',leads,'Leads',l=>({title:l.contact_name||l.company_name||'Lead',detail:(l.company_name||'Sin empresa')+' · '+(l.status||'Sin estado')}),'No han entrado leads en los últimos siete días.');
-    addList(lists,'Leads por atender',urgentLeads,'Leads',l=>({title:l.contact_name||l.company_name||'Lead',detail:(l.company_name||'Sin empresa')+' · '+(l.next_action||'Planificar seguimiento')+(l.next_action_at?' · '+new Date(l.next_action_at).toLocaleDateString('es-ES'):' · Sin fecha')}),'No hay leads con seguimientos pendientes para hoy.');
+    addList(lists,'Leads por atender',urgentLeads,'Leads',l=>({title:l.contact_name||l.company_name||'Lead',detail:(l.company_name||'Sin empresa')+' · '+(l.next_action||'Planificar seguimiento')+(l.next_action_at?' · '+new Date(l.next_action_at).toLocaleDateString('es-ES'):' · Sin fecha'),urgent:!!l.next_action_at&&dateKey(new Date(l.next_action_at))<today,today:!!l.next_action_at&&dateKey(new Date(l.next_action_at))===today}),'No hay leads con seguimientos pendientes para hoy.');
     const urgentOpps=lateOpps===null?null:[...lateOpps,...(closingSoon||[])].sort((a,b)=>(a.expected_close_date||'').localeCompare(b.expected_close_date||''));
-    addList(lists,'Cierres comerciales próximos',urgentOpps,'Oportunidades',o=>({title:o.title||'Oportunidad',detail:(o.expected_close_date||'Sin fecha')+(o.expected_close_date<today?' · ATRASADA':' · Próximo cierre')+' · '+Number(o.estimated_value||0).toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0})}),'No hay cierres vencidos ni previstos para los próximos siete días.');
+    addList(lists,'Cierres comerciales próximos',urgentOpps,'Oportunidades',o=>({title:o.title||'Oportunidad',detail:(o.expected_close_date||'Sin fecha')+(o.expected_close_date<today?' · ATRASADA':' · Próximo cierre')+' · '+Number(o.estimated_value||0).toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0}),urgent:o.expected_close_date<today,today:o.expected_close_date===today}),'No hay cierres vencidos ni previstos para los próximos siete días.');
     body.append(lists);
     panel.querySelector('.crm-priorities-updated').textContent='Actualizado '+now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
   }
@@ -166,10 +172,15 @@
   .crm-priorities-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:20px 0}
   .crm-priorities-stat{border:1px solid #d8e4ec;border-radius:10px;background:#f7fbfc;padding:13px;text-align:left;cursor:pointer}
   .crm-priorities-stat strong{display:block;font-size:29px;color:#087f74}.crm-priorities-stat span{font-size:13px;color:#52677b}
+  .crm-priorities-stat-urgent{border-color:#efc6bf;background:#fff3f1}.crm-priorities-stat-urgent strong{color:#b42318}
+  .crm-priorities-stat-today{border-color:#f0d9a9;background:#fff9ea}.crm-priorities-stat-today strong{color:#935900}
+  .crm-priorities-stat:hover,.crm-priorities-item:hover{box-shadow:0 3px 10px #142c481a;transform:translateY(-1px)}
+  .crm-priorities-stat:focus-visible,.crm-priorities-item:focus-visible{outline:3px solid #56b9ad;outline-offset:2px}
   .crm-priorities-lists{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
   .crm-priorities-group{min-width:0;border:1px solid #e1e8ee;border-radius:10px;padding:15px}
   .crm-priorities-group h3{font-size:15px;margin:0 0 9px}.crm-priorities-item{display:block;width:100%;padding:10px 0;background:transparent;border:0;border-bottom:1px solid #ecf1f5;text-align:left;cursor:pointer}
   .crm-priorities-item strong,.crm-priorities-item small{display:block}.crm-priorities-item strong{color:#213e55;font-size:13px}.crm-priorities-item small{color:#718096;font-size:12px;margin-top:4px}
+  .crm-priorities-item-urgent{border-left:3px solid #d4554a;padding-left:9px;background:#fff7f5}.crm-priorities-item-today{border-left:3px solid #d5a344;padding-left:9px;background:#fffaf0}
   .crm-priorities-empty,.crm-priorities-error{font-size:13px;color:#64748b}.crm-priorities-error{color:#b42318}
   @media(max-width:900px){.crm-priorities-lists{grid-template-columns:1fr}.crm-priorities-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
   `;
