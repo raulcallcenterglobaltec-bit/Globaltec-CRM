@@ -80,6 +80,15 @@
       if(!rows.length){list.append(el('p','No hay oportunidades para estos filtros.','crm-opp-empty'));return;}
       for(const r of rows.slice(0,300)){
         const row=el('article','','crm-opp-item'),info=el('div','','crm-opp-info');
+        const badges=el('div','','crm-opp-badges');
+        const addBadge=(label,type)=>badges.append(el('span',label,'crm-opp-badge crm-opp-badge-'+type));
+        if(stage(r)==='won')addBadge('Ganada','success');
+        else if(stage(r)==='lost')addBadge('Perdida','muted');
+        else if(expired(r,today))addBadge('Cierre vencido','urgent');
+        else if(!r.expected_close_date)addBadge('Sin fecha de cierre','warning');
+        if(stage(r)==='open'&&!r.company_id)addBadge('Sin cliente','warning');
+        if(stage(r)==='open'&&taskVisible&&(taskSummary.get(r.id)?.overdue||0)>0)addBadge('Tarea vencida','urgent');
+        if(badges.childElementCount)info.append(badges);
         info.append(el('strong',r.title||'Sin título'));
         info.append(el('small',`${r.companies?.name||'Sin cliente'} · ${r.pipeline_stages?.name||'Sin etapa'} · ${r.expected_close_date||'Sin fecha de cierre'}`));
         info.append(el('small',r.lead_id?`Lead de origen: ${leadLabels.get(r.lead_id)||'No disponible'}`:'Sin lead de origen','crm-opp-origin'));
@@ -172,6 +181,7 @@
     .crm-opp-info{flex:1;min-width:0}.crm-opp-info strong,.crm-opp-info small,.crm-opp-value strong,.crm-opp-value small{display:block}.crm-opp-info small,.crm-opp-value small{color:#687e90;margin-top:5px}.crm-opp-info .crm-opp-tasks{color:#087f74;font-weight:700}.crm-opp-value{text-align:right;white-space:nowrap}
     .crm-opp-value .crm-opp-followup{display:block;margin:8px 0 0 auto;border:1px solid #087f74;background:#fff;color:#087f74;border-radius:8px;padding:7px 10px;font:inherit;font-size:12px;font-weight:750;cursor:pointer}
     .crm-opp-info .crm-opp-origin{color:#2563a2;font-weight:650}
+    .crm-opp-badges{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}.crm-opp-badge{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:750;border:1px solid transparent}.crm-opp-badge-warning{background:#fff5df;color:#915600;border-color:#f4da9b}.crm-opp-badge-urgent{background:#fff0ee;color:#b42318;border-color:#f0c9c3}.crm-opp-badge-success{background:#e7f7ec;color:#177245;border-color:#bce1c7}.crm-opp-badge-muted{background:#eef1f5;color:#536477;border-color:#d9e0e9}
     .crm-opp-dialog footer{justify-content:flex-end;flex-wrap:wrap;gap:12px;margin-top:22px;padding-top:18px;border-top:1px solid #e1e8ed}
     .crm-opp-dialog footer button{min-height:42px;padding:10px 16px;border:1px solid #087f74;border-radius:9px;color:#08776e;background:#fff;cursor:pointer;font-weight:700}
     .crm-opp-dialog footer button:last-child{background:#087f74;color:#fff}

@@ -127,6 +127,14 @@
       if(!rows.length){list.append(el('p','No hay leads con estos filtros.','crm-lead-summary-empty'));return;}
       for(const row of rows.slice(0,300)){
         const item=el('article','','crm-lead-summary-row'),info=el('div','','crm-lead-summary-info');
+        const badges=el('div','','crm-lead-badges');
+        const addBadge=(label,type)=>badges.append(el('span',label,'crm-lead-badge crm-lead-badge-'+type));
+        if(active(row)&&dueDay(row)&&dueDay(row)<today)addBadge('Seguimiento vencido','urgent');
+        else if(active(row)&&dueDay(row)===today)addBadge('Actuación hoy','warning');
+        if(active(row)&&(!row.next_action||!row.next_action_at))addBadge('Sin planificar','warning');
+        if(active(row)&&!row.assigned_to)addBadge('Sin responsable','muted');
+        if(row.status==='converted')addBadge('Convertido','success');
+        if(badges.childElementCount)info.append(badges);
         info.append(el('strong',row.contact_name||row.company_name||'Lead sin nombre'));
         info.append(el('small',`${row.company_name||'Sin empresa'} · ${row.status||'Sin estado'} · ${row.phone||row.email||'Sin teléfono ni correo'}`));
         const action=el('div','','crm-lead-summary-next');action.append(el('strong',row.next_action||'Sin próxima actuación'));
@@ -189,6 +197,7 @@
     .crm-lead-summary-dialog input,.crm-lead-summary-dialog select{display:block;box-sizing:border-box;width:100%;padding:10px;border:1px solid #bed0dc;border-radius:9px;margin-top:6px;font:inherit}
     .crm-lead-summary-notice{min-height:20px;font-size:13px}.crm-lead-summary-list{display:grid;gap:8px;max-height:400px;overflow:auto}.crm-lead-summary-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid #e1e8ed;border-radius:9px}
     .crm-lead-summary-info{flex:1;min-width:0}.crm-lead-summary-info strong,.crm-lead-summary-info small,.crm-lead-summary-next strong,.crm-lead-summary-next small{display:block}.crm-lead-summary-info small,.crm-lead-summary-next small{color:#687d8c;margin-top:5px}.crm-lead-summary-next{text-align:right;max-width:270px}.crm-lead-summary-next .crm-lead-summary-warning{color:#ae5100;font-weight:750}
+    .crm-lead-badges{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}.crm-lead-badge{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:750;border:1px solid transparent}.crm-lead-badge-warning{background:#fff5df;color:#915600;border-color:#f4da9b}.crm-lead-badge-urgent{background:#fff0ee;color:#b42318;border-color:#f0c9c3}.crm-lead-badge-success{background:#e7f7ec;color:#177245;border-color:#bce1c7}.crm-lead-badge-muted{background:#eef1f5;color:#536477;border-color:#d9e0e9}
     .crm-lead-plan-button{margin-top:9px;border:1px solid #087f74;background:#fff;color:#087f74;border-radius:8px;padding:7px 10px;cursor:pointer;font-size:12px;font-weight:750}.crm-lead-plan{flex:0 0 100%;display:grid;grid-template-columns:1fr 200px auto;align-items:end;gap:9px;padding:12px;background:#f5faf8;border:1px solid #dcebe7;border-radius:9px}.crm-lead-plan label{text-align:left}.crm-lead-plan div{display:flex;gap:5px}.crm-lead-plan button{border:1px solid #087f74;color:#087f74;background:#fff;border-radius:8px;padding:10px;cursor:pointer}.crm-lead-plan button[type=submit]{background:#087f74;color:#fff}
     .crm-lead-opportunity-button{display:block;margin-top:8px;padding:7px 10px;border-radius:8px;border:1px solid #087f74;background:#e9f7f2;color:#08776e;font-weight:750;font-size:12px;cursor:pointer}
     .crm-lead-opportunity-form{flex:0 0 100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:14px;background:#f2faf7;border:1px solid #cbe6dc;border-radius:10px}
