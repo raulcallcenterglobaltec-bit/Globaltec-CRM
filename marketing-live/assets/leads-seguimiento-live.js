@@ -25,15 +25,17 @@
       <header><div><small>CONTROL COMERCIAL</small><h2 id="crm-lead-summary-title">Seguimiento de leads</h2></div><button type="button" data-close aria-label="Cerrar">×</button></header>
       <p>Consulta los leads y sus próximas actuaciones. Si hay una venta concreta, puedes crear una oportunidad vinculada al lead sin asignar automáticamente un cliente.</p>
       <div class="crm-lead-summary-metrics"></div>
-      <div class="crm-lead-summary-controls"><label>Ver<select id="crm-lead-summary-view"><option value="attention">Necesitan atención</option><option value="overdue">Seguimiento vencido</option><option value="today">Actuación para hoy</option><option value="upcoming">Próximos siete días</option><option value="noaction">Sin próxima actuación</option><option value="unassigned">Sin responsable</option><option value="nocontact">Sin teléfono ni correo</option><option value="qualified">Cualificados</option><option value="proposal">En propuesta</option><option value="new">Nuevos</option><option value="converted">Convertidos</option><option value="all">Todos</option></select></label><label>Ordenar<select id="crm-lead-summary-sort"><option value="recent">Más recientes</option><option value="action">Próxima actuación</option><option value="name">Nombre A-Z</option></select></label><label>Buscar<input id="crm-lead-summary-search" type="search" placeholder="Persona, empresa o teléfono"></label></div>
+      <div class="crm-lead-summary-controls"><label>Ver<select id="crm-lead-summary-view"><option value="attention">Necesitan atención</option><option value="overdue">Seguimiento vencido</option><option value="today">Actuación para hoy</option><option value="upcoming">Próximos siete días</option><option value="noaction">Sin próxima actuación</option><option value="unassigned">Sin responsable</option><option value="nocontact">Sin teléfono ni correo</option><option value="qualified">Cualificados</option><option value="proposal">En propuesta</option><option value="new">Nuevos</option><option value="converted">Convertidos</option><option value="all">Todos</option></select></label><label>Ordenar<select id="crm-lead-summary-sort"><option value="urgent">Más urgentes</option><option value="recent">Más recientes</option><option value="action">Próxima actuación</option><option value="name">Nombre A-Z</option></select></label><label>Buscar<input id="crm-lead-summary-search" type="search" placeholder="Persona, empresa o teléfono"></label></div>
       <p class="crm-lead-summary-notice" role="status"></p><div class="crm-lead-summary-list"></div>
-      <footer><button type="button" id="crm-lead-summary-export">Exportar CSV</button><button type="button" id="crm-lead-summary-refresh">Actualizar</button><button type="button" data-close>Cerrar</button></footer>
+      <footer><button type="button" id="crm-lead-summary-reset">Limpiar filtros</button><button type="button" id="crm-lead-summary-export">Exportar CSV</button><button type="button" id="crm-lead-summary-refresh">Actualizar</button><button type="button" data-close>Cerrar</button></footer>
     </section>`;
     document.body.append(overlay);
     const stats=overlay.querySelector('.crm-lead-summary-metrics'),list=overlay.querySelector('.crm-lead-summary-list'),notice=overlay.querySelector('.crm-lead-summary-notice');
     const view=overlay.querySelector('#crm-lead-summary-view'),search=overlay.querySelector('#crm-lead-summary-search'),sort=overlay.querySelector('#crm-lead-summary-sort');
     const message=(value,bad=false)=>{notice.textContent=value;notice.style.color=bad?'#b42318':'#087f74';};
-    const close=()=>overlay.remove();overlay.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);overlay.onclick=e=>{if(e.target===overlay)close();};
+    const onEscape=e=>{if(e.key==='Escape')close();};
+    const close=()=>{document.removeEventListener('keydown',onEscape);overlay.remove();};document.addEventListener('keydown',onEscape);
+    overlay.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);overlay.onclick=e=>{if(e.target===overlay)close();};
     let org='',entries=[],canEdit=false,canCreateOpportunity=false,busy=false;
     const active=x=>!['converted','discarded','spam'].includes(x.status);
     const day=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -116,6 +118,10 @@
         return [x.contact_name,x.company_name,x.phone,x.email,x.next_action].join(' ').toLocaleLowerCase('es').includes(q);
       });
       if(sort.value==='action')matching.sort((a,b)=>(a.next_action_at||'9999-12-31').localeCompare(b.next_action_at||'9999-12-31'));
+      if(sort.value==='urgent'){
+        const rank=x=>!active(x)?4:dueDay(x)&&dueDay(x)<today?0:dueDay(x)===today?1:!x.next_action||!x.next_action_at?2:3;
+        matching.sort((a,b)=>rank(a)-rank(b)||(a.next_action_at||'9999-12-31').localeCompare(b.next_action_at||'9999-12-31'));
+      }
       if(sort.value==='name')matching.sort((a,b)=>(a.contact_name||a.company_name||'').localeCompare(b.contact_name||b.company_name||'','es'));
       return matching;
     }
@@ -137,6 +143,16 @@
         if(badges.childElementCount)info.append(badges);
         info.append(el('strong',row.contact_name||row.company_name||'Lead sin nombre'));
         info.append(el('small',`${row.company_name||'Sin empresa'} · ${row.status||'Sin estado'} · ${row.phone||row.email||'Sin teléfono ni correo'}`));
+        const quick=el('div','','crm-lead-quick-actions');
+        const phone=String(row.phone||'').trim().replace(/[^+\d]/g,'');
+        if(phone){const call=el('a','Llamar');call.href='tel:'+phone;quick.append(call);}
+        const email=String(row.email||'').trim();
+        if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){const mail=el('a','Correo');mail.href='mailto:'+email;quick.append(mail);}
+        const copy=el('button','Copiar datos');copy.type='button';copy.onclick=async()=>{
+          if(document.getElementById('active-organization')?.value!==org){message('Ha cambiado la empresa. Abre el panel otra vez.',true);return;}
+          try{await navigator.clipboard.writeText([row.contact_name,row.company_name,row.phone,row.email].filter(Boolean).join(' · '));message('Datos del lead copiados.');}
+          catch{message('No se pudo copiar. Comprueba los permisos del navegador.',true);}
+        };quick.append(copy);info.append(quick);
         const action=el('div','','crm-lead-summary-next');action.append(el('strong',row.next_action||'Sin próxima actuación'));
         action.append(el('small',row.next_action_at?new Date(row.next_action_at).toLocaleString('es-ES',{dateStyle:'short',timeStyle:'short'}):'Sin fecha'));
         if(active(row)&&(!row.next_action||!row.next_action_at||!row.assigned_to))action.append(el('small',[!row.next_action||!row.next_action_at?'Falta planificar':'',!row.assigned_to?'Sin responsable':''].filter(Boolean).join(' · '),'crm-lead-summary-warning'));
@@ -170,6 +186,7 @@
     view.onchange=render;sort.onchange=render;search.oninput=render;
     overlay.querySelector('#crm-lead-summary-export').onclick=()=>csv(filtered());
     overlay.querySelector('#crm-lead-summary-refresh').onclick=load;
+    overlay.querySelector('#crm-lead-summary-reset').onclick=()=>{view.value='attention';sort.value='urgent';search.value='';render();};
     org=document.getElementById('active-organization')?.value||'';
     if(!org)message('Selecciona una empresa en el CRM.',true);else load();
   }
@@ -198,6 +215,7 @@
     .crm-lead-summary-notice{min-height:20px;font-size:13px}.crm-lead-summary-list{display:grid;gap:8px;max-height:400px;overflow:auto}.crm-lead-summary-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid #e1e8ed;border-radius:9px}
     .crm-lead-summary-info{flex:1;min-width:0}.crm-lead-summary-info strong,.crm-lead-summary-info small,.crm-lead-summary-next strong,.crm-lead-summary-next small{display:block}.crm-lead-summary-info small,.crm-lead-summary-next small{color:#687d8c;margin-top:5px}.crm-lead-summary-next{text-align:right;max-width:270px}.crm-lead-summary-next .crm-lead-summary-warning{color:#ae5100;font-weight:750}
     .crm-lead-badges{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}.crm-lead-badge{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:750;border:1px solid transparent}.crm-lead-badge-warning{background:#fff5df;color:#915600;border-color:#f4da9b}.crm-lead-badge-urgent{background:#fff0ee;color:#b42318;border-color:#f0c9c3}.crm-lead-badge-success{background:#e7f7ec;color:#177245;border-color:#bce1c7}.crm-lead-badge-muted{background:#eef1f5;color:#536477;border-color:#d9e0e9}
+    .crm-lead-quick-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.crm-lead-quick-actions a,.crm-lead-quick-actions button{display:inline-flex;align-items:center;padding:6px 10px;min-height:30px;border:1px solid #c5d9df;background:#f8fcfc;border-radius:7px;color:#08776e;text-decoration:none;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
     .crm-lead-plan-button{margin-top:9px;border:1px solid #087f74;background:#fff;color:#087f74;border-radius:8px;padding:7px 10px;cursor:pointer;font-size:12px;font-weight:750}.crm-lead-plan{flex:0 0 100%;display:grid;grid-template-columns:1fr 200px auto;align-items:end;gap:9px;padding:12px;background:#f5faf8;border:1px solid #dcebe7;border-radius:9px}.crm-lead-plan label{text-align:left}.crm-lead-plan div{display:flex;gap:5px}.crm-lead-plan button{border:1px solid #087f74;color:#087f74;background:#fff;border-radius:8px;padding:10px;cursor:pointer}.crm-lead-plan button[type=submit]{background:#087f74;color:#fff}
     .crm-lead-opportunity-button{display:block;margin-top:8px;padding:7px 10px;border-radius:8px;border:1px solid #087f74;background:#e9f7f2;color:#08776e;font-weight:750;font-size:12px;cursor:pointer}
     .crm-lead-opportunity-form{flex:0 0 100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:14px;background:#f2faf7;border:1px solid #cbe6dc;border-radius:10px}
