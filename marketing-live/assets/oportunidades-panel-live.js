@@ -16,13 +16,13 @@
   const norm=x=>String(x||'').trim().toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   function csvCell(value){let s=String(value??'');if(/^[\s\u0000-\u001f]*[=+@\-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';}
   function download(rows){
-    const headers=['Oportunidad','Cliente','Contacto','Etapa','Importe estimado EUR','Cuota mensual EUR','Probabilidad %','Cierre previsto','Responsable asignado','Tareas pendientes','Tareas vencidas'];
-    const values=[headers,...rows.map(r=>[r.title,r.companies?.name||'',r.contacts?[r.contacts.first_name,r.contacts.last_name].filter(Boolean).join(' '):'',r.pipeline_stages?.name||'',r.estimated_value||'',r.monthly_value||'',r.probability??'',r.expected_close_date||'',r.owner_id?'Sí':'No',taskCountsAvailable?(taskCounts.get(r.id)?.pending||0):'No disponible',taskCountsAvailable?(taskCounts.get(r.id)?.overdue||0):'No disponible'])];
+    const headers=['Oportunidad','Lead de origen','Cliente','Contacto','Etapa','Importe estimado EUR','Cuota mensual EUR','Probabilidad %','Cierre previsto','Responsable asignado','Tareas pendientes','Tareas vencidas'];
+    const values=[headers,...rows.map(r=>[r.title,r.lead_id?leadLabels.get(r.lead_id)||'Lead no disponible':'Sin lead',r.companies?.name||'',r.contacts?[r.contacts.first_name,r.contacts.last_name].filter(Boolean).join(' '):'',r.pipeline_stages?.name||'',r.estimated_value||'',r.monthly_value||'',r.probability??'',r.expected_close_date||'',r.owner_id?'Sí':'No',taskCountsAvailable?(taskCounts.get(r.id)?.pending||0):'No disponible',taskCountsAvailable?(taskCounts.get(r.id)?.overdue||0):'No disponible'])];
     const data='\ufeff'+values.map(row=>row.map(csvCell).join(';')).join('\r\n');
     const url=URL.createObjectURL(new Blob([data],{type:'text/csv;charset=utf-8'}));const a=el('a');a.href=url;
     a.download='globaltec-oportunidades-'+new Date().toISOString().slice(0,10)+'.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);
   }
-  let taskCounts=new Map(),taskCountsAvailable=false;
+  let taskCounts=new Map(),taskCountsAvailable=false,leadLabels=new Map();
   function open(){
     if(document.getElementById('crm-opportunity-dashboard'))return;
     const overlay=el('div','','crm-opp-overlay');overlay.id='crm-opportunity-dashboard';
@@ -30,7 +30,7 @@
       <header><div><small>SEGUIMIENTO DE VENTAS</small><h2 id="crm-opp-title">Control de oportunidades</h2></div><button type="button" data-close aria-label="Cerrar">×</button></header>
       <p>Resumen comercial de la empresa seleccionada. Los importes son previsiones según los valores introducidos, no ventas facturadas.</p>
       <div class="crm-opp-metrics"></div>
-      <div class="crm-opp-filters"><label>Ver<select id="crm-opp-view"><option value="open">En curso</option><option value="overdue">Cierre vencido</option><option value="next7">Cierre en 7 días</option><option value="next30">Próximos 30 días</option><option value="nodate">Sin fecha de cierre</option><option value="highprob">Alta probabilidad (70% o más)</option><option value="withouttasks">Sin tareas pendientes</option><option value="taskoverdue">Con tareas vencidas</option><option value="unassigned">Sin responsable</option><option value="won">Ganadas</option><option value="lost">Perdidas</option><option value="all">Todas</option></select></label><label>Ordenar<select id="crm-opp-sort"><option value="recent">Más recientes</option><option value="closing">Cierre más próximo</option><option value="amount">Mayor importe</option><option value="probability">Mayor probabilidad</option></select></label><label>Buscar<input id="crm-opp-search" type="search" placeholder="Oportunidad o cliente"></label></div>
+      <div class="crm-opp-filters"><label>Ver<select id="crm-opp-view"><option value="open">En curso</option><option value="noclient">En curso sin cliente</option><option value="withlead">Con lead de origen</option><option value="withoutlead">Sin lead de origen</option><option value="overdue">Cierre vencido</option><option value="next7">Cierre en 7 días</option><option value="next30">Próximos 30 días</option><option value="nodate">Sin fecha de cierre</option><option value="highprob">Alta probabilidad (70% o más)</option><option value="withouttasks">Sin tareas pendientes</option><option value="taskoverdue">Con tareas vencidas</option><option value="unassigned">Sin responsable</option><option value="won">Ganadas</option><option value="lost">Perdidas</option><option value="all">Todas</option></select></label><label>Ordenar<select id="crm-opp-sort"><option value="recent">Más recientes</option><option value="closing">Cierre más próximo</option><option value="amount">Mayor importe</option><option value="probability">Mayor probabilidad</option></select></label><label>Buscar<input id="crm-opp-search" type="search" placeholder="Oportunidad, lead o cliente"></label></div>
       <p class="crm-opp-notice" role="status"></p><div class="crm-opp-list"></div>
       <footer><button type="button" id="crm-opp-export">Exportar CSV</button><button type="button" id="crm-opp-refresh">Actualizar</button><button type="button" data-close>Cerrar</button></footer>
     </section>`;
@@ -49,6 +49,9 @@
       const q=norm(search.value);
       const matching=records.filter(r=>{
         if(view.value==='open'&&stage(r)!=='open')return false;
+        if(view.value==='noclient'&&(stage(r)!=='open'||!!r.company_id))return false;
+        if(view.value==='withlead'&&!r.lead_id)return false;
+        if(view.value==='withoutlead'&&!!r.lead_id)return false;
         if(view.value==='won'&&stage(r)!=='won')return false;
         if(view.value==='lost'&&stage(r)!=='lost')return false;
         if(view.value==='overdue'&&!expired(r,today))return false;
@@ -59,7 +62,7 @@
         if(view.value==='withouttasks'&&(!taskVisible||stage(r)!=='open'||(taskSummary.get(r.id)?.pending||0)>0))return false;
         if(view.value==='taskoverdue'&&(!taskVisible||stage(r)!=='open'||!(taskSummary.get(r.id)?.overdue)))return false;
         if(view.value==='unassigned'&&(stage(r)!=='open'||!!r.owner_id))return false;
-        return norm([r.title,r.companies?.name,r.contacts?.first_name,r.contacts?.last_name].join(' ')).includes(q);
+        return norm([r.title,r.companies?.name,r.contacts?.first_name,r.contacts?.last_name,r.lead_id?leadLabels.get(r.lead_id):''].join(' ')).includes(q);
       });
       if(sort.value==='amount')matching.sort((a,b)=>Number(b.estimated_value||0)-Number(a.estimated_value||0));
       if(sort.value==='probability')matching.sort((a,b)=>Number(b.probability||0)-Number(a.probability||0));
@@ -71,7 +74,7 @@
       const now=new Date(),today=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
       const weighted=openRecords.reduce((sum,r)=>sum+Number(r.estimated_value||0)*(Number(r.probability??0)/100),0);
       const won=records.filter(r=>stage(r)==='won'),lost=records.filter(r=>stage(r)==='lost');
-      const metrics=[['En curso',openRecords.length],['Ganadas',won.length],['Perdidas',lost.length],['Tasa de éxito',won.length+lost.length?Math.round(won.length/(won.length+lost.length)*100)+'%':'—'],['Cierre vencido',openRecords.filter(r=>expired(r,today)).length],['Sin fecha de cierre',openRecords.filter(r=>!r.expected_close_date).length],['Valor en curso',money(openRecords.reduce((s,r)=>s+Number(r.estimated_value||0),0))],['Importe ganado estimado',money(won.reduce((s,r)=>s+Number(r.estimated_value||0),0))],['Previsión ponderada',money(weighted)],['Sin responsable',openRecords.filter(r=>!r.owner_id).length],['Sin tareas pendientes',taskVisible?openRecords.filter(r=>!(taskSummary.get(r.id)?.pending)).length:'—'],['Con tareas vencidas',taskVisible?openRecords.filter(r=>(taskSummary.get(r.id)?.overdue||0)>0).length:'—']];
+      const metrics=[['En curso',openRecords.length],['Sin cliente',openRecords.filter(r=>!r.company_id).length],['Con lead de origen',records.filter(r=>!!r.lead_id).length],['Ganadas',won.length],['Perdidas',lost.length],['Tasa de éxito',won.length+lost.length?Math.round(won.length/(won.length+lost.length)*100)+'%':'—'],['Cierre vencido',openRecords.filter(r=>expired(r,today)).length],['Sin fecha de cierre',openRecords.filter(r=>!r.expected_close_date).length],['Valor en curso',money(openRecords.reduce((s,r)=>s+Number(r.estimated_value||0),0))],['Importe ganado estimado',money(won.reduce((s,r)=>s+Number(r.estimated_value||0),0))],['Previsión ponderada',money(weighted)],['Sin responsable',openRecords.filter(r=>!r.owner_id).length],['Sin tareas pendientes',taskVisible?openRecords.filter(r=>!(taskSummary.get(r.id)?.pending)).length:'—'],['Con tareas vencidas',taskVisible?openRecords.filter(r=>(taskSummary.get(r.id)?.overdue||0)>0).length:'—']];
       stats.replaceChildren();for(const [label,value] of metrics){const box=el('div','','crm-opp-stat');box.append(el('strong',String(value)),el('span',label));stats.append(box);}
       list.replaceChildren();const rows=selected();
       if(!rows.length){list.append(el('p','No hay oportunidades para estos filtros.','crm-opp-empty'));return;}
@@ -79,6 +82,7 @@
         const row=el('article','','crm-opp-item'),info=el('div','','crm-opp-info');
         info.append(el('strong',r.title||'Sin título'));
         info.append(el('small',`${r.companies?.name||'Sin cliente'} · ${r.pipeline_stages?.name||'Sin etapa'} · ${r.expected_close_date||'Sin fecha de cierre'}`));
+        info.append(el('small',r.lead_id?`Lead de origen: ${leadLabels.get(r.lead_id)||'No disponible'}`:'Sin lead de origen','crm-opp-origin'));
         if(taskVisible){const t=taskSummary.get(r.id)||{pending:0,overdue:0,next:''};info.append(el('small',`${t.pending} tareas pendientes${t.overdue?' · '+t.overdue+' vencidas':''}${t.next?' · Próxima: '+t.next:' · Sin próxima tarea'}`,'crm-opp-tasks'));}
         const val=el('div','','crm-opp-value');val.append(el('strong',money(r.estimated_value)),el('small',`${Number(r.probability||0)}% de probabilidad`));
         if(stage(r)==='open'){
@@ -96,15 +100,27 @@
       message(`${rows.length} oportunidades con el filtro actual.${!taskVisible?' No se pudo consultar el seguimiento de tareas.':''}${rows.length>300?' Se muestran las primeras 300; el CSV incluye todas.':''}`);
     }
     async function load(){
-      message('Cargando oportunidades…');records=[];taskSummary=new Map();taskVisible=false;taskCounts=new Map();taskCountsAvailable=false;list.replaceChildren();
+      message('Cargando oportunidades…');records=[];taskSummary=new Map();taskVisible=false;taskCounts=new Map();taskCountsAvailable=false;leadLabels=new Map();list.replaceChildren();
       try{
         const active=document.getElementById('active-organization')?.value;
         if(active!==org)throw Error('Ha cambiado la empresa. Vuelve a abrir el panel.');
         const allowed=await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org,p_module:'opportunities',p_action:'view'}});
         if(allowed!==true)throw Error('No tienes permiso para consultar oportunidades.');
         for(let offset=0;offset<10000;offset+=500){
-          const page=await api(`opportunities?select=id,title,company_id,contact_id,estimated_value,monthly_value,probability,expected_close_date,owner_id,companies(name),contacts(first_name,last_name),pipeline_stages(name,is_won,is_lost)&organization_id=eq.${encodeURIComponent(org)}&order=created_at.desc&limit=500&offset=${offset}`);
+          const page=await api(`opportunities?select=id,title,lead_id,company_id,contact_id,estimated_value,monthly_value,probability,expected_close_date,owner_id,companies(name),contacts(first_name,last_name),pipeline_stages(name,is_won,is_lost)&organization_id=eq.${encodeURIComponent(org)}&order=created_at.desc&limit=500&offset=${offset}`);
           records.push(...page);if(page.length<500)break;
+        }
+        const leadIds=[...new Set(records.map(r=>r.lead_id).filter(Boolean))];
+        if(leadIds.length){
+          try{
+            const permitted=await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org,p_module:'leads',p_action:'view'}});
+            if(permitted===true){
+              for(let i=0;i<leadIds.length;i+=100){
+                const page=await api(`leads?select=id,contact_name,company_name&organization_id=eq.${encodeURIComponent(org)}&id=in.(${leadIds.slice(i,i+100).map(encodeURIComponent).join(',')})`);
+                for(const lead of page)leadLabels.set(lead.id,lead.contact_name||lead.company_name||'Lead sin nombre');
+              }
+            }
+          }catch(error){console.warn('Origen de leads no disponible:',error.message);}
         }
         try{
           const allowedTasks=await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org,p_module:'tasks',p_action:'view'}});
@@ -155,6 +171,7 @@
     .crm-opp-notice{min-height:20px;font-size:13px}.crm-opp-list{max-height:400px;overflow:auto;display:grid;gap:8px}.crm-opp-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid #e1e8ed;border-radius:9px}
     .crm-opp-info{flex:1;min-width:0}.crm-opp-info strong,.crm-opp-info small,.crm-opp-value strong,.crm-opp-value small{display:block}.crm-opp-info small,.crm-opp-value small{color:#687e90;margin-top:5px}.crm-opp-info .crm-opp-tasks{color:#087f74;font-weight:700}.crm-opp-value{text-align:right;white-space:nowrap}
     .crm-opp-value .crm-opp-followup{display:block;margin:8px 0 0 auto;border:1px solid #087f74;background:#fff;color:#087f74;border-radius:8px;padding:7px 10px;font:inherit;font-size:12px;font-weight:750;cursor:pointer}
+    .crm-opp-info .crm-opp-origin{color:#2563a2;font-weight:650}
     .crm-opp-dialog footer button{padding:10px 14px;border:1px solid #087f74;border-radius:9px;color:#08776e;background:#fff;cursor:pointer;font-weight:700}
     @media(max-width:720px){.crm-opp-metrics{grid-template-columns:repeat(2,1fr)}.crm-opp-filters{grid-template-columns:1fr}.crm-opp-dialog{padding:15px}.crm-opp-item{flex-wrap:wrap}}`;
   document.head.append(css);
