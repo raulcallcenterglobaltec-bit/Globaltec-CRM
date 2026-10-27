@@ -27,7 +27,7 @@
         <label>Buscar<input id="crm-agenda-search" placeholder="Asunto o cliente" type="search"></label>
       </div>
       <p class="crm-agenda-notice" role="status"></p><div class="crm-agenda-list"></div>
-      <footer><button type="button" id="crm-agenda-export">Exportar CSV</button><button type="button" data-close>Cerrar</button><button type="button" id="crm-agenda-refresh">Actualizar</button></footer>
+      <footer><button type="button" id="crm-agenda-export">Exportar CSV</button><button type="button" id="crm-agenda-refresh">Actualizar</button><button type="button" data-close>Cerrar</button></footer>
     </section>`;
     document.body.append(modal);
     const org=modal.querySelector('#crm-agenda-org'),range=modal.querySelector('#crm-agenda-range'),search=modal.querySelector('#crm-agenda-search');
@@ -160,7 +160,10 @@
     .crm-agenda-info{flex:1;min-width:190px}.crm-agenda-info strong,.crm-agenda-info small{display:block}.crm-agenda-info small{color:#687c8e;margin-top:5px}
     .crm-agenda-edit,.crm-agenda-save,.crm-agenda-cancel,.crm-agenda-dialog footer button{padding:9px 13px;border:1px solid #0b8075;border-radius:8px;background:white;color:#08776e;cursor:pointer;font-weight:700}
     .crm-agenda-editor{display:flex;align-items:flex-end;gap:9px;flex-wrap:wrap;width:100%;border-top:1px solid #e1e9ee;padding-top:10px}.crm-agenda-editor label{flex:1;min-width:150px}
-    .crm-agenda-save,.crm-agenda-dialog footer #crm-agenda-refresh{background:#087f74;color:#fff}.crm-agenda-empty{color:#64748b}
+    .crm-agenda-save,.crm-agenda-dialog footer button:last-child{background:#087f74;color:#fff}.crm-agenda-empty{color:#64748b}
+    .crm-agenda-dialog footer{justify-content:flex-end;flex-wrap:wrap;gap:12px;margin-top:22px;padding-top:18px;border-top:1px solid #e1e8ed}
+    .crm-agenda-dialog footer button{min-height:42px;padding:10px 16px}
+    @media(max-width:520px){.crm-agenda-dialog footer{gap:10px}.crm-agenda-dialog footer button{flex:1 1 130px}}
     @media(max-width:750px){.crm-agenda-filters{grid-template-columns:1fr}.crm-agenda-dialog{padding:16px}}`;
   document.head.append(style);
   new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(install);}).observe(root,{childList:true,subtree:true});

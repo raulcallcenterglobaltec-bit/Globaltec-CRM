@@ -156,6 +156,10 @@
     .crm-client-history-item{padding:11px 13px;border:1px solid #e0e8ed;border-radius:9px}.crm-client-history-item time{color:#657d90;font-size:12px;margin-right:10px}.crm-client-history-item strong{font-size:14px}.crm-client-history-item p{white-space:pre-wrap;margin:5px 0 0;color:#3f566c;font-size:13px}
     .crm-client-note-form{border-top:1px solid #e0e8ed;margin:17px 0;padding-top:10px}.crm-client-note-form h3{font-size:16px}
     .crm-client-history-dialog button{cursor:pointer}.crm-client-note-form button,.crm-client-history-dialog footer button{padding:10px 14px;border:1px solid #087f74;border-radius:8px;background:#fff;color:#08776e;font-weight:700}
+    .crm-client-history-dialog footer{justify-content:flex-end;flex-wrap:wrap;gap:12px;margin-top:22px;padding-top:18px;border-top:1px solid #e1e8ed}
+    .crm-client-history-dialog footer button{min-height:42px;padding:10px 16px}
+    .crm-client-history-dialog footer button:last-child{background:#087f74;color:#fff}
+    @media(max-width:520px){.crm-client-history-dialog footer{gap:10px}.crm-client-history-dialog footer button{flex:1 1 140px}}
     .crm-client-note-form button{margin-top:9px;background:#087f74;color:white}.crm-client-history-dialog button:disabled{opacity:.5;cursor:wait}
     @media(max-width:700px){.crm-client-history-controls{grid-template-columns:1fr}.crm-client-history-metrics{grid-template-columns:repeat(2,1fr)}.crm-client-history-dialog{padding:15px}}`;
   document.head.append(style);

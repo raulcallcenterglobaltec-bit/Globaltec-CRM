@@ -184,6 +184,28 @@ jobs:
             fi
             echo MARKETING_FILES_OK
           '
+      - name: Renovar versiones de los paneles en la pagina principal
+        env:
+          SSHPASS: ${{ secrets.NOMINALIA_SSH_PASSWORD }}
+        run: |
+          set -euo pipefail
+          sshpass -e ssh -T \
+            -o StrictHostKeyChecking=accept-new \
+            -o PreferredAuthentications=password \
+            -o PubkeyAuthentication=no \
+            -o ConnectTimeout=20 \
+            grupoglobalteces@grupyj.ssh.tb-hosting.com \
+            "BUILD_SHA=${GITHUB_SHA} sh -s" <<'REMOTE'
+          set -eu
+          cd subsites/crm.grupoglobaltec.es
+          test -s index.html
+          for asset in oportunidades-panel-live.js leads-seguimiento-live.js agenda-rapida-live.js cliente-seguimiento-live.js; do
+            sed -E "s#(/assets/${asset})(\\?v=[a-f0-9]+)?\"#\\1?v=${BUILD_SHA}\"#g" index.html > index.html.version-next
+            mv index.html.version-next index.html
+            grep -q "/assets/${asset}?v=${BUILD_SHA}" index.html
+          done
+          echo PANEL_VERSIONS_OK
+          REMOTE
       - name: Comprobar publicación real por HTTPS
         run: |
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/marketing.html | grep -q 'Calendario editorial'
@@ -212,6 +234,7 @@ jobs:
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/ | grep -q '/assets/oportunidades-panel-live.js'
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/assets/leads-seguimiento-live.js | grep -q 'crm-lead-summary-button'
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/ | grep -q '/assets/leads-seguimiento-live.js'
+          curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/ | grep -q "/assets/oportunidades-panel-live.js?v=${GITHUB_SHA}"
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/ | grep -q '/assets/tasks-delete-live.js'
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/assets/diseno-unificado-live.css | grep -q 'Globaltec CRM'
           curl -fsSL --retry 4 --retry-delay 2 https://crm.grupoglobaltec.es/ | grep -q '/assets/diseno-unificado-live.css'

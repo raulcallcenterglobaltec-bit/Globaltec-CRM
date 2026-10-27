@@ -196,7 +196,10 @@
     .crm-lead-opportunity-form label{font-size:12px;font-weight:700}.crm-lead-opportunity-form label:has(textarea){grid-column:1/-1}
     .crm-lead-opportunity-form :is(input,select,textarea){box-sizing:border-box;width:100%;padding:10px;margin-top:5px;border:1px solid #b8d4cc;border-radius:8px;font:inherit}
     .crm-lead-opportunity-form>div{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}.crm-lead-opportunity-form button{padding:10px;border:1px solid #087f74;border-radius:8px;background:white;color:#087f74;font-weight:700;cursor:pointer}.crm-lead-opportunity-form button[type=submit]{background:#087f74;color:white}.crm-lead-opportunity-form button:disabled{opacity:.6}
-    .crm-lead-summary-dialog footer button{padding:10px 14px;border:1px solid #087f74;border-radius:9px;background:#fff;color:#08776e;cursor:pointer;font-weight:700}
+    .crm-lead-summary-dialog footer{justify-content:flex-end;flex-wrap:wrap;gap:12px;margin-top:22px;padding-top:18px;border-top:1px solid #e1e8ed}
+    .crm-lead-summary-dialog footer button{min-height:42px;padding:10px 16px;border:1px solid #087f74;border-radius:9px;background:#fff;color:#08776e;cursor:pointer;font-weight:700}
+    .crm-lead-summary-dialog footer button:last-child{background:#087f74;color:#fff}
+    @media(max-width:520px){.crm-lead-summary-dialog footer{gap:10px}.crm-lead-summary-dialog footer button{flex:1 1 130px}}
     @media(max-width:800px){.crm-lead-summary-metrics{grid-template-columns:repeat(2,1fr)}.crm-lead-summary-controls{grid-template-columns:1fr}.crm-lead-summary-dialog{padding:15px}.crm-lead-summary-row{flex-wrap:wrap}.crm-lead-plan,.crm-lead-opportunity-form{grid-template-columns:1fr}}`;
   document.head.append(css);
   new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(install);}).observe(root,{childList:true,characterData:true,subtree:true});install();
