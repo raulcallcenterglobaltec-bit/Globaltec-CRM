@@ -199,7 +199,7 @@ jobs:
           set -eu
           cd subsites/crm.grupoglobaltec.es
           test -s index.html
-          for asset in oportunidades-panel-live.js leads-seguimiento-live.js agenda-rapida-live.js cliente-seguimiento-live.js; do
+          for asset in oportunidades-panel-live.js leads-seguimiento-live.js agenda-rapida-live.js cliente-seguimiento-live.js contact-actions-live.js calidad-datos-live.js; do
             sed -E "s#(/assets/${asset})(\\?v=[a-f0-9]+)?\"#\\1?v=${BUILD_SHA}\"#g" index.html > index.html.version-next
             mv index.html.version-next index.html
             grep -q "/assets/${asset}?v=${BUILD_SHA}" index.html

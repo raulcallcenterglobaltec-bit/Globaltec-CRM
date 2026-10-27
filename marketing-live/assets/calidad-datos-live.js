@@ -131,7 +131,8 @@
       for(const row of rows.slice(0,500)){
         const item=make('article','','crm-quality-row');
         const info=make('div','','crm-quality-row-info');
-        info.append(make('strong',row.name||'Sin nombre'),make('small',row.type+' · '+row.reason),make('small',[row.phone,row.email].filter(Boolean).join(' · ')||'Sin datos de contacto'));
+        info.append(make('span',row.type,row.kind==='duplicates'?'crm-quality-tag crm-quality-tag-duplicate':'crm-quality-tag crm-quality-tag-incomplete'));
+        info.append(make('strong',row.name||'Sin nombre'),make('small',row.reason),make('small',[row.phone,row.email].filter(Boolean).join(' · ')||'Sin datos de contacto'));
         const action=make('button','Buscar ficha');action.type='button';action.onclick=()=>findInPage(row);
         item.append(info,action);results.append(item);
       }
@@ -191,7 +192,11 @@
     .crm-quality-controls{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:15px 0}.crm-quality-dialog label{font-weight:650;font-size:13px}.crm-quality-dialog input,.crm-quality-dialog select{display:block;box-sizing:border-box;width:100%;padding:10px;border:1px solid #bdd0d8;border-radius:8px;margin-top:6px;font:inherit}
     .crm-quality-notice{min-height:19px;font-size:13px}.crm-quality-results{display:grid;gap:8px;max-height:380px;overflow:auto}.crm-quality-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border:1px solid #e0e8ed;border-radius:9px}
     .crm-quality-row-info{flex:1;min-width:0}.crm-quality-row-info strong,.crm-quality-row-info small{display:block}.crm-quality-row-info small{color:#667d8b;margin-top:3px}
+    .crm-quality-tag{display:inline-flex;border-radius:999px;padding:4px 8px;margin-bottom:7px;font-size:11px;font-weight:750;border:1px solid transparent}.crm-quality-tag-duplicate{background:#fff0ee;border-color:#f0c9c3;color:#b42318}.crm-quality-tag-incomplete{background:#fff5df;border-color:#f4da9b;color:#915600}
     .crm-quality-row button,.crm-quality-dialog footer button{padding:9px 13px;border:1px solid #087f74;border-radius:8px;background:#fff;color:#08776e;cursor:pointer;font-weight:700;white-space:nowrap}
+    .crm-quality-dialog footer{justify-content:flex-end;flex-wrap:wrap;gap:12px;margin-top:22px;padding-top:18px;border-top:1px solid #e1e8ed}
+    .crm-quality-dialog footer button{min-height:42px;padding:10px 16px}.crm-quality-dialog footer button:last-child{background:#087f74;color:#fff}
+    @media(max-width:520px){.crm-quality-dialog footer{gap:10px}.crm-quality-dialog footer button{flex:1 1 145px}}
     .crm-quality-navigation-notice{position:fixed;bottom:20px;right:20px;z-index:100100;color:#fff;padding:13px 17px;border-radius:10px;box-shadow:0 8px 28px #142c4860;max-width:360px;font-size:13px}
     @media(max-width:720px){.crm-quality-controls{grid-template-columns:1fr}.crm-quality-dialog{padding:15px}.crm-quality-row{flex-wrap:wrap}}`;
   document.head.append(css);
