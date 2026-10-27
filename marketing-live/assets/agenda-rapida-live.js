@@ -23,18 +23,21 @@
       <div class="crm-agenda-summary"></div>
       <div class="crm-agenda-filters">
         <label>Empresa<select id="crm-agenda-org"></select></label>
-        <label>Ver<select id="crm-agenda-range"><option value="upcoming">Próximas</option><option value="today">Hoy</option><option value="week">Próximos 7 días</option><option value="no-client">Sin cliente vinculado</option><option value="all">Todas</option></select></label>
+        <label>Ver<select id="crm-agenda-range"><option value="upcoming">Próximas</option><option value="today">Hoy</option><option value="week">Próximos 7 días</option><option value="past">Pasadas</option><option value="no-client">Sin cliente vinculado</option><option value="all">Todas</option></select></label>
         <label>Buscar<input id="crm-agenda-search" placeholder="Asunto o cliente" type="search"></label>
+        <label>Ordenar<select id="crm-agenda-sort"><option value="soon">Fecha más próxima</option><option value="recent">Fecha más lejana</option><option value="name">Asunto A-Z</option></select></label>
       </div>
       <p class="crm-agenda-notice" role="status"></p><div class="crm-agenda-list"></div>
-      <footer><button type="button" id="crm-agenda-export">Exportar CSV</button><button type="button" id="crm-agenda-refresh">Actualizar</button><button type="button" data-close>Cerrar</button></footer>
+      <footer><button type="button" id="crm-agenda-reset">Limpiar filtros</button><button type="button" id="crm-agenda-export">Exportar CSV</button><button type="button" id="crm-agenda-refresh">Actualizar</button><button type="button" data-close>Cerrar</button></footer>
     </section>`;
     document.body.append(modal);
-    const org=modal.querySelector('#crm-agenda-org'),range=modal.querySelector('#crm-agenda-range'),search=modal.querySelector('#crm-agenda-search');
+    const org=modal.querySelector('#crm-agenda-org'),range=modal.querySelector('#crm-agenda-range'),search=modal.querySelector('#crm-agenda-search'),sort=modal.querySelector('#crm-agenda-sort');
     const list=modal.querySelector('.crm-agenda-list'),notice=modal.querySelector('.crm-agenda-notice');
     const message=(value,bad=false)=>{notice.textContent=value;notice.style.color=bad?'#b42318':'#17665d';};
-    modal.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>modal.remove());
-    modal.onclick=event=>{if(event.target===modal)modal.remove();};
+    const onEscape=event=>{if(event.key==='Escape')close();};
+    const close=()=>{document.removeEventListener('keydown',onEscape);modal.remove();};document.addEventListener('keydown',onEscape);
+    modal.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);
+    modal.onclick=event=>{if(event.target===modal)close();};
     let records=[],canEdit=false,busy=false;
     const dayKey=date=>{const d=new Date(date);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
     function csvCell(value){let s=String(value??'');if(/^[\s\u0000-\u001f]*[=+@\-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';}
@@ -48,14 +51,19 @@
       const now=new Date(),start=new Date(now.getFullYear(),now.getMonth(),now.getDate());
       const tomorrow=new Date(start.getTime()+86400000),endWeek=new Date(start.getTime()+7*86400000);
       const q=search.value.trim().toLocaleLowerCase('es');
-      return records.filter(item=>{
+      const rows=records.filter(item=>{
         const date=new Date(item.activity_date);
         if(range.value==='upcoming'&&date<now)return false;
+        if(range.value==='past'&&date>=now)return false;
         if(range.value==='today'&&(date<start||date>=tomorrow))return false;
         if(range.value==='week'&&(date<start||date>=endWeek))return false;
         if(range.value==='no-client'&&item.company_id)return false;
         return ((item.subject||'')+' '+(item.companies?.name||'')).toLocaleLowerCase('es').includes(q);
       });
+      if(sort.value==='soon')rows.sort((a,b)=>new Date(a.activity_date)-new Date(b.activity_date));
+      if(sort.value==='recent')rows.sort((a,b)=>new Date(b.activity_date)-new Date(a.activity_date));
+      if(sort.value==='name')rows.sort((a,b)=>(a.subject||'').localeCompare(b.subject||'','es'));
+      return rows;
     }
     function render(){
       list.replaceChildren();const selected=filtered();
@@ -66,11 +74,23 @@
       if(!selected.length){list.append(make('p','No hay citas con esos filtros.','crm-agenda-empty'));return;}
       for(const item of selected){
         const row=make('article','','crm-agenda-row'),detail=make('div','','crm-agenda-info');
+        const tags=make('div','','crm-agenda-tags');
+        const meeting=new Date(item.activity_date);
+        if(meeting>=start&&meeting<tomorrow)tags.append(make('span','Hoy','crm-agenda-tag crm-agenda-tag-today'));
+        else if(meeting<start)tags.append(make('span','Pasada','crm-agenda-tag crm-agenda-tag-past'));
+        if(!item.company_id)tags.append(make('span','Sin cliente','crm-agenda-tag crm-agenda-tag-warning'));
+        if(tags.childElementCount)detail.append(tags);
         detail.append(make('strong',item.subject||'Cita sin asunto'));
         const date=new Date(item.activity_date);
         const duration=item.end_date?Math.max(0,Math.round((new Date(item.end_date)-date)/60000)):null;
         detail.append(make('small',`${date.toLocaleString('es-ES',{dateStyle:'medium',timeStyle:'short'})} · ${item.companies?.name||'Sin cliente'}${duration!==null?' · '+duration+' min':''}`));
         row.append(detail);
+        const copy=make('button','Copiar cita','crm-agenda-copy');copy.type='button';
+        copy.onclick=async()=>{
+          const summary=[item.subject||'Cita',date.toLocaleString('es-ES',{dateStyle:'medium',timeStyle:'short'}),item.companies?.name||'Sin cliente'].join(' · ');
+          try{await navigator.clipboard.writeText(summary);message('Datos de la cita copiados.');}
+          catch{message('No se pudo copiar. Comprueba los permisos del navegador.',true);}
+        };row.append(copy);
         if(canEdit){
           const edit=make('button','Reprogramar','crm-agenda-edit');edit.type='button';edit.disabled=busy;
           edit.onclick=()=>{
@@ -117,7 +137,8 @@
         render();
       }catch(error){message(error.message,true);}
     }
-    org.onchange=load;range.onchange=render;search.oninput=render;
+    org.onchange=load;range.onchange=render;search.oninput=render;sort.onchange=render;
+    modal.querySelector('#crm-agenda-reset').onclick=()=>{range.value='upcoming';sort.value='soon';search.value='';render();};
     modal.querySelector('#crm-agenda-refresh').onclick=load;
     (async()=>{
       try{
@@ -158,7 +179,8 @@
     .crm-agenda-dialog input,.crm-agenda-dialog select{display:block;box-sizing:border-box;width:100%;padding:10px;margin-top:6px;border:1px solid #b8cad6;border-radius:8px;font:inherit}
     .crm-agenda-notice{min-height:20px;font-size:13px}.crm-agenda-list{display:grid;gap:7px}.crm-agenda-row{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px;border:1px solid #e0e8ee;border-radius:9px}
     .crm-agenda-info{flex:1;min-width:190px}.crm-agenda-info strong,.crm-agenda-info small{display:block}.crm-agenda-info small{color:#687c8e;margin-top:5px}
-    .crm-agenda-edit,.crm-agenda-save,.crm-agenda-cancel,.crm-agenda-dialog footer button{padding:9px 13px;border:1px solid #0b8075;border-radius:8px;background:white;color:#08776e;cursor:pointer;font-weight:700}
+    .crm-agenda-edit,.crm-agenda-save,.crm-agenda-cancel,.crm-agenda-copy,.crm-agenda-dialog footer button{padding:9px 13px;border:1px solid #0b8075;border-radius:8px;background:white;color:#08776e;cursor:pointer;font-weight:700}
+    .crm-agenda-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px}.crm-agenda-tag{padding:4px 8px;border:1px solid transparent;border-radius:999px;font-size:11px;font-weight:750}.crm-agenda-tag-today{background:#fff5df;color:#915600;border-color:#f4da9b}.crm-agenda-tag-past{background:#eef1f5;color:#536477;border-color:#d9e0e9}.crm-agenda-tag-warning{background:#fff0ee;color:#b42318;border-color:#f0c9c3}
     .crm-agenda-editor{display:flex;align-items:flex-end;gap:9px;flex-wrap:wrap;width:100%;border-top:1px solid #e1e9ee;padding-top:10px}.crm-agenda-editor label{flex:1;min-width:150px}
     .crm-agenda-save,.crm-agenda-dialog footer button:last-child{background:#087f74;color:#fff}.crm-agenda-empty{color:#64748b}
     .crm-agenda-dialog footer{justify-content:flex-end;flex-wrap:wrap;gap:12px;margin-top:22px;padding-top:18px;border-top:1px solid #e1e8ed}

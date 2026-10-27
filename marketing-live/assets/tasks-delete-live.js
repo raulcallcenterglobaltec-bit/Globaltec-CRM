@@ -39,8 +39,9 @@
       <label>Empresa <select id="crm-tasks-org"></select></label>
       <div id="crm-tasks-summary" class="crm-tasks-summary"></div>
       <div class="crm-tasks-filters">
-        <label>Vista <select id="crm-tasks-view"><option value="pending">Pendientes</option><option value="today">Para hoy</option><option value="week">Próximos 7 días</option><option value="overdue">Vencidas</option><option value="nodate">Sin fecha de vencimiento</option><option value="unassigned">Sin responsable</option><option value="opportunity">De oportunidades</option><option value="completed">Completadas</option><option value="all">Todas</option></select></label>
+        <label>Vista <select id="crm-tasks-view"><option value="pending">Pendientes</option><option value="today">Para hoy</option><option value="week">Próximos 7 días</option><option value="overdue">Vencidas</option><option value="nodate">Sin fecha de vencimiento</option><option value="noclient">Sin cliente</option><option value="unassigned">Sin responsable</option><option value="opportunity">De oportunidades</option><option value="completed">Completadas</option><option value="all">Todas</option></select></label>
         <label>Buscar <input id="crm-tasks-search" type="search" placeholder="Título, cliente u oportunidad…"></label>
+        <label>Ordenar <select id="crm-tasks-sort"><option value="urgent">Más urgentes</option><option value="due">Vencimiento próximo</option><option value="priority">Mayor prioridad</option><option value="name">Título A-Z</option></select></label>
         <label>Cliente <select id="crm-tasks-client"><option value="all">Todos</option></select></label>
         <label>Prioridad <select id="crm-tasks-priority"><option value="all">Todas</option><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option><option value="low">Baja</option></select></label>
         <label>Responsable <select id="crm-tasks-owner"><option value="all">Todos</option><option value="mine">Mis tareas</option></select></label>
@@ -49,12 +50,12 @@
       </div>
       <div id="crm-tasks-delete-notice" role="status" aria-live="polite"></div>
       <div id="crm-tasks-delete-list"></div>
-      <div class="crm-tasks-delete-footer"><button type="button" class="crm-tasks-export">Exportar CSV</button><button type="button" class="crm-tasks-done">Cerrar y actualizar CRM</button></div>
+      <div class="crm-tasks-delete-footer"><button type="button" class="crm-tasks-reset">Limpiar filtros</button><button type="button" class="crm-tasks-export">Exportar CSV</button><button type="button" class="crm-tasks-done">Cerrar y actualizar CRM</button></div>
     </section>`;
     document.body.append(overlay);
     const get = id => overlay.querySelector('#' + id);
     const org = get('crm-tasks-org'), search = get('crm-tasks-search');
-    const view = get('crm-tasks-view'), client = get('crm-tasks-client');
+    const view = get('crm-tasks-view'), client = get('crm-tasks-client'), sort=get('crm-tasks-sort');
     const priority = get('crm-tasks-priority'), owner = get('crm-tasks-owner');
     const from = get('crm-tasks-from'), to = get('crm-tasks-to');
     const list = get('crm-tasks-delete-list'), notice = get('crm-tasks-delete-notice');
@@ -62,7 +63,9 @@
     let busy = false;
     let canEdit = false;
     let canDelete = false;
-    const close = () => { overlay.remove(); location.reload(); };
+    const onEscape=event=>{if(event.key==='Escape')close();};
+    const close = () => { document.removeEventListener('keydown',onEscape);overlay.remove();location.reload(); };
+    document.addEventListener('keydown',onEscape);
     overlay.querySelector('.crm-tasks-close').onclick = close;
     overlay.querySelector('.crm-tasks-done').onclick = close;
     const setNotice = (message, bad = false) => { notice.textContent = message; notice.style.color = bad ? '#b42318' : '#26645c'; };
@@ -84,12 +87,13 @@
     overlay.querySelector('.crm-tasks-export').onclick=exportCsv;
     function filters() {
       const term = search.value.toLocaleLowerCase('es').trim();
-      return records.filter(task => {
+      const rows=records.filter(task => {
         if (view.value === 'pending' && !isPending(task)) return false;
         if (view.value === 'overdue' && !overdue(task)) return false;
         if (view.value === 'today' && !today(task)) return false;
         if (view.value === 'week' && !inWeek(task)) return false;
         if (view.value === 'nodate' && (!isPending(task) || task.due_date)) return false;
+        if (view.value === 'noclient' && (!isPending(task) || !!task.company_id)) return false;
         if (view.value === 'unassigned' && (!isPending(task) || task.assigned_to)) return false;
         if (view.value === 'opportunity' && (!isPending(task) || !task.opportunity_id)) return false;
         if (view.value === 'completed' && task.status !== 'completed') return false;
@@ -101,6 +105,14 @@
         if (to.value && (!due || due > to.value)) return false;
         return ((task.title || '') + ' ' + (task.companies?.name || '') + ' ' + (task.description || '')).toLocaleLowerCase('es').includes(term);
       });
+      const importance={urgent:0,high:1,normal:2,low:3};
+      const priorityRank=t=>importance[t.priority]??2;
+      const dateRank=t=>t.due_date?new Date(t.due_date).getTime():Number.MAX_SAFE_INTEGER;
+      if(sort.value==='urgent')rows.sort((a,b)=>(overdue(a)?0:today(a)?1:isPending(a)?2:3)-(overdue(b)?0:today(b)?1:isPending(b)?2:3)||priorityRank(a)-priorityRank(b)||dateRank(a)-dateRank(b));
+      if(sort.value==='due')rows.sort((a,b)=>dateRank(a)-dateRank(b));
+      if(sort.value==='priority')rows.sort((a,b)=>priorityRank(a)-priorityRank(b)||dateRank(a)-dateRank(b));
+      if(sort.value==='name')rows.sort((a,b)=>(a.title||'').localeCompare(b.title||'','es'));
+      return rows;
     }
     function render() {
       list.replaceChildren();
@@ -127,6 +139,12 @@
       for (const task of filtered) {
         const row = element('div', '', 'crm-tasks-delete-row');
         const info = element('div');
+        const tags=element('div','','crm-task-tags');
+        if(overdue(task))tags.append(element('span','Vencida','crm-task-tag crm-task-tag-urgent'));
+        else if(today(task))tags.append(element('span','Para hoy','crm-task-tag crm-task-tag-today'));
+        if(isPending(task)&&!task.due_date)tags.append(element('span','Sin fecha','crm-task-tag crm-task-tag-muted'));
+        if(isPending(task)&&task.priority==='urgent')tags.append(element('span','Prioridad urgente','crm-task-tag crm-task-tag-urgent'));
+        if(tags.childElementCount)info.append(tags);
         info.append(element('strong', task.title || 'Sin título'));
         const state = ({pending:'Pendiente',in_progress:'En curso',completed:'Completada',cancelled:'Cancelada'})[task.status] || task.status;
         const due = task.due_date ? new Date(task.due_date).toLocaleString('es-ES', {dateStyle:'short',timeStyle:'short'}) : 'Sin vencimiento';
@@ -223,8 +241,9 @@
       } catch (error) { records = []; setNotice(error.message, true); render(); }
     }
     org.onchange = load;
-    for (const filter of [view,client,priority,owner,from,to]) filter.onchange = render;
+    for (const filter of [view,sort,client,priority,owner,from,to]) filter.onchange = render;
     search.oninput = render;
+    overlay.querySelector('.crm-tasks-reset').onclick=()=>{view.value='pending';sort.value='urgent';client.value='all';priority.value='all';owner.value='all';from.value='';to.value='';search.value='';render();};
     (async () => {
       try {
         const organizations = await request('organizations?select=id,name&active=eq.true&order=name');
@@ -280,11 +299,12 @@
   .crm-task-count strong{font-size:24px;color:#142c48}.crm-task-count span{font-size:12px;color:#64748b}
   #crm-tasks-delete-notice{margin:14px 0;font-size:14px}.crm-tasks-delete-row{display:flex;align-items:center;justify-content:space-between;border-top:1px solid #e3e8ed;padding:12px 0;gap:12px;flex-wrap:wrap}
   .crm-tasks-delete-row strong,.crm-tasks-delete-row small{display:block}.crm-tasks-delete-row small{margin-top:5px;color:#64748b}.crm-tasks-delete-row .crm-task-linked{color:#087f74;font-weight:700}.crm-tasks-delete-row .crm-task-alert{color:#aa5100;font-weight:700}
+  .crm-task-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px}.crm-task-tag{display:inline-flex;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:750;border:1px solid transparent}.crm-task-tag-urgent{background:#fff0ee;border-color:#f0c9c3;color:#b42318}.crm-task-tag-today{background:#fff5df;border-color:#f4da9b;color:#915600}.crm-task-tag-muted{background:#eef1f5;border-color:#d9e0e9;color:#536477}
   .crm-tasks-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
   .crm-task-editor{flex:0 0 100%;display:grid;grid-template-columns:1fr 150px auto;align-items:end;gap:10px;padding:12px;background:#f5faf8;border:1px solid #d7e8e3;border-radius:9px}.crm-task-editor label{margin:0!important}.crm-task-editor div{display:flex;gap:6px}.crm-task-editor button{padding:10px;border:1px solid #087f74;border-radius:8px;background:#fff;color:#087f74;cursor:pointer}.crm-task-editor button[type=submit]{background:#087f74;color:#fff}
   .crm-tasks-primary{border:1px solid #087f74;border-radius:8px;color:#087f74;background:#fff;padding:8px 13px;cursor:pointer}
   .crm-tasks-danger{border:1px solid #dc8a82;border-radius:8px;color:#b42318;background:#fff;padding:8px 13px;cursor:pointer}
-  .crm-tasks-danger:disabled{opacity:.5}.crm-tasks-delete-footer{display:flex;justify-content:flex-end;gap:10px;padding-top:16px}.crm-tasks-export{padding:10px 14px;background:#fff;color:#087f74;border:1px solid #087f74;border-radius:8px;cursor:pointer}.crm-tasks-done{padding:10px 14px;background:#087f74;color:white;border:0;border-radius:8px;cursor:pointer}@media(max-width:700px){.crm-task-editor{grid-template-columns:1fr}.crm-tasks-summary{grid-template-columns:repeat(2,1fr)}}`;
+  .crm-tasks-danger:disabled{opacity:.5}.crm-tasks-delete-footer{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin-top:20px;padding-top:18px;border-top:1px solid #e1e8ed}.crm-tasks-export,.crm-tasks-reset{padding:10px 14px;background:#fff;color:#087f74;border:1px solid #087f74;border-radius:8px;cursor:pointer}.crm-tasks-done{padding:10px 14px;background:#087f74;color:white;border:0;border-radius:8px;cursor:pointer}@media(max-width:700px){.crm-task-editor{grid-template-columns:1fr}.crm-tasks-summary{grid-template-columns:repeat(2,1fr)}.crm-tasks-delete-footer button{flex:1 1 150px}}`;
   document.head.append(css);
   new MutationObserver(install).observe(document.body, {childList:true,characterData:true,subtree:true});
   install();
