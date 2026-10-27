@@ -65,8 +65,11 @@
     function render(){
       const today=Date.now(),pending=items.filter(x=>x.kind==='task'&&x.pending),future=items.filter(x=>x.kind==='meeting'&&new Date(x.date).getTime()>=today);
       const openOpps=items.filter(x=>x.kind==='opportunity'&&x.open),wonOpps=items.filter(x=>x.kind==='opportunity'&&x.won);
+      const metricViews={'Contactos':'contact','Tareas pendientes':'pending','Tareas vencidas':'overdue','Ventas abiertas':'openopp','Ventas ganadas':'wonopp','Valor abierto':'openopp','Registros':'all'};
       metrics.replaceChildren();for(const [name,value] of [['Contactos',capabilities.contacts?items.filter(x=>x.kind==='contact').length:'—'],['Actividades',items.filter(x=>x.kind==='activity'||x.kind==='meeting').length],['Tareas pendientes',capabilities.tasks?pending.length:'—'],['Tareas vencidas',capabilities.tasks?pending.filter(x=>x.overdue).length:'—'],['Próximas citas',future.length],['Ventas abiertas',capabilities.opportunities?openOpps.length:'—'],['Ventas ganadas',capabilities.opportunities?wonOpps.length:'—'],['Valor abierto',capabilities.opportunities?openOpps.reduce((sum,x)=>sum+Number(x.amount||0),0).toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0}):'—'],['Registros',items.length]]){
-        const box=el('div','','crm-client-history-metric');box.append(el('strong',String(value)),el('span',name));metrics.append(box);
+        const target=metricViews[name],enabled=target&&value!=='—';const box=el(enabled?'button':'div','','crm-client-history-metric');
+        if(enabled){box.type='button';box.classList.add('crm-client-history-metric-link');box.title='Mostrar '+name.toLowerCase();box.setAttribute('aria-pressed',String(kind.value===target));box.onclick=()=>{kind.value=target;render();list.scrollIntoView({block:'nearest',behavior:'smooth'});};}
+        box.append(el('strong',String(value)),el('span',name));metrics.append(box);
       }
       list.replaceChildren();const selected=filtered();
       if(!selected.length){list.append(el('p','No hay registros con estos filtros.','crm-client-history-empty'));return;}
@@ -209,6 +212,7 @@
     .crm-client-history-dialog input,.crm-client-history-dialog select,.crm-client-history-dialog textarea{box-sizing:border-box;display:block;width:100%;margin-top:6px;padding:10px;border:1px solid #bccad6;border-radius:8px;font:inherit}
     .crm-client-history-metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:9px}.crm-client-history-metric{background:#f1f9f8;border:1px solid #cce2de;border-radius:9px;padding:12px}
     .crm-client-history-metric strong,.crm-client-history-metric span{display:block}.crm-client-history-metric strong{font-size:24px;color:#087f74}.crm-client-history-metric span{font-size:12px}
+    .crm-client-history-metric-link{font:inherit;text-align:left;cursor:pointer;transition:background .15s,border-color .15s}.crm-client-history-metric-link:hover{background:#e6f5f0;border-color:#56b7a6}.crm-client-history-metric-link[aria-pressed=true]{background:#ddf3ed;border-color:#087f74;box-shadow:inset 0 0 0 1px #087f74}.crm-client-history-metric-link:focus-visible{outline:3px solid #56b9ad;outline-offset:2px}
     .crm-client-history-notice{min-height:19px;font-size:13px}.crm-client-history-list{display:grid;gap:8px;max-height:300px;overflow:auto}
     .crm-client-history-item{padding:11px 13px;border:1px solid #e0e8ed;border-radius:9px}.crm-client-history-item time{color:#657d90;font-size:12px;margin-right:10px}.crm-client-history-item strong{font-size:14px}.crm-client-history-item p{white-space:pre-wrap;margin:5px 0 0;color:#3f566c;font-size:13px}
     .crm-client-history-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px}.crm-client-history-tag{border:1px solid transparent;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:750}.crm-client-history-tag-urgent{background:#fff0ee;color:#b42318;border-color:#f0c9c3}.crm-client-history-tag-open{background:#fff5df;color:#915600;border-color:#f4da9b}.crm-client-history-tag-won{background:#e7f7ec;color:#177245;border-color:#bce1c7}

@@ -32,7 +32,7 @@
       <div class="crm-opp-metrics"></div>
       <div class="crm-opp-filters"><label>Ver<select id="crm-opp-view"><option value="open">En curso</option><option value="noclient">En curso sin cliente</option><option value="withlead">Con lead de origen</option><option value="withoutlead">Sin lead de origen</option><option value="overdue">Cierre vencido</option><option value="today">Cierre hoy</option><option value="next7">Cierre en 7 días</option><option value="next30">Próximos 30 días</option><option value="nodate">Sin fecha de cierre</option><option value="noamount">Sin importe estimado</option><option value="noprob">Sin probabilidad</option><option value="highprob">Alta probabilidad (70% o más)</option><option value="withtasks">Con tareas pendientes</option><option value="withouttasks">Sin tareas pendientes</option><option value="taskoverdue">Con tareas vencidas</option><option value="unassigned">Sin responsable</option><option value="won">Ganadas</option><option value="lost">Perdidas</option><option value="all">Todas</option></select></label><label>Ordenar<select id="crm-opp-sort"><option value="urgent">Más urgentes</option><option value="recent">Más recientes</option><option value="closing">Cierre más próximo</option><option value="amount">Mayor importe</option><option value="monthly">Mayor cuota mensual</option><option value="probability">Mayor probabilidad</option></select></label><label>Buscar<input id="crm-opp-search" type="search" placeholder="Oportunidad, lead o cliente"></label></div>
       <p class="crm-opp-notice" role="status"></p><div class="crm-opp-list"></div>
-      <footer><button type="button" id="crm-opp-reset">Limpiar filtros</button><button type="button" id="crm-opp-export">Exportar CSV</button><button type="button" id="crm-opp-refresh">Actualizar</button><button type="button" data-close>Cerrar</button></footer>
+      <footer><button type="button" id="crm-opp-reset">Limpiar filtros</button><button type="button" id="crm-opp-copy-panel">Copiar resumen</button><button type="button" id="crm-opp-export">Exportar CSV</button><button type="button" id="crm-opp-refresh">Actualizar</button><button type="button" data-close>Cerrar</button></footer>
     </section>`;
     document.body.append(overlay);
     const stats=overlay.querySelector('.crm-opp-metrics'),list=overlay.querySelector('.crm-opp-list'),notice=overlay.querySelector('.crm-opp-notice');
@@ -111,7 +111,12 @@
       const weighted=openRecords.reduce((sum,r)=>sum+Number(r.estimated_value||0)*(Number(r.probability??0)/100),0);
       const won=records.filter(r=>stage(r)==='won'),lost=records.filter(r=>stage(r)==='lost');
       const metrics=[['En curso',openRecords.length],['Sin cliente',openRecords.filter(r=>!r.company_id).length],['Con lead de origen',records.filter(r=>!!r.lead_id).length],['Ganadas',won.length],['Perdidas',lost.length],['Tasa de éxito',won.length+lost.length?Math.round(won.length/(won.length+lost.length)*100)+'%':'—'],['Cierre vencido',openRecords.filter(r=>expired(r,today)).length],['Cierre hoy',openRecords.filter(r=>r.expected_close_date===today).length],['Sin fecha de cierre',openRecords.filter(r=>!r.expected_close_date).length],['Sin importe',openRecords.filter(r=>r.estimated_value==null).length],['Sin probabilidad',openRecords.filter(r=>r.probability==null).length],['Valor en curso',money(openRecords.reduce((s,r)=>s+Number(r.estimated_value||0),0))],['Importe ganado estimado',money(won.reduce((s,r)=>s+Number(r.estimated_value||0),0))],['Previsión ponderada',money(weighted)],['Sin responsable',openRecords.filter(r=>!r.owner_id).length],['Sin tareas pendientes',taskVisible?openRecords.filter(r=>!(taskSummary.get(r.id)?.pending)).length:'—'],['Con tareas vencidas',taskVisible?openRecords.filter(r=>(taskSummary.get(r.id)?.overdue||0)>0).length:'—']];
-      stats.replaceChildren();for(const [label,value] of metrics){const box=el('div','','crm-opp-stat');box.append(el('strong',String(value)),el('span',label));stats.append(box);}
+      const metricViews={'En curso':'open','Sin cliente':'noclient','Con lead de origen':'withlead','Ganadas':'won','Perdidas':'lost','Cierre vencido':'overdue','Cierre hoy':'today','Sin fecha de cierre':'nodate','Sin importe':'noamount','Sin probabilidad':'noprob','Sin responsable':'unassigned','Sin tareas pendientes':'withouttasks','Con tareas vencidas':'taskoverdue'};
+      stats.replaceChildren();for(const [label,value] of metrics){
+        const target=metricViews[label],enabled=target&&typeof value==='number'&&(taskVisible||!['withouttasks','taskoverdue'].includes(target));
+        const box=el(enabled?'button':'div','','crm-opp-stat');if(enabled){box.type='button';box.classList.add('crm-opp-stat-link');box.title='Filtrar: '+label;box.setAttribute('aria-pressed',String(view.value===target));box.onclick=()=>{view.value=target;render();list.scrollIntoView({block:'nearest',behavior:'smooth'});};}
+        box.append(el('strong',String(value)),el('span',label));stats.append(box);
+      }
       list.replaceChildren();const rows=selected();
       if(!rows.length){list.append(el('p','No hay oportunidades para estos filtros.','crm-opp-empty'));return;}
       for(const r of rows.slice(0,300)){
@@ -204,6 +209,12 @@
     }
     view.onchange=render;sort.onchange=render;search.oninput=render;overlay.querySelector('#crm-opp-export').onclick=()=>download(selected());
     overlay.querySelector('#crm-opp-refresh').onclick=load;
+    overlay.querySelector('#crm-opp-copy-panel').onclick=async()=>{
+      if(document.getElementById('active-organization')?.value!==org){message('Ha cambiado la empresa. Abre de nuevo el panel.',true);return;}
+      const rows=selected(),openRows=rows.filter(x=>stage(x)==='open'),today=new Date().toLocaleDateString('sv-SE');
+      const lines=['Globaltec CRM · Control de oportunidades','Filtro: '+view.selectedOptions[0]?.textContent,'Oportunidades seleccionadas: '+rows.length,'Abiertas: '+openRows.length,'Cierres vencidos: '+openRows.filter(x=>expired(x,today)).length,'Valor abierto estimado: '+money(openRows.reduce((s,x)=>s+Number(x.estimated_value||0),0)),'Previsión ponderada: '+money(openRows.reduce((s,x)=>s+Number(x.estimated_value||0)*Number(x.probability||0)/100,0))];
+      try{await navigator.clipboard.writeText(lines.join('\n'));message('Resumen de oportunidades copiado.');}catch{message('No se pudo copiar. Comprueba los permisos del navegador.',true);}
+    };
     overlay.querySelector('#crm-opp-reset').onclick=()=>{view.value='open';sort.value='urgent';search.value='';render();};
     org=document.getElementById('active-organization')?.value||'';
     if(!org)message('Selecciona primero una empresa en el CRM.',true);else load();
@@ -227,6 +238,7 @@
     .crm-opp-dialog header,.crm-opp-dialog footer{display:flex;align-items:center;justify-content:space-between;gap:12px}.crm-opp-dialog h2{margin:4px 0}
     .crm-opp-dialog header small{color:#087f74;font-weight:750}.crm-opp-dialog header button{border:0;background:none;font-size:28px;cursor:pointer}
     .crm-opp-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}.crm-opp-stat{border:1px solid #d6e6e3;background:#f2f9f8;padding:12px;border-radius:10px}.crm-opp-stat strong,.crm-opp-stat span{display:block}.crm-opp-stat strong{font-size:23px;color:#087f74}.crm-opp-stat span{font-size:12px;color:#556b7c}
+    .crm-opp-stat-link{font:inherit;text-align:left;cursor:pointer;transition:background .15s,border-color .15s}.crm-opp-stat-link:hover{background:#e5f5f0;border-color:#58b5a6}.crm-opp-stat-link[aria-pressed=true]{background:#ddf3ed;border-color:#087f74;box-shadow:inset 0 0 0 1px #087f74}.crm-opp-stat-link:focus-visible{outline:3px solid #56b9ad;outline-offset:2px}
     .crm-opp-filters{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}.crm-opp-dialog label{font-size:13px;font-weight:650}.crm-opp-dialog input,.crm-opp-dialog select{display:block;box-sizing:border-box;width:100%;padding:10px;border:1px solid #bed0dc;border-radius:9px;margin-top:6px;font:inherit}
     .crm-opp-notice{min-height:20px;font-size:13px}.crm-opp-list{max-height:400px;overflow:auto;display:grid;gap:8px}.crm-opp-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid #e1e8ed;border-radius:9px}
     .crm-opp-info{flex:1;min-width:0}.crm-opp-info strong,.crm-opp-info small,.crm-opp-value strong,.crm-opp-value small{display:block}.crm-opp-info small,.crm-opp-value small{color:#687e90;margin-top:5px}.crm-opp-info .crm-opp-tasks{color:#087f74;font-weight:700}.crm-opp-value{text-align:right;white-space:nowrap}

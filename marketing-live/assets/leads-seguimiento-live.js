@@ -30,7 +30,7 @@
       <div class="crm-lead-summary-metrics"></div>
       <div class="crm-lead-summary-controls"><label>Ver<select id="crm-lead-summary-view"><option value="attention">Necesitan atención</option><option value="overdue">Seguimiento vencido</option><option value="today">Actuación para hoy</option><option value="upcoming">Próximos siete días</option><option value="noaction">Sin próxima actuación</option><option value="withopp">Con oportunidades</option><option value="withoutopp">Sin oportunidades</option><option value="openopp">Con venta abierta</option><option value="wonopp">Con venta ganada</option><option value="unassigned">Sin responsable</option><option value="nocontact">Sin teléfono ni correo</option><option value="qualified">Cualificados</option><option value="proposal">En propuesta</option><option value="new">Nuevos</option><option value="converted">Convertidos</option><option value="all">Todos</option></select></label><label>Ordenar<select id="crm-lead-summary-sort"><option value="urgent">Más urgentes</option><option value="potential">Mayor potencial</option><option value="recent">Más recientes</option><option value="action">Próxima actuación</option><option value="name">Nombre A-Z</option></select></label><label>Buscar<input id="crm-lead-summary-search" type="search" placeholder="Persona, empresa, oportunidad o teléfono"></label></div>
       <p class="crm-lead-summary-notice" role="status"></p><div class="crm-lead-summary-list"></div>
-      <footer><button type="button" id="crm-lead-summary-reset">Limpiar filtros</button><button type="button" id="crm-lead-summary-export">Exportar CSV</button><button type="button" id="crm-lead-summary-refresh">Actualizar</button><button type="button" data-close>Cerrar</button></footer>
+      <footer><button type="button" id="crm-lead-summary-reset">Limpiar filtros</button><button type="button" id="crm-lead-summary-copy">Copiar resumen</button><button type="button" id="crm-lead-summary-export">Exportar CSV</button><button type="button" id="crm-lead-summary-refresh">Actualizar</button><button type="button" data-close>Cerrar</button></footer>
     </section>`;
     document.body.append(overlay);
     const stats=overlay.querySelector('.crm-lead-summary-metrics'),list=overlay.querySelector('.crm-lead-summary-list'),notice=overlay.querySelector('.crm-lead-summary-notice');
@@ -140,7 +140,12 @@
     function render(){
       const today=day(new Date());const activeLeads=entries.filter(active);
       const metrics=[['Nuevos',entries.filter(x=>x.status==='new').length],['Pendientes',activeLeads.length],['Vencidos',activeLeads.filter(x=>dueDay(x)&&dueDay(x)<today).length],['Cualificados',entries.filter(x=>x.status==='qualified').length],['En propuesta',entries.filter(x=>x.status==='proposal').length],['Sin próxima acción',activeLeads.filter(x=>!x.next_action||!x.next_action_at).length],['Sin responsable',activeLeads.filter(x=>!x.assigned_to).length],['Sin contacto',activeLeads.filter(x=>!x.phone&&!x.email).length],['Convertidos',entries.filter(x=>x.status==='converted').length],['Con oportunidades',canViewOpportunities?entries.filter(x=>related(x).length).length:'—'],['Sin oportunidades',canViewOpportunities?entries.filter(x=>!related(x).length).length:'—'],['Ventas abiertas',canViewOpportunities?entries.reduce((s,x)=>s+openDeals(x).length,0):'—'],['Ventas ganadas',canViewOpportunities?entries.reduce((s,x)=>s+wonDeals(x).length,0):'—']];
-      stats.replaceChildren();for(const [name,value] of metrics){const box=el('div','','crm-lead-summary-stat');box.append(el('strong',String(value)),el('span',name));stats.append(box);}
+      const metricViews={'Nuevos':'new','Vencidos':'overdue','Cualificados':'qualified','En propuesta':'proposal','Sin próxima acción':'noaction','Sin responsable':'unassigned','Sin contacto':'nocontact','Convertidos':'converted','Con oportunidades':'withopp','Sin oportunidades':'withoutopp','Ventas abiertas':'openopp','Ventas ganadas':'wonopp'};
+      stats.replaceChildren();for(const [name,value] of metrics){
+        const target=metricViews[name],enabled=target&&typeof value==='number'&&(canViewOpportunities||!['withopp','withoutopp','openopp','wonopp'].includes(target));
+        const box=el(enabled?'button':'div','','crm-lead-summary-stat');if(enabled){box.type='button';box.classList.add('crm-lead-summary-stat-link');box.title='Filtrar: '+name;box.setAttribute('aria-pressed',String(view.value===target));box.onclick=()=>{view.value=target;render();list.scrollIntoView({block:'nearest',behavior:'smooth'});};}
+        box.append(el('strong',String(value)),el('span',name));stats.append(box);
+      }
       list.replaceChildren();const rows=filtered();
       if(!rows.length){list.append(el('p','No hay leads con estos filtros.','crm-lead-summary-empty'));return;}
       for(const row of rows.slice(0,300)){
@@ -233,6 +238,13 @@
     }
     view.onchange=render;sort.onchange=render;search.oninput=render;
     overlay.querySelector('#crm-lead-summary-export').onclick=()=>csv(filtered(),linkedOpportunities,canViewOpportunities);
+    overlay.querySelector('#crm-lead-summary-copy').onclick=async()=>{
+      if(document.getElementById('active-organization')?.value!==org){message('Ha cambiado la empresa activa. Abre el panel de nuevo.',true);return;}
+      const current=filtered(),activeRows=current.filter(active),today=day(new Date());
+      const lines=['Globaltec CRM · Seguimiento de leads','Filtro: '+view.selectedOptions[0]?.textContent,'Leads seleccionados: '+current.length,'Activos: '+activeRows.length,'Seguimientos vencidos: '+activeRows.filter(x=>dueDay(x)&&dueDay(x)<today).length,'Sin próxima acción: '+activeRows.filter(x=>!x.next_action||!x.next_action_at).length];
+      if(canViewOpportunities)lines.push('Oportunidades abiertas: '+current.reduce((s,x)=>s+openDeals(x).length,0),'Valor abierto estimado: '+current.reduce((s,x)=>s+openValue(x),0).toLocaleString('es-ES',{style:'currency',currency:'EUR'}));
+      try{await navigator.clipboard.writeText(lines.join('\n'));message('Resumen de leads copiado.');}catch{message('No se pudo copiar. Comprueba los permisos del navegador.',true);}
+    };
     overlay.querySelector('#crm-lead-summary-refresh').onclick=load;
     overlay.querySelector('#crm-lead-summary-reset').onclick=()=>{view.value='attention';sort.value='urgent';search.value='';render();};
     org=document.getElementById('active-organization')?.value||'';
@@ -258,6 +270,7 @@
     .crm-lead-summary-dialog header small{color:#087f74;font-weight:750}.crm-lead-summary-dialog header button{border:0;background:none;font-size:28px;cursor:pointer}
     .crm-lead-summary-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.crm-lead-summary-stat{border:1px solid #d2e4e0;border-radius:10px;background:#f3f9f7;padding:12px}
     .crm-lead-summary-stat strong,.crm-lead-summary-stat span{display:block}.crm-lead-summary-stat strong{font-size:25px;color:#087f74}.crm-lead-summary-stat span{font-size:12px;color:#587083}
+    .crm-lead-summary-stat-link{font:inherit;text-align:left;cursor:pointer;transition:background .15s,border-color .15s}.crm-lead-summary-stat-link:hover{background:#e8f5f1;border-color:#58b5a6}.crm-lead-summary-stat-link[aria-pressed=true]{background:#ddf3ed;border-color:#087f74;box-shadow:inset 0 0 0 1px #087f74}.crm-lead-summary-stat-link:focus-visible{outline:3px solid #56b9ad;outline-offset:2px}
     .crm-lead-summary-controls{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:15px 0}.crm-lead-summary-dialog label{font-size:13px;font-weight:650}
     .crm-lead-summary-dialog input,.crm-lead-summary-dialog select{display:block;box-sizing:border-box;width:100%;padding:10px;border:1px solid #bed0dc;border-radius:9px;margin-top:6px;font:inherit}
     .crm-lead-summary-notice{min-height:20px;font-size:13px}.crm-lead-summary-list{display:grid;gap:8px;max-height:400px;overflow:auto}.crm-lead-summary-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid #e1e8ed;border-radius:9px}
