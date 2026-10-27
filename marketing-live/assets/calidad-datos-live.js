@@ -32,7 +32,7 @@
       <div class="crm-quality-metrics"></div>
       <div class="crm-quality-controls"><label>Mostrar<select id="crm-quality-view"><option value="duplicates">Posibles duplicados</option><option value="incomplete">Fichas incompletas</option><option value="all">Todas las incidencias</option></select></label><label>Problema<select id="crm-quality-problem"><option value="all">Todos los problemas</option><option value="email">Sin correo</option><option value="phone">Sin teléfono</option><option value="name">Sin nombre</option><option value="tax">Sin CIF/NIF</option></select></label><label>Buscar<input type="search" id="crm-quality-search" placeholder="Nombre, teléfono o correo"></label><label>Ordenar<select id="crm-quality-sort"><option value="name">Nombre (A-Z)</option><option value="type">Tipo de incidencia</option></select></label></div>
       <p class="crm-quality-notice" role="status"></p><div class="crm-quality-results"></div>
-      <footer><button type="button" id="crm-quality-export">Descargar revisión CSV</button><button type="button" data-close>Cerrar</button></footer>
+      <footer><button type="button" id="crm-quality-reset">Limpiar filtros</button><button type="button" id="crm-quality-copy">Copiar resumen</button><button type="button" id="crm-quality-export">Descargar revisión CSV</button><button type="button" data-close>Cerrar</button></footer>
     </section>`;
     document.body.append(overlay);
     overlay.querySelector('#crm-quality-title').textContent='Revisar '+page.toLowerCase();
@@ -40,7 +40,8 @@
     const view=overlay.querySelector('#crm-quality-view'),search=overlay.querySelector('#crm-quality-search');
     const problem=overlay.querySelector('#crm-quality-problem'),sort=overlay.querySelector('#crm-quality-sort');
     const message=(value,bad=false)=>{notice.textContent=value;notice.style.color=bad?'#b42318':'#087f74';};
-    const close=()=>overlay.remove();overlay.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);overlay.onclick=e=>{if(e.target===overlay)close();};
+    const onEscape=e=>{if(e.key==='Escape')close();};const close=()=>{document.removeEventListener('keydown',onEscape);overlay.remove();};document.addEventListener('keydown',onEscape);
+    overlay.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);overlay.onclick=e=>{if(e.target===overlay)close();};
     let entries=[],issues=[],org='';
     function label(item){return page==='Clientes'?item.name:[item.first_name,item.last_name].filter(Boolean).join(' ')||'Contacto sin nombre';}
     function itemPhone(item){return item.mobile||item.phone||'';}
@@ -88,8 +89,10 @@
       }
       stats.replaceChildren();
       const affected=new Set(issues.filter(x=>x.kind==='duplicates').map(x=>x.id));
-      for(const [title,value] of [['Registros',entries.length],['Posibles duplicados',affected.size],['Incompletos',issues.filter(x=>x.kind==='incomplete').length]]){
-        const box=make('div','','crm-quality-stat');box.append(make('strong',String(value)),make('span',title));stats.append(box);
+      for(const [title,value,target] of [['Incidencias',issues.length,'all'],['Posibles duplicados',affected.size,'duplicates'],['Incompletos',issues.filter(x=>x.kind==='incomplete').length,'incomplete']]){
+        const box=make('button','','crm-quality-stat crm-quality-stat-link');box.type='button';box.title='Mostrar '+title.toLowerCase();box.setAttribute('aria-pressed',String(view.value===target));
+        box.onclick=()=>{view.value=target;problem.disabled=target==='duplicates';if(problem.disabled)problem.value='all';render();results.scrollIntoView({block:'nearest',behavior:'smooth'});};
+        box.append(make('strong',String(value)),make('span',title));stats.append(box);
       }
     }
     function filtered(){const q=norm(search.value);return issues.filter(row=>(view.value==='all'||row.kind===view.value)&&(problem.value==='all'||row.problem?.includes(problem.value))&&norm([row.name,row.phone,row.email,row.reason].join(' ')).includes(q)).sort((a,b)=>sort.value==='type'?(a.type.localeCompare(b.type,'es')||a.name.localeCompare(b.name,'es')):a.name.localeCompare(b.name,'es'));}
@@ -126,6 +129,7 @@
       noticeOutside('No se encontró el buscador de '+page+'. Entra en ese módulo y busca «'+row.name+'».',true);
     }
     function render(){
+      for(const box of stats.querySelectorAll('.crm-quality-stat-link'))box.setAttribute('aria-pressed',String((box.querySelector('span')?.textContent==='Incidencias'?'all':box.querySelector('span')?.textContent==='Posibles duplicados'?'duplicates':'incomplete')===view.value));
       results.replaceChildren();const rows=filtered();
       if(!rows.length){results.append(make('p','No hay incidencias con estos filtros.','crm-quality-empty'));return;}
       for(const row of rows.slice(0,500)){
@@ -141,6 +145,13 @@
     view.onchange=()=>{problem.disabled=view.value==='duplicates';if(problem.disabled)problem.value='all';render();};problem.disabled=true;
     problem.onchange=render;sort.onchange=render;search.oninput=render;
     overlay.querySelector('#crm-quality-export').onclick=()=>exportRows(filtered(),page);
+    overlay.querySelector('#crm-quality-reset').onclick=()=>{view.value='duplicates';problem.value='all';problem.disabled=true;sort.value='name';search.value='';render();};
+    overlay.querySelector('#crm-quality-copy').onclick=async()=>{
+      if(document.getElementById('active-organization')?.value!==org){message('Ha cambiado la empresa. Abre la revisión de nuevo.',true);return;}
+      const affected=new Set(issues.filter(x=>x.kind==='duplicates').map(x=>x.id));
+      const summary=['Globaltec CRM · Calidad de '+page,'Registros revisados: '+entries.length,'Fichas con posible duplicidad: '+affected.size,'Fichas incompletas: '+issues.filter(x=>x.kind==='incomplete').length,'Filtro actual: '+view.selectedOptions[0]?.textContent,'Incidencias filtradas: '+filtered().length,'No se ha modificado ni fusionado ninguna ficha.'].join('\n');
+      try{await navigator.clipboard.writeText(summary);message('Resumen de calidad copiado.');}catch{message('No se pudo copiar. Comprueba los permisos del navegador.',true);}
+    };
     (async()=>{
       try{
         org=document.getElementById('active-organization')?.value||'';
@@ -189,6 +200,7 @@
     .crm-quality-dialog header,.crm-quality-dialog footer{display:flex;align-items:center;justify-content:space-between;gap:12px}.crm-quality-dialog header small{color:#087f74;font-weight:750}.crm-quality-dialog h2{margin:4px 0}
     .crm-quality-dialog header button{border:0;background:none;font-size:28px;cursor:pointer}.crm-quality-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
     .crm-quality-stat{border:1px solid #cfe3dd;border-radius:10px;background:#f2f9f7;padding:12px}.crm-quality-stat strong,.crm-quality-stat span{display:block}.crm-quality-stat strong{font-size:25px;color:#087f74}.crm-quality-stat span{font-size:12px}
+    .crm-quality-stat-link{font:inherit;text-align:left;cursor:pointer}.crm-quality-stat-link:hover{background:#e7f6f0;border-color:#58b5a6}.crm-quality-stat-link[aria-pressed=true]{background:#ddf3ed;border-color:#087f74;box-shadow:inset 0 0 0 1px #087f74}.crm-quality-stat-link:focus-visible{outline:3px solid #56b9ad;outline-offset:2px}
     .crm-quality-controls{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:15px 0}.crm-quality-dialog label{font-weight:650;font-size:13px}.crm-quality-dialog input,.crm-quality-dialog select{display:block;box-sizing:border-box;width:100%;padding:10px;border:1px solid #bdd0d8;border-radius:8px;margin-top:6px;font:inherit}
     .crm-quality-notice{min-height:19px;font-size:13px}.crm-quality-results{display:grid;gap:8px;max-height:380px;overflow:auto}.crm-quality-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border:1px solid #e0e8ed;border-radius:9px}
     .crm-quality-row-info{flex:1;min-width:0}.crm-quality-row-info strong,.crm-quality-row-info small{display:block}.crm-quality-row-info small{color:#667d8b;margin-top:3px}

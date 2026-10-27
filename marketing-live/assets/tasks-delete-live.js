@@ -39,7 +39,7 @@
       <label>Empresa <select id="crm-tasks-org"></select></label>
       <div id="crm-tasks-summary" class="crm-tasks-summary"></div>
       <div class="crm-tasks-filters">
-        <label>Vista <select id="crm-tasks-view"><option value="pending">Pendientes</option><option value="today">Para hoy</option><option value="week">Próximos 7 días</option><option value="overdue">Vencidas</option><option value="nodate">Sin fecha de vencimiento</option><option value="noclient">Sin cliente</option><option value="unassigned">Sin responsable</option><option value="opportunity">De oportunidades</option><option value="completed">Completadas</option><option value="all">Todas</option></select></label>
+        <label>Vista <select id="crm-tasks-view"><option value="pending">Pendientes</option><option value="today">Para hoy</option><option value="tomorrow">Para mañana</option><option value="week">Próximos 7 días</option><option value="overdue">Vencidas</option><option value="nodate">Sin fecha de vencimiento</option><option value="noclient">Sin cliente</option><option value="unassigned">Sin responsable</option><option value="opportunity">De oportunidades</option><option value="completed">Completadas</option><option value="all">Todas</option></select></label>
         <label>Buscar <input id="crm-tasks-search" type="search" placeholder="Título, cliente u oportunidad…"></label>
         <label>Ordenar <select id="crm-tasks-sort"><option value="urgent">Más urgentes</option><option value="due">Vencimiento próximo</option><option value="priority">Mayor prioridad</option><option value="name">Título A-Z</option></select></label>
         <label>Cliente <select id="crm-tasks-client"><option value="all">Todos</option></select></label>
@@ -50,7 +50,7 @@
       </div>
       <div id="crm-tasks-delete-notice" role="status" aria-live="polite"></div>
       <div id="crm-tasks-delete-list"></div>
-      <div class="crm-tasks-delete-footer"><button type="button" class="crm-tasks-reset">Limpiar filtros</button><button type="button" class="crm-tasks-export">Exportar CSV</button><button type="button" class="crm-tasks-done">Cerrar y actualizar CRM</button></div>
+      <div class="crm-tasks-delete-footer"><button type="button" class="crm-tasks-reset">Limpiar filtros</button><button type="button" class="crm-tasks-copy-summary">Copiar resumen</button><button type="button" class="crm-tasks-export">Exportar CSV</button><button type="button" class="crm-tasks-done">Cerrar y actualizar CRM</button></div>
     </section>`;
     document.body.append(overlay);
     const get = id => overlay.querySelector('#' + id);
@@ -76,6 +76,7 @@
     const isPending = task => task.status === 'pending' || task.status === 'in_progress';
     const overdue = task => isPending(task) && task.due_date && dayKey(task.due_date) < dayKey(new Date());
     const today = task => isPending(task) && task.due_date && dayKey(task.due_date) === dayKey(new Date());
+    const tomorrow = task => {const now=new Date(),next=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);return isPending(task)&&!!task.due_date&&dayKey(task.due_date)===dayKey(next);};
     const inWeek = task => {const now=new Date(),end=new Date(now.getFullYear(),now.getMonth(),now.getDate()+7);return isPending(task)&&!!task.due_date&&dayKey(task.due_date)>=dayKey(now)&&dayKey(task.due_date)<=dayKey(end);};
     const localTime = date => {const d=new Date(date),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;};
     function csvCell(value) { let s=String(value??''); if (/^[\s\u0000-\u001f]*[=+@\-]/.test(s)) s="'"+s; return '"'+s.replace(/"/g,'""')+'"'; }
@@ -85,12 +86,19 @@
       const url=URL.createObjectURL(new Blob([content],{type:'text/csv;charset=utf-8'}));const link=element('a');link.href=url;link.download='globaltec-tareas-'+new Date().toISOString().slice(0,10)+'.csv';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);
     }
     overlay.querySelector('.crm-tasks-export').onclick=exportCsv;
+    overlay.querySelector('.crm-tasks-copy-summary').onclick=async()=>{
+      const active=document.getElementById('active-organization')?.value;
+      if(active&&active!==org.value){setNotice('La empresa ha cambiado. Vuelve a abrir el gestor.',true);return;}
+      const selected=filters();const lines=['Globaltec CRM · Gestión de tareas','Empresa: '+(org.selectedOptions[0]?.textContent||''),'Vista: '+(view.selectedOptions[0]?.textContent||''),'Tareas seleccionadas: '+selected.length,'Pendientes: '+selected.filter(isPending).length,'Vencidas: '+selected.filter(overdue).length,'Sin fecha: '+selected.filter(t=>isPending(t)&&!t.due_date).length,'Sin responsable: '+selected.filter(t=>isPending(t)&&!t.assigned_to).length];
+      try{await navigator.clipboard.writeText(lines.join('\n'));setNotice('Resumen de tareas copiado.');}catch{setNotice('No se pudo copiar. Comprueba los permisos del navegador.',true);}
+    };
     function filters() {
       const term = search.value.toLocaleLowerCase('es').trim();
       const rows=records.filter(task => {
         if (view.value === 'pending' && !isPending(task)) return false;
         if (view.value === 'overdue' && !overdue(task)) return false;
         if (view.value === 'today' && !today(task)) return false;
+        if (view.value === 'tomorrow' && !tomorrow(task)) return false;
         if (view.value === 'week' && !inWeek(task)) return false;
         if (view.value === 'nodate' && (!isPending(task) || task.due_date)) return false;
         if (view.value === 'noclient' && (!isPending(task) || !!task.company_id)) return false;
@@ -121,6 +129,7 @@
       const counts = [
         ['Pendientes', records.filter(isPending).length, 'pending'],
         ['Para hoy', records.filter(today).length, 'today'],
+        ['Para mañana', records.filter(tomorrow).length, 'tomorrow'],
         ['En 7 días', records.filter(inWeek).length, 'week'],
         ['Vencidas', records.filter(overdue).length, 'overdue'],
         ['Sin fecha', records.filter(task=>isPending(task)&&!task.due_date).length, 'nodate'],
@@ -142,6 +151,7 @@
         const tags=element('div','','crm-task-tags');
         if(overdue(task))tags.append(element('span','Vencida','crm-task-tag crm-task-tag-urgent'));
         else if(today(task))tags.append(element('span','Para hoy','crm-task-tag crm-task-tag-today'));
+        else if(tomorrow(task))tags.append(element('span','Mañana','crm-task-tag crm-task-tag-today'));
         if(isPending(task)&&!task.due_date)tags.append(element('span','Sin fecha','crm-task-tag crm-task-tag-muted'));
         if(isPending(task)&&task.priority==='urgent')tags.append(element('span','Prioridad urgente','crm-task-tag crm-task-tag-urgent'));
         if(tags.childElementCount)info.append(tags);
