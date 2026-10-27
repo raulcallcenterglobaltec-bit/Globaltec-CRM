@@ -47,15 +47,35 @@
     const heading=el('h3',title);block.append(heading);
     if(records===null){block.append(el('p','No disponible para tu perfil.','crm-priorities-empty'));}
     else if(!records.length){block.append(el('p',empty,'crm-priorities-empty'));}
-    else for(const item of records.slice(0,5)){
+    else for(const item of records.slice(0,20)){
       const btn=el('button','','crm-priorities-item');btn.type='button';
       const info=formatter(item);
       if(info.urgent)btn.classList.add('crm-priorities-item-urgent');
       else if(info.today)btn.classList.add('crm-priorities-item-today');
+      btn.dataset.priority=info.urgent?'urgent':info.today?'today':'normal';
       btn.append(el('strong',info.title),el('small',info.detail));
       btn.addEventListener('click',()=>selectModule(module));block.append(btn);
     }
     container.append(block);
+  }
+  function applyView(panel){
+    const filter=panel.querySelector('#crm-priorities-filter')?.value||'all';
+    const search=(panel.querySelector('#crm-priorities-search')?.value||'').trim().toLocaleLowerCase('es');
+    const expanded=panel.dataset.expanded==='true';
+    let visibleTotal=0;
+    for(const group of panel.querySelectorAll('.crm-priorities-group')){
+      let shown=0;
+      for(const item of group.querySelectorAll('.crm-priorities-item')){
+        const matching=(filter==='all'||item.dataset.priority===filter)&&item.textContent.toLocaleLowerCase('es').includes(search);
+        const visible=matching&&(expanded||shown<5);
+        item.hidden=!visible;if(visible){shown++;visibleTotal++;}
+      }
+      let placeholder=group.querySelector('.crm-priorities-filter-empty');
+      if(!placeholder){placeholder=el('p','Sin resultados con estos filtros.','crm-priorities-filter-empty');group.append(placeholder);}
+      placeholder.hidden=shown>0||!group.querySelector('.crm-priorities-item');
+    }
+    const counter=panel.querySelector('.crm-priorities-counter');if(counter)counter.textContent=`${visibleTotal} elementos visibles`;
+    const expand=panel.querySelector('.crm-priorities-expand');if(expand)expand.textContent=expanded?'Ver menos':'Ver más por sección';
   }
   function render(panel,data) {
     panel.querySelector('.crm-priorities-body').replaceChildren();
@@ -101,6 +121,8 @@
     addList(lists,'Cierres comerciales próximos',urgentOpps,'Oportunidades',o=>({title:o.title||'Oportunidad',detail:(o.expected_close_date||'Sin fecha')+(o.expected_close_date<today?' · ATRASADA':' · Próximo cierre')+' · '+Number(o.estimated_value||0).toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0}),urgent:o.expected_close_date<today,today:o.expected_close_date===today}),'No hay cierres vencidos ni previstos para los próximos siete días.');
     body.append(lists);
     panel.querySelector('.crm-priorities-updated').textContent='Actualizado '+now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    panel.dataset.summary=metrics.map(([name,value])=>`${name}: ${value}`).join('\n');
+    applyView(panel);
   }
   async function load(org,force=false) {
     if(!org)return;
@@ -150,7 +172,17 @@
       const right=el('div','','crm-priorities-tools');right.append(el('small','','crm-priorities-updated'));
       const refresh=el('button','Actualizar','crm-priorities-refresh');refresh.type='button';refresh.onclick=()=>load(select.value,true);
       right.append(refresh);header.append(title,right);
-      panel.append(header,el('div','','crm-priorities-body'));
+      const filters=el('div','','crm-priorities-filters');
+      const viewLabel=el('label','Mostrar');const view=el('select');view.id='crm-priorities-filter';
+      for(const [value,text] of [['all','Todas'],['urgent','Urgentes'],['today','Para hoy']]){const option=el('option',text);option.value=value;view.append(option);}viewLabel.append(view);
+      const searchLabel=el('label','Buscar');const search=el('input');search.id='crm-priorities-search';search.type='search';search.placeholder='Tarea, cita, lead u oportunidad';searchLabel.append(search);
+      const expand=el('button','Ver más por sección','crm-priorities-expand');expand.type='button';expand.onclick=()=>{panel.dataset.expanded=panel.dataset.expanded==='true'?'false':'true';applyView(panel);};
+      const copy=el('button','Copiar resumen','crm-priorities-copy');copy.type='button';copy.onclick=async()=>{try{await navigator.clipboard.writeText('Globaltec CRM · Prioridades comerciales\n'+panel.dataset.summary);copy.textContent='Resumen copiado';setTimeout(()=>copy.textContent='Copiar resumen',2500);}catch{copy.textContent='No se pudo copiar';setTimeout(()=>copy.textContent='Copiar resumen',2500);}};
+      const reset=el('button','Limpiar','crm-priorities-reset');reset.type='button';reset.onclick=()=>{view.value='all';search.value='';panel.dataset.expanded='false';applyView(panel);};
+      const counter=el('small','','crm-priorities-counter');
+      filters.append(viewLabel,searchLabel,expand,copy,reset,counter);
+      view.onchange=()=>applyView(panel);search.oninput=()=>applyView(panel);
+      panel.append(header,filters,el('div','','crm-priorities-body'));
       dashboard.insertBefore(panel,summary);
     }
     if(currentOrg!==select.value){currentOrg=select.value;cache=null;load(currentOrg,true);}
@@ -169,6 +201,13 @@
   .crm-priorities-header h2{font-size:20px;margin:0 0 4px}.crm-priorities-header p{font-size:13px;color:#64748b;margin:0}
   .crm-priorities-tools{display:flex;align-items:center;gap:12px}.crm-priorities-tools small{color:#718096}
   .crm-priorities-refresh{background:#fff;border:1px solid #b6c5d4;border-radius:8px;padding:9px 13px;color:#1d4c68;font-weight:700;cursor:pointer}
+  .crm-priorities-filters{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin-top:17px;padding:12px;background:#f6fafb;border:1px solid #dce8ea;border-radius:11px}
+  .crm-priorities-filters label{display:grid;gap:4px;font-size:12px;font-weight:700;color:#29465b;flex:0 1 170px}.crm-priorities-filters label:nth-child(2){flex:1 1 220px}
+  .crm-priorities-filters select,.crm-priorities-filters input{height:38px;min-width:0;width:100%;box-sizing:border-box;border:1px solid #bdced9;background:#fff;border-radius:8px;padding:7px 10px;font:inherit;color:#17334b}
+  .crm-priorities-filters button{min-height:38px;padding:8px 12px;border:1px solid #0b8075;border-radius:8px;background:#fff;color:#08776e;font-size:12px;font-weight:750;cursor:pointer;white-space:nowrap}
+  .crm-priorities-filters button:hover{background:#eaf7f4}.crm-priorities-filters small{font-size:12px;color:#607689;white-space:nowrap}
+  .crm-priorities-filters :is(input,select,button):focus-visible{outline:3px solid #56b9ad;outline-offset:2px}
+  .crm-priorities-item[hidden],.crm-priorities-filter-empty[hidden]{display:none!important}.crm-priorities-filter-empty{font-size:12px;color:#607689}
   .crm-priorities-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:20px 0}
   .crm-priorities-stat{border:1px solid #d8e4ec;border-radius:10px;background:#f7fbfc;padding:13px;text-align:left;cursor:pointer}
   .crm-priorities-stat strong{display:block;font-size:29px;color:#087f74}.crm-priorities-stat span{font-size:13px;color:#52677b}
@@ -183,6 +222,7 @@
   .crm-priorities-item-urgent{border-left:3px solid #d4554a;padding-left:9px;background:#fff7f5}.crm-priorities-item-today{border-left:3px solid #d5a344;padding-left:9px;background:#fffaf0}
   .crm-priorities-empty,.crm-priorities-error{font-size:13px;color:#64748b}.crm-priorities-error{color:#b42318}
   @media(max-width:900px){.crm-priorities-lists{grid-template-columns:1fr}.crm-priorities-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:520px){.crm-priorities-panel{padding:14px}.crm-priorities-filters label,.crm-priorities-filters label:nth-child(2){flex:1 1 100%}.crm-priorities-filters button{flex:1 1 auto}.crm-priorities-stats{gap:8px}.crm-priorities-stat{padding:10px}.crm-priorities-stat strong{font-size:23px}}
   `;
   document.head.append(css);
   mount();
