@@ -12,6 +12,11 @@
     if(!res.ok)throw Error(data?.message||`Error ${res.status} al consultar los leads.`);return data;
   }
   function el(tag,label='',cls=''){const x=document.createElement(tag);x.textContent=label;if(cls)x.className=cls;return x;}
+  function formatLeadEntryTime(value){
+    if(!value)return 'Hora no disponible';
+    const date=new Date(value);if(Number.isNaN(date.getTime()))return 'Hora no disponible';
+    return new Intl.DateTimeFormat('es-ES',{timeZone:'Europe/Madrid',dateStyle:'short',timeStyle:'short'}).format(date);
+  }
   function cell(value){let text=String(value??'');if(/^[\s\u0000-\u001f]*[=+@\-]/.test(text))text="'"+text;return '"'+text.replace(/"/g,'""')+'"';}
   function csv(rows,linked,canSee){
     const values=[['Lead','Empresa','Teléfono','Correo','Estado','Próxima actuación','Fecha próxima actuación','Responsable','Oportunidades','Abiertas','Ganadas','Valor abierto EUR'],...rows.map(x=>{
@@ -160,6 +165,9 @@
         if(badges.childElementCount)info.append(badges);
         info.append(el('strong',row.contact_name||row.company_name||'Lead sin nombre'));
         info.append(el('small',`${row.company_name||'Sin empresa'} · ${row.status||'Sin estado'} · ${row.phone||row.email||'Sin teléfono ni correo'}`));
+        const landingValue=String(row.landing_identifier||row.referrer||'Formulario web').trim();
+        const landingMeta=el('small',`Landing: ${landingValue} · Entrada: ${formatLeadEntryTime(row.created_at)}`,'crm-lead-entry-meta');
+        landingMeta.style.display='block';landingMeta.style.overflowWrap='anywhere';info.append(landingMeta);
         const quick=el('div','','crm-lead-quick-actions');
         const phone=String(row.phone||'').trim().replace(/[^+\d]/g,'');
         if(phone){const call=el('a','Llamar');call.href='tel:'+phone;quick.append(call);}
@@ -215,7 +223,7 @@
         canEdit=(await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org,p_module:'leads',p_action:'edit'}}).catch(()=>false))===true;
         canCreateOpportunity=(await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org,p_module:'opportunities',p_action:'edit'}}).catch(()=>false))===true;
         for(let offset=0;offset<10000;offset+=500){
-          const batch=await api(`leads?select=id,contact_name,company_name,email,phone,status,assigned_to,next_action,next_action_at,created_at&organization_id=eq.${encodeURIComponent(org)}&order=created_at.desc&limit=500&offset=${offset}`);
+          const batch=await api(`leads?select=id,contact_name,company_name,email,phone,status,assigned_to,next_action,next_action_at,landing_identifier,referrer,created_at&organization_id=eq.${encodeURIComponent(org)}&order=created_at.desc&limit=500&offset=${offset}`);
           entries.push(...batch);if(batch.length<500)break;
         }
         try{
