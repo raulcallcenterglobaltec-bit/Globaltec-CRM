@@ -12,6 +12,7 @@
     if(!res.ok)throw Error(data?.message||`Error ${res.status} al consultar los leads.`);return data;
   }
   function el(tag,label='',cls=''){const x=document.createElement(tag);x.textContent=label;if(cls)x.className=cls;return x;}
+  function leadStatusLabel(status){return status==='converted'?'Aceptado':status==='discarded'?'No aceptado':status==='spam'?'Spam':'En curso';}
   function formatLeadEntryTime(value){
     if(!value)return 'Hora no disponible';
     const date=new Date(value);if(Number.isNaN(date.getTime()))return 'Hora no disponible';
@@ -30,8 +31,9 @@
     if(document.getElementById('crm-lead-summary'))return;
     const overlay=el('div','','crm-lead-summary-overlay');overlay.id='crm-lead-summary';
     overlay.innerHTML=`<section class="crm-lead-summary-dialog" role="dialog" aria-modal="true" aria-labelledby="crm-lead-summary-title">
-      <header><div><small>CONTROL COMERCIAL</small><h2 id="crm-lead-summary-title">Seguimiento de leads</h2></div><button type="button" data-close aria-label="Cerrar">×</button></header>
-      <p>Consulta los leads y sus próximas actuaciones. Si hay una venta concreta, puedes crear una oportunidad vinculada al lead sin asignar automáticamente un cliente.</p>
+      <header><div><small>UNA SOLICITUD · UNA FICHA</small><h2 id="crm-lead-summary-title">Leads y solicitudes</h2></div><button type="button" data-close aria-label="Cerrar">×</button></header>
+      <p>Cada llamada o formulario es una sola ficha. Sigue la solicitud hasta que se acepte o no salga adelante.</p>
+       <button type="button" id="crm-lead-new-phone">+ Registrar llamada</button>
       <div class="crm-lead-summary-metrics"></div>
       <div class="crm-lead-summary-controls"><label>Ver<select id="crm-lead-summary-view"><option value="attention">Necesitan atención</option><option value="overdue">Seguimiento vencido</option><option value="today">Actuación para hoy</option><option value="upcoming">Próximos siete días</option><option value="noaction">Sin próxima actuación</option><option value="withopp">Con oportunidades</option><option value="withoutopp">Sin oportunidades</option><option value="openopp">Con venta abierta</option><option value="wonopp">Con venta ganada</option><option value="unassigned">Sin responsable</option><option value="nocontact">Sin teléfono ni correo</option><option value="qualified">Cualificados</option><option value="proposal">En propuesta</option><option value="new">Nuevos</option><option value="converted">Convertidos</option><option value="all">Todos</option></select></label><label>Ordenar<select id="crm-lead-summary-sort"><option value="urgent">Más urgentes</option><option value="potential">Mayor potencial</option><option value="recent">Más recientes</option><option value="action">Próxima actuación</option><option value="name">Nombre A-Z</option></select></label><label>Buscar<input id="crm-lead-summary-search" type="search" placeholder="Persona, empresa, oportunidad o teléfono"></label></div>
       <p class="crm-lead-summary-notice" role="status"></p><div class="crm-lead-summary-list"></div>
@@ -142,6 +144,43 @@
       if(sort.value==='potential'&&canViewOpportunities)matching.sort((a,b)=>openValue(b)-openValue(a)||related(b).length-related(a).length);
       return matching;
     }
+    async function changeStatus(item,status,select){
+      if(busy)return;
+      busy=true;select.disabled=true;
+      try{
+        if(document.getElementById('active-organization')?.value!==org)throw Error('Ha cambiado la empresa activa. Abre el panel de nuevo.');
+        const allowed=await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org,p_module:'leads',p_action:'edit'}});
+        if(allowed!==true)throw Error('No tienes permiso para modificar leads.');
+        const updated=await api('leads?id=eq.'+encodeURIComponent(item.id)+'&organization_id=eq.'+encodeURIComponent(org)+'&select=id,status',{method:'PATCH',body:{status}});
+        if(!Array.isArray(updated)||updated.length!==1||updated[0].id!==item.id)throw Error('No se confirmó el estado. Actualiza los leads e inténtalo de nuevo.');
+        item.status=updated[0].status;render();message('Estado actualizado: '+leadStatusLabel(status)+'.');
+      }catch(error){select.value=['converted','discarded'].includes(item.status)?item.status:'reviewing';message(error.message,true);}
+      finally{busy=false;select.disabled=false;}
+    }
+    function registerPhoneLead(){
+      if(!canEdit){message('No tienes permiso para registrar solicitudes.',true);return;}
+      let form=overlay.querySelector('.crm-phone-lead-form');
+      if(form){form.scrollIntoView({block:'nearest',behavior:'smooth'});return;}
+      form=el('form','','crm-phone-lead-form');
+      form.innerHTML='<h3>Nueva solicitud por llamada</h3><label>Nombre (opcional)<input name="name" maxlength="180" placeholder="Nombre de la persona"></label><label>Empresa (opcional)<input name="company" maxlength="250" placeholder="Empresa"></label><label>Teléfono<input name="phone" maxlength="50" placeholder="+34…"></label><label>Correo (opcional)<input name="email" type="email" maxlength="254" placeholder="persona@empresa.es"></label><label class="wide">Qué necesita<textarea name="message" rows="3" maxlength="5000" placeholder="Motivo de la llamada"></textarea></label><div><button type="button" data-cancel>Cancelar</button><button type="submit">Guardar solicitud</button></div>';
+      overlay.querySelector('.crm-lead-summary-controls').before(form);form.querySelector('[data-cancel]').onclick=()=>form.remove();
+      form.onsubmit=async event=>{
+        event.preventDefault();if(busy)return;
+        const phone=form.elements.phone.value.trim(),email=form.elements.email.value.trim(),name=form.elements.name.value.trim(),company=form.elements.company.value.trim();
+        if(!phone&&!email){message('Indica teléfono o correo para poder contactar.',true);return;}
+        if(document.getElementById('active-organization')?.value!==org){message('Ha cambiado la empresa activa. Abre el panel otra vez.',true);return;}
+        busy=true;const submit=form.querySelector('[type="submit"]');submit.disabled=true;
+        try{
+          const allowed=await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org,p_module:'leads',p_action:'edit'}});
+          if(allowed!==true)throw Error('No tienes permiso para registrar solicitudes.');
+          const sources=await api('lead_sources?select=id,name&organization_id=eq.'+encodeURIComponent(org)+'&active=eq.true');
+          const source=sources.find(x=>String(x.name||'').trim().toLocaleLowerCase('es')==='llamada');
+          const created=await api('leads?select=id',{method:'POST',body:{organization_id:org,contact_name:name||null,company_name:company||null,phone:phone||null,email:email||null,message:form.elements.message.value.trim()||null,source_id:source?.id||null,landing_identifier:'Llamada telefónica',status:'new',assigned_to:session().user.id}});
+          if(!Array.isArray(created)||created.length!==1||!created[0].id)throw Error('No se confirmó el registro. Actualiza los leads antes de repetir.');
+          form.remove();await load();message('Solicitud registrada en Leads.');
+        }catch(error){message(error.message,true);submit.disabled=false;}finally{busy=false;}
+      };
+    }
     function render(){
       const today=day(new Date());const activeLeads=entries.filter(active);
       const metrics=[['Nuevos',entries.filter(x=>x.status==='new').length],['Pendientes',activeLeads.length],['Vencidos',activeLeads.filter(x=>dueDay(x)&&dueDay(x)<today).length],['Cualificados',entries.filter(x=>x.status==='qualified').length],['En propuesta',entries.filter(x=>x.status==='proposal').length],['Sin próxima acción',activeLeads.filter(x=>!x.next_action||!x.next_action_at).length],['Sin responsable',activeLeads.filter(x=>!x.assigned_to).length],['Sin contacto',activeLeads.filter(x=>!x.phone&&!x.email).length],['Convertidos',entries.filter(x=>x.status==='converted').length],['Con oportunidades',canViewOpportunities?entries.filter(x=>related(x).length).length:'—'],['Sin oportunidades',canViewOpportunities?entries.filter(x=>!related(x).length).length:'—'],['Ventas abiertas',canViewOpportunities?entries.reduce((s,x)=>s+openDeals(x).length,0):'—'],['Ventas ganadas',canViewOpportunities?entries.reduce((s,x)=>s+wonDeals(x).length,0):'—']];
@@ -161,10 +200,11 @@
         else if(active(row)&&dueDay(row)===today)addBadge('Actuación hoy','warning');
         if(active(row)&&(!row.next_action||!row.next_action_at))addBadge('Sin planificar','warning');
         if(active(row)&&!row.assigned_to)addBadge('Sin responsable','muted');
-        if(row.status==='converted')addBadge('Convertido','success');
+        if(row.status==='converted')addBadge('Aceptado','success');
+         if(row.status==='discarded')addBadge('No aceptado','muted');
         if(badges.childElementCount)info.append(badges);
         info.append(el('strong',row.contact_name||row.company_name||'Lead sin nombre'));
-        info.append(el('small',`${row.company_name||'Sin empresa'} · ${row.status||'Sin estado'} · ${row.phone||row.email||'Sin teléfono ni correo'}`));
+        info.append(el('small','Estado: '+leadStatusLabel(row.status)+' · '+(row.company_name||'Sin empresa')+' · '+(row.phone||row.email||'Sin teléfono ni correo')));
         const landingIdentifier=String(row.landing_identifier||'').trim();
         const landingReferrer=String(row.referrer||'').trim();
         const landingValue=(!landingIdentifier||/^formulario web$/i.test(landingIdentifier))?(landingReferrer||landingIdentifier||'Formulario web'):landingIdentifier;
@@ -201,16 +241,15 @@
           }
           info.append(context);
         }
-        const action=el('div','','crm-lead-summary-next');action.append(el('strong',row.next_action||'Sin próxima actuación'));
+        const action=el('div','','crm-lead-summary-next');
+         if(canEdit){const statusSelect=el('select','','crm-lead-status');statusSelect.setAttribute('aria-label','Estado de la solicitud');statusSelect.innerHTML='<option value="reviewing">En curso</option><option value="converted">Aceptado</option><option value="discarded">No aceptado</option>';statusSelect.value=['converted','discarded'].includes(row.status)?row.status:'reviewing';statusSelect.onchange=()=>changeStatus(row,statusSelect.value,statusSelect);action.append(statusSelect);}
+         action.append(el('strong',row.next_action||'Sin próxima actuación'));
         action.append(el('small',row.next_action_at?new Date(row.next_action_at).toLocaleString('es-ES',{dateStyle:'short',timeStyle:'short'}):'Sin fecha'));
         if(active(row)&&(!row.next_action||!row.next_action_at||!row.assigned_to))action.append(el('small',[!row.next_action||!row.next_action_at?'Falta planificar':'',!row.assigned_to?'Sin responsable':''].filter(Boolean).join(' · '),'crm-lead-summary-warning'));
         if(canEdit&&active(row)){
           const planButton=el('button',row.next_action_at?'Reprogramar':'Planificar','crm-lead-plan-button');planButton.type='button';
           planButton.onclick=()=>plan(row,item);action.append(planButton);
         }
-        if(canCreateOpportunity&&active(row)){
-          const opportunityButton=el('button','Crear oportunidad','crm-lead-opportunity-button');opportunityButton.type='button';
-          opportunityButton.onclick=()=>newOpportunity(row,item);action.append(opportunityButton);
         }
         item.append(info,action);list.append(item);
       }
@@ -247,6 +286,7 @@
       }catch(error){message(error.message,true);}
     }
     view.onchange=render;sort.onchange=render;search.oninput=render;
+    overlay.querySelector('#crm-lead-new-phone').onclick=registerPhoneLead;
     overlay.querySelector('#crm-lead-summary-export').onclick=()=>csv(filtered(),linkedOpportunities,canViewOpportunities);
     overlay.querySelector('#crm-lead-summary-copy').onclick=async()=>{
       if(document.getElementById('active-organization')?.value!==org){message('Ha cambiado la empresa activa. Abre el panel de nuevo.',true);return;}
