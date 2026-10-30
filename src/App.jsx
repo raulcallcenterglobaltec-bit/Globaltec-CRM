@@ -208,32 +208,7 @@ useEffect(() => {
         }
       }
       if (fresh.length) {
-        let attributedFresh = fresh.map(row => ({ ...row, landingName: null, landingUrl: null, leadReceivedAt: row.created_at }))
-        try {
-          const { data: submissions, error: submissionsError } = await supabase
-            .from('crm_form_submissions')
-            .select('contact_id,created_at,crm_landing_forms(name,landing_url)')
-            .eq('organization_id', activeOrg)
-            .in('contact_id', fresh.map(row => row.id))
-            .order('created_at', { ascending: false })
-          if (!submissionsError) {
-            const latestSubmission = new Map()
-            for (const submission of submissions || []) {
-              if (!latestSubmission.has(submission.contact_id)) latestSubmission.set(submission.contact_id, submission)
-            }
-            attributedFresh = fresh.map(row => {
-              const submission = latestSubmission.get(row.id)
-              const form = Array.isArray(submission?.crm_landing_forms) ? submission.crm_landing_forms[0] : submission?.crm_landing_forms
-              return {
-                ...row,
-                landingName: form?.name || null,
-                landingUrl: form?.landing_url || null,
-                leadReceivedAt: submission?.created_at || row.created_at
-              }
-            })
-          }
-        } catch { /* La alerta conserva el origen y la fecha del contacto si no hay acceso a los datos del formulario. */ }
-        setContactAlerts(previous => ({ org: activeOrg, rows: [...attributedFresh.reverse(), ...(previous.org === activeOrg ? previous.rows : [])].slice(0, 100) }))
+        setContactAlerts(previous => ({ org: activeOrg, rows: [...fresh.reverse(), ...(previous.org === activeOrg ? previous.rows : [])].slice(0, 100) }))
         loadContacts(); loadCompanies(); loadOpportunities()
       }
     } catch { /* Reintentar en la siguiente comprobación. */ } finally { running = false }
@@ -254,21 +229,6 @@ const [editingContactId, setEditingContactId] = useState(null)
 const [selectedContactId, setSelectedContactId] = useState(null)
 const [openedAlertContact, setOpenedAlertContact] = useState(null)
 const selectedContact = contacts.find(contact => contact.id === selectedContactId) || (openedAlertContact?.id === selectedContactId ? openedAlertContact : null)
-function formatContactReceivedAt(value) {
-  if (!value) return 'Hora no disponible'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'Hora no disponible'
-  return new Intl.DateTimeFormat('es-ES', {
-    timeZone: 'Europe/Madrid',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23'
-  }).format(date)
-}
-
 function contactRequest(contact) {
   const linked = canViewModule('opportunities') ? opportunities.filter(item => item.contact_id === contact.id) : []
   const messages = [...new Set([contact.notes, ...linked.map(item => item.description)].filter(value => typeof value === 'string' && value.trim()).map(value => value.trim()))]
@@ -1767,7 +1727,7 @@ onClick={() => {
   {deleteNotice?.org === activeOrg && deleteNotice.module === currentPage && <div role={deleteNotice.error ? 'alert' : 'status'} style={{ padding: '12px 16px', marginBottom: 16, borderRadius: 10, background: deleteNotice.error ? '#fff0ed' : '#e9faf4', color: deleteNotice.error ? '#b42318' : '#12483d' }}>{deleteNotice.text}</div>}
   {watchContacts && contactAlerts.org === activeOrg && contactAlerts.rows.length > 0 && (
     <div role="status" aria-live="polite" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '16px 20px', marginBottom: 20, border: '2px solid #087f74', borderRadius: 14, background: '#e9faf4', color: '#12483d' }}>
-      <div style={{ flex: '1 1 240px' }}><strong style={{ fontSize: 18 }}>● {contactAlerts.rows.length === 1 ? 'Ha entrado un contacto nuevo' : `${contactAlerts.rows.length} contactos nuevos`}</strong><div style={{ marginTop: 8 }}><strong>{[contactAlerts.rows[0].first_name, contactAlerts.rows[0].last_name].filter(Boolean).join(' ') || 'Nuevo contacto'}</strong><div>{contactRequest(contacts.find(item => item.id === contactAlerts.rows[0].id) || contactAlerts.rows[0]).company} · {contactAlerts.rows[0].phone || contactAlerts.rows[0].mobile || 'Sin teléfono'}</div><div style={{display:'flex',flexWrap:'wrap',gap:'4px 16px',marginTop:6,fontSize:14}}><span><strong>Landing:</strong> {contactAlerts.rows[0].landingName || 'Formulario web'}</span><span><strong>Recibido:</strong> {formatContactReceivedAt(contactAlerts.rows[0].leadReceivedAt || contactAlerts.rows[0].created_at)}</span></div><div style={{marginTop:6,whiteSpace:'pre-wrap'}}>Qué necesita cubrir: {contactRequest(contacts.find(item => item.id === contactAlerts.rows[0].id) || contactAlerts.rows[0]).need || contactRequest(contacts.find(item => item.id === contactAlerts.rows[0].id) || contactAlerts.rows[0]).message || 'Sin información'}</div></div></div>
+      <div style={{ flex: '1 1 240px' }}><strong style={{ fontSize: 18 }}>● {contactAlerts.rows.length === 1 ? 'Ha entrado un contacto nuevo' : `${contactAlerts.rows.length} contactos nuevos`}</strong><div style={{ marginTop: 8 }}><strong>{[contactAlerts.rows[0].first_name, contactAlerts.rows[0].last_name].filter(Boolean).join(' ') || 'Nuevo contacto'}</strong><div>{contactRequest(contacts.find(item => item.id === contactAlerts.rows[0].id) || contactAlerts.rows[0]).company} · {contactAlerts.rows[0].phone || contactAlerts.rows[0].mobile || 'Sin teléfono'}</div><div style={{marginTop:6,whiteSpace:'pre-wrap'}}>Qué necesita cubrir: {contactRequest(contacts.find(item => item.id === contactAlerts.rows[0].id) || contactAlerts.rows[0]).need || contactRequest(contacts.find(item => item.id === contactAlerts.rows[0].id) || contactAlerts.rows[0]).message || 'Sin información'}</div></div></div>
       <button type="button" className="primary-action" onClick={() => { openContactRequest(contacts.find(item => item.id === contactAlerts.rows[0].id) || contactAlerts.rows[0]); loadContacts(); loadOpportunities(); setContactAlerts(previous => ({...previous, rows:previous.rows.slice(1)})) }}>Ver solicitud</button>
       <button type="button" className="secondary-action" onClick={() => setContactAlerts({ org: activeOrg, rows: [] })}>Cerrar aviso</button>
     </div>
