@@ -165,8 +165,10 @@
         if(badges.childElementCount)info.append(badges);
         info.append(el('strong',row.contact_name||row.company_name||'Lead sin nombre'));
         info.append(el('small',`${row.company_name||'Sin empresa'} · ${row.status||'Sin estado'} · ${row.phone||row.email||'Sin teléfono ni correo'}`));
-        const landingValue=String(row.landing_identifier||row.referrer||'Formulario web').trim();
-        const landingMeta=el('small',`Landing: ${landingValue} · Entrada: ${formatLeadEntryTime(row.created_at)}`,'crm-lead-entry-meta');
+        const landingIdentifier=String(row.landing_identifier||'').trim();
+        const landingReferrer=String(row.referrer||'').trim();
+        const landingValue=(!landingIdentifier||/^formulario web$/i.test(landingIdentifier))?(landingReferrer||landingIdentifier||'Formulario web'):landingIdentifier;
+        const landingMeta=el('small',`Landing: ${landingValue} · Recibido: ${formatLeadEntryTime(row.created_at)}`,'crm-lead-entry-meta');
         landingMeta.style.display='block';landingMeta.style.overflowWrap='anywhere';info.append(landingMeta);
         const quick=el('div','','crm-lead-quick-actions');
         const phone=String(row.phone||'').trim().replace(/[^+\d]/g,'');
