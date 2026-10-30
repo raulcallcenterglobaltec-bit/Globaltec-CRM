@@ -24,7 +24,7 @@
       x.contact_name||'',x.company_name||'',x.phone||'',x.email||'',leadStatusLabel(x.status),
       x.landing_identifier||x.referrer||'Formulario web',formatLeadEntryTime(x.created_at),x.next_action||'',x.next_action_at||''
     ])];
-    const data='\\ufeff'+values.map(row=>row.map(cell).join(';')).join('\\r\\n');
+    const data='\ufeff'+values.map(row=>row.map(cell).join(';')).join('\r\n');
     const url=URL.createObjectURL(new Blob([data],{type:'text/csv;charset=utf-8'}));const a=el('a');a.href=url;a.download='globaltec-solicitudes-'+new Date().toISOString().slice(0,10)+'.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);
   }
   function open(){
