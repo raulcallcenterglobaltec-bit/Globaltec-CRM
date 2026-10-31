@@ -104,6 +104,7 @@
     }
     async function changeStatus(item,status,select){
       if(busy)return;
+      if(item.status==='converted'&&status!=='converted'){select.value='converted';message('La solicitud ya se aceptó y está vinculada a un cliente.',true);return;}
       busy=true;select.disabled=true;
       try{
         if(document.getElementById('active-organization')?.value!==org)throw Error('Ha cambiado la empresa activa. Abre el panel de nuevo.');
@@ -188,7 +189,7 @@
           catch{message('No se pudo copiar. Comprueba los permisos del navegador.',true);}
         };quick.append(copy);info.append(quick);
         const action=el('div','','crm-lead-summary-next');
-         if(canEdit){const statusSelect=el('select','','crm-lead-status');statusSelect.setAttribute('aria-label','Estado de la solicitud');statusSelect.innerHTML='<option value="reviewing">En curso</option><option value="converted">Aceptado</option><option value="discarded">No aceptado</option>';statusSelect.value=['converted','discarded'].includes(row.status)?row.status:'reviewing';statusSelect.onchange=()=>changeStatus(row,statusSelect.value,statusSelect);action.append(statusSelect);}
+         if(canEdit){const statusSelect=el('select','','crm-lead-status');statusSelect.setAttribute('aria-label','Estado de la solicitud');statusSelect.innerHTML='<option value="reviewing">En curso</option><option value="converted">Aceptado</option><option value="discarded">No aceptado</option>';statusSelect.value=['converted','discarded'].includes(row.status)?row.status:'reviewing';if(row.status==='converted'){statusSelect.disabled=true;statusSelect.title='Solicitud aceptada y vinculada a Cliente';}statusSelect.onchange=()=>changeStatus(row,statusSelect.value,statusSelect);action.append(statusSelect);}
          action.append(el('strong',row.next_action||'Sin próxima actuación'));
         action.append(el('small',row.next_action_at?new Date(row.next_action_at).toLocaleString('es-ES',{dateStyle:'short',timeStyle:'short'}):'Sin fecha'));
         if(active(row)&&(!row.next_action||!row.next_action_at||!row.assigned_to))action.append(el('small',[!row.next_action||!row.next_action_at?'Falta planificar':'',!row.assigned_to?'Sin responsable':''].filter(Boolean).join(' · '),'crm-lead-summary-warning'));
