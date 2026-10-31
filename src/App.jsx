@@ -115,11 +115,16 @@ function App() {
     return () => { cancelled = true }
   }, [activeOrg, session?.user?.id, profile?.active, profile?.role])
   const accessRef = useRef({ org: '', permissions: [], user: null })
+  function modulePermission(module) {
+    const explicit = modulePermissions.find(p => p.organization_id === activeOrg && p.module === module)
+    if (explicit || module !== 'leads') return explicit
+    return modulePermissions.find(p => p.organization_id === activeOrg && p.module === 'contacts')
+  }
   function canViewModule(module) {
-    return !!profile?.active && modulePermissions.some(p => p.organization_id === activeOrg && p.module === module && p.can_view)
+    return !!profile?.active && !!modulePermission(module)?.can_view
   }
   function canEditModule(module) {
-    return canViewModule(module) && profile.role !== 'demo' && modulePermissions.some(p => p.organization_id === activeOrg && p.module === module && p.can_edit)
+    return canViewModule(module) && profile.role !== 'demo' && !!modulePermission(module)?.can_edit
   }
   function clearCRMData() {
     setClientSearch(''); setClientStatusFilter('all'); setContactSearch(''); setOpportunitySearch(''); setOpportunityStageFilter('all'); setCallSearch(''); setCallTypeFilter('all'); setCallStatusFilter('all'); setTaskSearch(''); setTaskStatusFilter('all'); setTaskPriorityFilter('all')
@@ -149,7 +154,7 @@ function App() {
     accessRef.current = { ...accessRef.current, org: activeOrg, permissions: modulePermissions }
     clearCRMData()
     if (!activeOrg || !profile?.active) return
-    const pages = ['dashboard','clients','contacts','opportunities','calls','agenda','tasks','reports']
+    const pages = ['dashboard','leads','clients','contacts','opportunities','calls','agenda','tasks','reports']
     if (!(currentPage === 'permissions' && profile.role === 'admin') && !['branding','landing-forms'].includes(currentPage) && !canViewModule(currentPage)) {
       setCurrentPage(pages.find(canViewModule) || 'no-access')
     }
@@ -1629,6 +1634,13 @@ onClick={() => {
         <CRMIcon name="dashboard" />
         Inicio
       </button>)}
+{canViewModule('leads') && (<button
+  className={`nav-item ${currentPage === 'leads' ? 'active' : ''}`}
+  onClick={() => setCurrentPage('leads')}
+>
+  <CRMIcon name="contacts" />
+  Leads
+</button>)}
 {canViewModule('clients') && (<button
   className={`nav-item ${currentPage === 'clients' ? 'active' : ''}`}
   onClick={() => {
@@ -1743,6 +1755,22 @@ onClick={() => {
     <ModulePermissions key={`${activeOrg}:${session.user.id}`} actorId={session.user.id} brandName={organization?.name} organizationId={activeOrg} onSaved={() => refreshPermissions(session.user.id)} />
   ) : !canViewModule(currentPage) ? (
     <div className="dashboard-heading"><div><h1>Sin acceso</h1><p>No tienes secciones habilitadas en esta empresa. Consulta con el administrador.</p></div></div>
+  ) : currentPage === 'leads' ? (
+    <div className="leads-page">
+      <div className="dashboard-heading">
+        <div>
+          <p className="dashboard-kicker">{organization?.name || 'Globaltec Marketing'} CRM</p>
+          <h1>Leads</h1>
+          <p>Una ficha por cada llamada o formulario, hasta saber si sale adelante.</p>
+        </div>
+        <div className="lead-heading-actions"></div>
+      </div>
+      <div className="dashboard-card" style={{ padding: 22 }}>
+        <h2>Seguimiento de solicitudes</h2>
+        <p>Consulta aquí los datos recibidos, la landing de origen, la hora de entrada, la próxima acción y el resultado.</p>
+        <p>Las solicitudes se mantienen como leads; no hace falta crear también un contacto o una oportunidad para seguirlas.</p>
+      </div>
+    </div>
   ) : currentPage === 'clients' ? (
  <>
   <div className="clients-page">
