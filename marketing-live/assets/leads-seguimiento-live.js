@@ -109,9 +109,17 @@
         if(document.getElementById('active-organization')?.value!==org)throw Error('Ha cambiado la empresa activa. Abre el panel de nuevo.');
         const allowed=await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org,p_module:'leads',p_action:'edit'}});
         if(allowed!==true)throw Error('No tienes permiso para modificar leads.');
-        const updated=await api('leads?id=eq.'+encodeURIComponent(item.id)+'&organization_id=eq.'+encodeURIComponent(org)+'&select=id,status',{method:'PATCH',body:{status}});
-        if(!Array.isArray(updated)||updated.length!==1||updated[0].id!==item.id)throw Error('No se confirmó el estado. Actualiza los leads e inténtalo de nuevo.');
-        item.status=updated[0].status;render();message('Estado actualizado: '+leadStatusLabel(status)+'.');
+        if(status==='converted'){
+          const conversion=await api('rpc/crm_accept_lead_as_client',{method:'POST',body:{p_org:org,p_lead_id:item.id}});
+          if(!conversion?.company_id)throw Error('No se confirmó el alta del cliente. Actualiza los leads antes de repetir.');
+          item.converted_company_id=conversion.company_id;
+          item.converted_client_name=conversion.name||item.company_name||item.contact_name||'Cliente';
+        }else{
+          const updated=await api('leads?id=eq.'+encodeURIComponent(item.id)+'&organization_id=eq.'+encodeURIComponent(org)+'&select=id,status',{method:'PATCH',body:{status}});
+          if(!Array.isArray(updated)||updated.length!==1||updated[0].id!==item.id)throw Error('No se confirmó el estado. Actualiza los leads e inténtalo de nuevo.');
+          item.status=updated[0].status;
+        }
+        item.status=status;render();message(status==='converted'?'Solicitud aceptada. Cliente: '+(item.converted_client_name||item.company_name||item.contact_name||'registrado en Clientes')+'.':'Estado actualizado: '+leadStatusLabel(status)+'.');
       }catch(error){select.value=['converted','discarded'].includes(item.status)?item.status:'reviewing';message(error.message,true);}
       finally{busy=false;select.disabled=false;}
     }
@@ -158,11 +166,12 @@
         else if(active(row)&&dueDay(row)===today)addBadge('Actuación hoy','warning');
         if(active(row)&&(!row.next_action||!row.next_action_at))addBadge('Sin planificar','warning');
         if(active(row)&&!row.assigned_to)addBadge('Sin responsable','muted');
-        if(row.status==='converted')addBadge('Aceptado','success');
+        if(row.status==='converted')addBadge('Aceptado · cliente','success');
          if(row.status==='discarded')addBadge('No aceptado','muted');
         if(badges.childElementCount)info.append(badges);
         info.append(el('strong',row.contact_name||row.company_name||'Lead sin nombre'));
         info.append(el('small','Estado: '+leadStatusLabel(row.status)+' · '+(row.company_name||'Sin empresa')+' · '+(row.phone||row.email||'Sin teléfono ni correo')));
+        if(row.status==='converted'&&row.converted_company_id)info.append(el('small','Cliente en Clientes: '+(row.converted_client_name||row.company_name||row.contact_name||'Vinculado')));
         const landingIdentifier=String(row.landing_identifier||'').trim();
         const landingReferrer=String(row.referrer||'').trim();
         const landingValue=(!landingIdentifier||/^formulario web$/i.test(landingIdentifier))?(landingReferrer||landingIdentifier||'Formulario web'):landingIdentifier;
@@ -199,7 +208,7 @@
         if(allowed!==true)throw Error('No tienes permiso para consultar leads.');
         canEdit=(await api('rpc/crm_has_module_permission',{method:'POST',body:{p_org:org,p_module:'leads',p_action:'edit'}}).catch(()=>false))===true;
         for(let offset=0;offset<10000;offset+=500){
-          const batch=await api(`leads?select=id,contact_name,company_name,email,phone,status,assigned_to,next_action,next_action_at,landing_identifier,referrer,created_at&organization_id=eq.${encodeURIComponent(org)}&order=created_at.desc&limit=500&offset=${offset}`);
+          const batch=await api(`leads?select=id,contact_name,company_name,email,phone,status,converted_company_id,assigned_to,next_action,next_action_at,landing_identifier,referrer,created_at&organization_id=eq.${encodeURIComponent(org)}&order=created_at.desc&limit=500&offset=${offset}`);
           entries.push(...batch);if(batch.length<500)break;
         }
         render();
